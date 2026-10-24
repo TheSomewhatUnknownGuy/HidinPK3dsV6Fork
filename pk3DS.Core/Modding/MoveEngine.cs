@@ -92,7 +92,10 @@ public static class MoveEngine
         int toAdd = (newCount + 1 - stockCount) * 4;
         if (toAdd <= 0) return false;
 
-        data = CROUtil.ExpandSegment(data, 'c', toAdd, tableOfs + (stockCount * 4));
+        // Explicit 0x00: these bytes become jump-table entries, not free space. A zero word
+        // decodes as ANDEQ R0,R0,R0 (a NOP that falls through); 0xCC filler would decode as a
+        // conditional branch to garbage.
+        data = CROUtil.ExpandSegment(data, 'c', toAdd, tableOfs + (stockCount * 4), 0x00);
         return true;
     }
 
@@ -149,6 +152,7 @@ public static class MoveEngine
 
         if (modified)
         {
+            if (UhuruGuard.RefusalFor(battlePath) != null) return false;
             pk3DS.Core.CTR.CROUtil.SaveCro(battlePath, data);
             ProjectState.Instance.AppliedPatches.Add($"{move.Name} -> Move ID {move.CurrentID}");
             ProjectState.Instance.Save();

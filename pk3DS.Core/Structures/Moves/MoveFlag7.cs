@@ -26,9 +26,18 @@ public enum MoveFlag7 : uint
     AnimateAlly = 1u << 15, // Always animate the move when used on an ally.
 
     Dance = 1u << 16, // When used by a Pokemon, other Pokemon with the Dancer Ability can attempt to execute the same move.
-    F18 = 1u << 17,
-    F19 = 1u << 18,
-    F20 = 1u << 19,
+
+    // Neither exists in the vanilla USUM move-flag word - both are Gen 8/9 categories this project
+    // repurposes two previously-unused bits for (see MoveEditor7.B_SetSlicingWindFlags_Click for the
+    // real move lists). Slicing is what Sharpness reads for its 1.5x power boost. WindPower and
+    // WindRider are kept as two separate bits, both set together on every wind move, because they
+    // are two distinct abilities with distinct (non-power-multiplier) effects that would need their
+    // own engine hooks - sharing one bit would conflate "is a wind move" with "Wind Power specifically
+    // cares," which AbilityMoveFlags' power-multiplier model can't express for either ability anyway.
+    Slicing = 1u << 17,
+    WindPower = 1u << 18,
+    WindRider = 1u << 19,
+
     F21 = 1u << 20,
     F22 = 1u << 21,
     F23 = 1u << 22,

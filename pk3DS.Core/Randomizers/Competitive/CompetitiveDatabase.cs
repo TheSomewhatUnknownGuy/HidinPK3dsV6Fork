@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using pk3DS.Core.Structures.PersonalInfo;
 
 namespace pk3DS.Core.Randomizers.Competitive;
@@ -24,115 +25,21 @@ public sealed class GameNameComparer : IEqualityComparer<string>
 
     public int GetHashCode(string obj) => Normalize(obj)?.ToUpperInvariant().GetHashCode() ?? 0;
 
-    /// <summary>Folds every apostrophe variant the games use onto the ASCII one.</summary>
+    /// <summary>Folds apostrophe, hyphen/dash, and space variants used in ROM text onto canonical ASCII equivalents.</summary>
     public static string Normalize(string s)
     {
         if (string.IsNullOrEmpty(s)) return s;
-        return s.Replace('’', '\'')  // right single quotation mark - what USUM uses
-                .Replace('ʼ', '\'')  // modifier letter apostrophe
-                .Replace('‘', '\''); // left single quotation mark
-    }
-}
-
-// Pokémon type constants matching the game's internal type IDs (Gen 6/7).
-public static class PokemonTypes
-{
-    public const int Normal = 0, Fighting = 1, Flying = 2, Poison = 3, Ground = 4,
-                     Rock = 5, Bug = 6, Ghost = 7, Steel = 8, Fire = 9,
-                     Water = 10, Grass = 11, Electric = 12, Psychic = 13,
-                     Ice = 14, Dragon = 15, Dark = 16, Fairy = 17;
-}
-
-// Gen 6+ type effectiveness chart (attacker type -> defender type -> multiplier).
-// Only non-neutral (not 1x) matchups are stored; anything absent defaults to 1x.
-public static class TypeEffectivenessChart
-{
-    private static readonly Dictionary<(int Atk, int Def), float> Chart = BuildChart();
-
-    public static float GetEffectiveness(int attackType, int defendType)
-    {
-        return Chart.TryGetValue((attackType, defendType), out float mult) ? mult : 1f;
-    }
-
-    // Effectiveness of attackType against a Pokemon with the given (1 or 2) defending types.
-    public static float GetEffectiveness(int attackType, int[] defendTypes)
-    {
-        float mult = 1f;
-        if (defendTypes == null) return mult;
-        foreach (int t in defendTypes)
-            mult *= GetEffectiveness(attackType, t);
-        return mult;
-    }
-
-    private static Dictionary<(int, int), float> BuildChart()
-    {
-        var c = new Dictionary<(int, int), float>();
-        void Set(int atk, int def, float mult) => c[(atk, def)] = mult;
-
-        int Normal = PokemonTypes.Normal, Fighting = PokemonTypes.Fighting, Flying = PokemonTypes.Flying,
-            Poison = PokemonTypes.Poison, Ground = PokemonTypes.Ground, Rock = PokemonTypes.Rock,
-            Bug = PokemonTypes.Bug, Ghost = PokemonTypes.Ghost, Steel = PokemonTypes.Steel,
-            Fire = PokemonTypes.Fire, Water = PokemonTypes.Water, Grass = PokemonTypes.Grass,
-            Electric = PokemonTypes.Electric, Psychic = PokemonTypes.Psychic, Ice = PokemonTypes.Ice,
-            Dragon = PokemonTypes.Dragon, Dark = PokemonTypes.Dark, Fairy = PokemonTypes.Fairy;
-
-        Set(Normal, Rock, 0.5f); Set(Normal, Ghost, 0f); Set(Normal, Steel, 0.5f);
-
-        Set(Fighting, Normal, 2f); Set(Fighting, Flying, 0.5f); Set(Fighting, Poison, 0.5f);
-        Set(Fighting, Rock, 2f); Set(Fighting, Bug, 0.5f); Set(Fighting, Ghost, 0f);
-        Set(Fighting, Steel, 2f); Set(Fighting, Psychic, 0.5f); Set(Fighting, Ice, 2f);
-        Set(Fighting, Dark, 2f); Set(Fighting, Fairy, 0.5f);
-
-        Set(Flying, Fighting, 2f); Set(Flying, Rock, 0.5f); Set(Flying, Bug, 2f);
-        Set(Flying, Steel, 0.5f); Set(Flying, Grass, 2f); Set(Flying, Electric, 0.5f);
-
-        Set(Poison, Poison, 0.5f); Set(Poison, Ground, 0.5f); Set(Poison, Rock, 0.5f);
-        Set(Poison, Ghost, 0.5f); Set(Poison, Steel, 0f); Set(Poison, Grass, 2f); Set(Poison, Fairy, 2f);
-
-        Set(Ground, Flying, 0f); Set(Ground, Poison, 2f); Set(Ground, Rock, 2f);
-        Set(Ground, Bug, 0.5f); Set(Ground, Steel, 2f); Set(Ground, Fire, 2f);
-        Set(Ground, Grass, 0.5f); Set(Ground, Electric, 2f);
-
-        Set(Rock, Fighting, 0.5f); Set(Rock, Flying, 2f); Set(Rock, Ground, 0.5f);
-        Set(Rock, Bug, 2f); Set(Rock, Steel, 0.5f); Set(Rock, Fire, 2f); Set(Rock, Ice, 2f);
-
-        Set(Bug, Fighting, 0.5f); Set(Bug, Flying, 0.5f); Set(Bug, Poison, 0.5f);
-        Set(Bug, Ghost, 0.5f); Set(Bug, Steel, 0.5f); Set(Bug, Fire, 0.5f); Set(Bug, Grass, 2f);
-        Set(Bug, Psychic, 2f); Set(Bug, Dark, 2f); Set(Bug, Fairy, 0.5f);
-
-        Set(Ghost, Normal, 0f); Set(Ghost, Ghost, 2f); Set(Ghost, Dark, 0.5f); Set(Ghost, Psychic, 2f);
-
-        Set(Steel, Rock, 2f); Set(Steel, Steel, 0.5f); Set(Steel, Fire, 0.5f);
-        Set(Steel, Water, 0.5f); Set(Steel, Electric, 0.5f); Set(Steel, Ice, 2f); Set(Steel, Fairy, 2f);
-
-        Set(Fire, Rock, 0.5f); Set(Fire, Bug, 2f); Set(Fire, Steel, 2f); Set(Fire, Fire, 0.5f);
-        Set(Fire, Water, 0.5f); Set(Fire, Grass, 2f); Set(Fire, Ice, 2f); Set(Fire, Dragon, 0.5f);
-
-        Set(Water, Ground, 2f); Set(Water, Rock, 2f); Set(Water, Fire, 2f); Set(Water, Water, 0.5f);
-        Set(Water, Grass, 0.5f); Set(Water, Dragon, 0.5f);
-
-        Set(Grass, Flying, 0.5f); Set(Grass, Poison, 0.5f); Set(Grass, Ground, 2f); Set(Grass, Rock, 2f);
-        Set(Grass, Bug, 0.5f); Set(Grass, Steel, 0.5f); Set(Grass, Fire, 0.5f); Set(Grass, Water, 2f);
-        Set(Grass, Grass, 0.5f); Set(Grass, Dragon, 0.5f);
-
-        Set(Electric, Flying, 2f); Set(Electric, Ground, 0f); Set(Electric, Water, 2f);
-        Set(Electric, Grass, 0.5f); Set(Electric, Electric, 0.5f); Set(Electric, Dragon, 0.5f);
-
-        Set(Psychic, Fighting, 2f); Set(Psychic, Poison, 2f); Set(Psychic, Steel, 0.5f);
-        Set(Psychic, Psychic, 0.5f); Set(Psychic, Dark, 0f);
-
-        Set(Ice, Flying, 2f); Set(Ice, Ground, 2f); Set(Ice, Steel, 0.5f); Set(Ice, Fire, 0.5f);
-        Set(Ice, Water, 0.5f); Set(Ice, Grass, 2f); Set(Ice, Ice, 0.5f); Set(Ice, Dragon, 2f);
-
-        Set(Dragon, Steel, 0.5f); Set(Dragon, Dragon, 2f); Set(Dragon, Fairy, 0f);
-
-        Set(Dark, Fighting, 0.5f); Set(Dark, Ghost, 2f); Set(Dark, Psychic, 2f);
-        Set(Dark, Dark, 0.5f); Set(Dark, Fairy, 0.5f);
-
-        Set(Fairy, Fighting, 2f); Set(Fairy, Poison, 0.5f); Set(Fairy, Steel, 0.5f);
-        Set(Fairy, Fire, 0.5f); Set(Fairy, Dragon, 2f); Set(Fairy, Dark, 2f);
-
-        return c;
+        return s.Replace('’', '\'')
+                .Replace('ʼ', '\'')
+                .Replace('‘', '\'')
+                .Replace('`', '\'')
+                .Replace('‐', '-')
+                .Replace('‑', '-')
+                .Replace('–', '-')
+                .Replace('—', '-')
+                .Replace('−', '-')
+                .Replace('\u00A0', ' ')
+                .Trim();
     }
 }
 
@@ -204,6 +111,19 @@ public static class CompetitiveDatabase
         "Air Lock", "Anticipation", "Cloud Nine", "Rain Dish", "Super Luck"
     };
 
+    public static readonly HashSet<string> PhysicalAttackBoostingAbilities = new(GameNameComparer.Instance)
+    {
+        "Huge Power", "Pure Power", "Gorilla Tactics", "Chilling Neigh", "Defiant", "Hustle",
+        "Guard Dog", "Guts", "Intrepid Sword", "Moxie", "Orichalcum Pulse", "Sword of Ruin",
+        "Tough Claws", "Toxic Boost", "Strong Jaw", "Iron Fist", "Sharpness", "Reckless"
+    };
+
+    public static readonly HashSet<string> SpecialAttackBoostingAbilities = new(GameNameComparer.Instance)
+    {
+        "Beads of Ruin", "Competitive", "Grim Neigh", "Hadron Engine", "Solar Power",
+        "Soul-Heart", "Berserk", "Mega Launcher", "Punk Rock", "Flare Boost"
+    };
+
     public static readonly Dictionary<int, string> FormLockedAbilities = new()
     {
         { 778, "Disguise" },     // Mimikyu
@@ -246,7 +166,7 @@ public static class CompetitiveDatabase
         rules["Dragon's Maw"] = new() { BiasedTypes = new() { PokemonTypes.Dragon } };
 
         // SpA-biased abilities: SpA >= 90
-        foreach (string a in new[] { "Beads of Ruin", "Competitive", "Grim Neigh", "Hadron Engine", "Solar Power", "Soul-Heart", "Berserk" })
+        foreach (string a in new[] { "Beads of Ruin", "Competitive", "Grim Neigh", "Hadron Engine", "Solar Power", "Soul-Heart", "Berserk", "Mega Launcher", "Punk Rock", "Flare Boost" })
             rules[a] = new() { MinSpaStat = 90, RequireHigherSpaForBias = true };
 
         // Atk-biased abilities: Atk >= 90
@@ -323,14 +243,15 @@ public static class CompetitiveDatabase
         rules["Moody"] = new() { MaxBST = 499 };
 
         // Attack stat caps
-        rules["Huge Power"] = new() { MaxAtkStat = 80 };
-        rules["Pure Power"] = new() { MaxAtkStat = 80 };
-        rules["Gorilla Tactics"] = new() { MaxAtkStat = 140 };
+        rules["Huge Power"] = new() { MaxAtkStat = 80, RequireHigherAtkForBias = true };
+        rules["Pure Power"] = new() { MaxAtkStat = 80, RequireHigherAtkForBias = true };
+        rules["Gorilla Tactics"] = new() { MaxAtkStat = 140, RequireHigherAtkForBias = true };
 
         // Iron Fist: 2+ punch moves, Atk >= 90
         rules["Iron Fist"] = new()
         {
             MinAtkStat = 90,
+            RequireHigherAtkForBias = true,
             RequiredMovePool = new(GameNameComparer.Instance)
             {
                 "Bullet Punch", "Comet Punch", "Dizzy Punch", "Double Iron Bash", "Drain Punch", "Dynamic Punch",
@@ -354,6 +275,7 @@ public static class CompetitiveDatabase
         // Sharpness: 2+ slicing moves
         rules["Sharpness"] = new()
         {
+            RequireHigherAtkForBias = true,
             RequiredMovePool = new(GameNameComparer.Instance)
             {
                 "Aerial Ace", "Air Cutter", "Air Slash", "Aqua Cutter", "Behemoth Blade", "Bitter Blade", "Ceaseless Edge",
@@ -374,6 +296,7 @@ public static class CompetitiveDatabase
         // Punk Rock: 2+ sound moves
         rules["Punk Rock"] = new()
         {
+            RequireHigherSpaForBias = true,
             RequiredMovePool = new(GameNameComparer.Instance)
             {
                 "Alluring Voice", "Boomburst", "Bug Buzz", "Chatter", "Clanging Scales", "Echoed Voice", "Eerie Spell",
@@ -390,6 +313,7 @@ public static class CompetitiveDatabase
         // Reckless: 2+ recoil moves
         rules["Reckless"] = new()
         {
+            RequireHigherAtkForBias = true,
             RequiredMovePool = new(GameNameComparer.Instance)
             {
                 "Axe Kick", "Brave Bird", "Double-Edge", "Flare Blitz", "Head Charge", "Head Smash", "High Jump Kick",
@@ -414,6 +338,7 @@ public static class CompetitiveDatabase
         // Strong Jaw: 2+ biting moves
         rules["Strong Jaw"] = new()
         {
+            RequireHigherAtkForBias = true,
             RequiredMovePool = new(GameNameComparer.Instance)
             {
                 "Bite", "Crunch", "Fire Fang", "Fishious Rend", "Hyper Fang", "Ice Fang",
@@ -453,7 +378,7 @@ public static class CompetitiveDatabase
         // Gen 5
         500, 530, 545, 560, 604, 609, 623, 631,
         // Gen 6
-        652, 655, 658, 668, 671, 678, 687, 691, 693, 701, 718, 719,
+        652, 655, 658, 668, 670, 671, 678, 687, 691, 693, 701, 718, 719,
         // Gen 7
         740, 768, 780, 801, 807,
         // Gen 8
@@ -499,6 +424,17 @@ public static class CompetitiveDatabase
         { 870, new[] { "Falinksite" } },
         { 952, new[] { "Scovillainite" } }, { 970, new[] { "Glimmoranite" } },
         { 978, new[] { "Tatsugirinite" } }, { 998, new[] { "Baxcalibrite" } },
+        // Uhuru gives these two Mega Evolution records too (Eternamax; Terapagos Terastal -> Stellar).
+        { 890, new[] { "Eternatusite" } }, { 1024, new[] { "Tera Crystal" } },
+    };
+
+    public static readonly HashSet<string> AllMegaStones = new(
+        MegaStoneMap.Values.SelectMany(x => x).Concat(new[] { "Blue Orb", "Red Orb" }),
+        GameNameComparer.Instance);
+
+    private static readonly Dictionary<int, int[]> ExplicitMegaFormIndices = new()
+    {
+        { 80, new[] { 1 } }, // Slowbro: Form 1 is Mega Slowbro; Form 2 is Galarian Slowbro
     };
 
     /// <summary>
@@ -511,7 +447,7 @@ public static class CompetitiveDatabase
     /// alt forms are non-Mega and are left alone. This matches how the Expansion Pack's Mega
     /// additions are documented (appended on top of a species' existing forms).
     /// </summary>
-    public static int[] GetMegaFormIndices(int species, PersonalInfo[] table)
+    public static int[] GetMegaFormIndices(int species, PersonalInfo[] table, int maxSpecies = 0)
     {
         if (table == null || species <= 0 || species >= table.Length) return [];
         if (!MegaStoneMap.TryGetValue(species, out var stones)) return [];
@@ -520,13 +456,28 @@ public static class CompetitiveDatabase
         int fc = entry?.FormeCount ?? 0;
         if (fc <= 1) return [];
 
+        if (maxSpecies <= 0)
+            maxSpecies = table.Length > 1025 ? 1025 : 807;
+
+        if (ExplicitMegaFormIndices.TryGetValue(species, out var explicitForms))
+        {
+            var expResult = new List<int>();
+            foreach (int f in explicitForms)
+            {
+                int formIdx = entry.FormeIndex(species, f, maxSpecies);
+                if (formIdx > 0 && formIdx < table.Length && formIdx != species)
+                    expResult.Add(formIdx);
+            }
+            return expResult.ToArray();
+        }
+
         int stoneCount = stones.Length;
         int firstMegaForm = Math.Max(1, fc - stoneCount);
 
         var result = new List<int>();
         for (int form = firstMegaForm; form < fc; form++)
         {
-            int formIdx = entry.FormeIndex(species, form);
+            int formIdx = entry.FormeIndex(species, form, maxSpecies);
             if (formIdx > 0 && formIdx < table.Length && formIdx != species)
                 result.Add(formIdx);
         }
@@ -580,7 +531,7 @@ public static class CompetitiveDatabase
         { PokemonTypes.Ice, "Never-Melt Ice" }, { PokemonTypes.Ghost, "Spell Tag" },
         { PokemonTypes.Psychic, "Twisted Spoon" }, { PokemonTypes.Fire, "Charcoal" },
         { PokemonTypes.Dragon, "Dragon Fang" }, { PokemonTypes.Normal, "Silk Scarf" },
-        { PokemonTypes.Fairy, "Fairy Feather" }, { PokemonTypes.Fighting, "Black Belt" },
+        { PokemonTypes.Fairy, "Pixie Plate" }, { PokemonTypes.Fighting, "Black Belt" },
     };
 
     // Type ID -> Arceus Plate name
@@ -594,6 +545,7 @@ public static class CompetitiveDatabase
         { PokemonTypes.Bug, "Insect Plate" }, { PokemonTypes.Rock, "Stone Plate" },
         { PokemonTypes.Ghost, "Spooky Plate" }, { PokemonTypes.Dragon, "Draco Plate" },
         { PokemonTypes.Dark, "Dread Plate" }, { PokemonTypes.Steel, "Iron Plate" },
+        { PokemonTypes.Fairy, "Pixie Plate" },
     };
 
     // Resistance berries: type weakness -> berry name (Manifesto line 170)
@@ -649,7 +601,7 @@ public static class CompetitiveDatabase
     public static readonly HashSet<string> MultiHitMoves = new(GameNameComparer.Instance)
     {
         "Arm Thrust", "Bone Rush", "Bullet Seed", "Icicle Spear", "Pin Missile", "Population Bomb", "Rock Blast",
-        "Scale Shot", "Water Shuriken", "Tail Slap", "Dual Wingbeat", "Double Iron Bash", "Surging Strikes"
+        "Scale Shot", "Water Shuriken", "Tail Slap"
     };
 
     public static readonly HashSet<string> HazardMoves = new(GameNameComparer.Instance)
@@ -657,9 +609,21 @@ public static class CompetitiveDatabase
         "Stealth Rock", "Spikes", "Toxic Spikes", "Sticky Web", "Ceaseless Edge", "Stone Axe"
     };
 
+    public static readonly HashSet<string> HazardRemovalMoves = new(GameNameComparer.Instance)
+    {
+        "Defog", "Rapid Spin", "Mortal Spin", "Court Change", "Tidy Up"
+    };
+
     public static readonly HashSet<string> PivotMoves = new(GameNameComparer.Instance)
     {
         "U-turn", "Volt Switch", "Flip Turn", "Parting Shot", "Chilly Reception", "Teleport"
+    };
+
+    public static readonly HashSet<string> PriorityMoves = new(GameNameComparer.Instance)
+    {
+        "Bullet Punch", "Mach Punch", "Ice Shard", "Shadow Sneak", "Aqua Jet",
+        "Quick Attack", "Sucker Punch", "Extreme Speed", "Fake Out", "First Impression",
+        "Accelerock", "Grassy Glide", "Jet Punch", "Vacuum Wave"
     };
 
     public static readonly HashSet<string> ScreenMoves = new(GameNameComparer.Instance)
@@ -670,7 +634,17 @@ public static class CompetitiveDatabase
     public static readonly HashSet<string> RecoveryMoves = new(GameNameComparer.Instance)
     {
         "Recover", "Roost", "Soft-Boiled", "Milk Drink", "Slack Off", "Shore Up", "Synthesis", "Morning Sun",
-        "Moonlight", "Strength Sap", "Wish", "Rest", "Lunar Blessing"
+        "Moonlight", "Strength Sap", "Wish", "Lunar Blessing"
+    };
+
+    public static readonly HashSet<string> FixedDamageMoves = new(GameNameComparer.Instance)
+    {
+        "Seismic Toss", "Night Shade", "Sonic Boom", "Dragon Rage", "Psywave"
+    };
+
+    public static readonly HashSet<string> WeakPriorityAttacks = new(GameNameComparer.Instance)
+    {
+        "Vacuum Wave", "Aqua Jet", "Mach Punch", "Bullet Punch", "Ice Shard", "Shadow Sneak", "Quick Attack", "Accelerock"
     };
 
     public static readonly HashSet<string> SetupMoves = new(GameNameComparer.Instance)
@@ -735,7 +709,7 @@ public static class CompetitiveDatabase
     public static readonly HashSet<string> NormalAttacks = new(GameNameComparer.Instance)
     {
         "Return", "Frustration", "Hyper Voice", "Double-Edge", "Body Slam", "Facade", "Extreme Speed",
-        "Quick Attack", "Tackle", "Slash", "Take Down", "Strength", "Tri Attack", "Boomburst", "Last Resort"
+        "Quick Attack", "Slash", "Take Down", "Strength", "Tri Attack", "Boomburst"
     };
 
     // Contact moves for Tough Claws validation
@@ -746,18 +720,18 @@ public static class CompetitiveDatabase
         "Circle Throw", "Close Combat", "Collision Course", "Crabhammer", "Cross Chop", "Cross Poison",
         "Crunch", "Darkest Lariat", "Dire Claw", "Double-Edge", "Double Iron Bash", "Dragon Ascent",
         "Dragon Claw", "Dragon Hammer", "Dragon Rush", "Drain Punch", "Drill Peck", "Drill Run",
-        "Dual Wingbeat", "Dynamic Punch", "Earthquake", "Electro Drift", "Extreme Speed", "Facade",
+        "Dual Wingbeat", "Dynamic Punch", "Electro Drift", "Extreme Speed", "Facade",
         "Fake Out", "False Surrender", "Fire Fang", "Fire Lash", "Fire Punch", "First Impression",
         "Flare Blitz", "Flip Turn", "Flower Trick", "Fly", "Focus Punch", "Foul Play", "Giga Impact",
         "Glaive Rush", "Glacial Lance", "Hammer Arm", "Head Charge", "Head Smash", "Headlong Rush",
         "Heat Crash", "Heavy Slam", "High Horsepower", "High Jump Kick", "Hyper Drill",
         "Ice Fang", "Ice Hammer", "Ice Punch", "Ice Spinner", "Icicle Crash", "Iron Head", "Iron Tail",
-        "Jaw Lock", "Jet Punch", "Knock Off", "Kowtow Cleave", "Lash Out", "Last Resort", "Leaf Blade",
+        "Jaw Lock", "Jet Punch", "Knock Off", "Kowtow Cleave", "Lash Out", "Leaf Blade",
         "Leech Life", "Liquidation", "Low Kick", "Lunge", "Mach Punch", "Megahorn", "Meteor Mash",
         "Mighty Cleave", "Mountain Gale", "Night Slash", "Outrage", "Play Rough", "Poison Fang",
-        "Poison Jab", "Population Bomb", "Pounce", "Power Whip", "Precipice Blades", "Psyblade",
+        "Poison Jab", "Population Bomb", "Pounce", "Power Whip", "Psyblade",
         "Psychic Fangs", "Psycho Cut", "Pyro Ball", "Quick Attack", "Rage Fist", "Raging Fury",
-        "Rapid Spin", "Razor Shell", "Sacred Sword", "Scale Shot", "Seed Bomb", "Shadow Claw",
+        "Rapid Spin", "Razor Shell", "Sacred Sword", "Scale Shot", "Shadow Claw",
         "Shadow Sneak", "Slash", "Solar Blade", "Spirit Break", "Spirit Shackle", "Stone Axe",
         "Stomping Tantrum", "Sucker Punch", "Sunsteel Strike", "Supercell Slam", "Superpower",
         "Surging Strikes", "Tachyon Cutter", "Temper Flare", "Throat Chop", "Thunder Fang",
@@ -774,7 +748,108 @@ public static class CompetitiveDatabase
         "Taunt", "Wish", "Whirlwind", "Roar", "Light Screen", "Reflect", "Aurora Veil", "Trick Room",
         "Sleep Powder", "Spore", "Yawn", "Lovely Kiss", "Substitute", "Baton Pass", "Destiny Bond",
         "Healing Wish", "Lunar Dance", "Memento", "Tailwind", "Gravity", "Detect", "Baneful Bunker",
-        "Rest", "Sleep Talk", "Shed Tail", "Disable", "Nuzzle", "Hone Claws"
+        "Rest", "Sleep Talk", "Shed Tail", "Disable", "Defog"
+    };
+
+    // Three-type cores based on competitive fundamentals (Smogon Issue 43):
+    // 1. Fire / Water / Grass (FWG) - Elemental Core
+    // 2. Steel / Fairy / Dragon (SFD) - Fantasy Core
+    // 3. Fighting / Dark / Psychic (FDP) - Momentum Core
+    public static readonly int[][] CompetitiveThreeTypeCores =
+    [
+        [PokemonTypes.Fire, PokemonTypes.Water, PokemonTypes.Grass],
+        [PokemonTypes.Steel, PokemonTypes.Fairy, PokemonTypes.Dragon],
+        [PokemonTypes.Fighting, PokemonTypes.Dark, PokemonTypes.Psychic]
+    ];
+
+    // Moves that hit both opposing Pokémon in Doubles/VGC
+    public static readonly HashSet<string> DoublesSpreadMoves = new(GameNameComparer.Instance)
+    {
+        "Heat Wave", "Rock Slide", "Hyper Voice", "Dazzling Gleam", "Muddy Water", "Snarl",
+        "Icy Wind", "Blizzard", "Discharge", "Earthquake", "Surf", "Sludge Wave", "Electroweb",
+        "Bleakwind Storm", "Springtide Storm", "Sandsear Storm", "Wildbolt Storm", "Glacial Lance",
+        "Astral Barrage", "Expanding Force", "Origin Pulse", "Precipice Blades", "Diamond Storm",
+        "Eruption", "Water Spout"
+    };
+
+    // Protection moves critical in Doubles/VGC (Smogon Issue 34)
+    public static readonly HashSet<string> ProtectMoves = new(GameNameComparer.Instance)
+    {
+        "Protect", "Detect", "Spiky Shield", "King's Shield", "Baneful Bunker", "Silk Trap",
+        "Burning Bulwark", "Wide Guard", "Quick Guard", "Mat Block", "Obstruct"
+    };
+
+    // Protection moves viable in Singles battles (excluding Doubles-only Wide/Quick Guard)
+    public static readonly HashSet<string> SinglesProtectMoves = new(GameNameComparer.Instance)
+    {
+        "Protect", "Detect", "Spiky Shield", "King's Shield", "Baneful Bunker", "Silk Trap",
+        "Burning Bulwark", "Mat Block", "Obstruct"
+    };
+
+    // Moves that only function or make competitive sense in multi-target battles (Doubles/Triples/VGC).
+    // These must NEVER be assigned or retained in Singles battles.
+    public static readonly HashSet<string> DoublesOnlyMoves = new(GameNameComparer.Instance)
+    {
+        "Wide Guard", "Quick Guard", "Follow Me", "Rage Powder", "Ally Switch", "Spotlight", "Helping Hand", "Instruct"
+    };
+
+    // Wide Guard and Quick Guard specific subset
+    public static readonly HashSet<string> WideQuickGuardMoves = new(GameNameComparer.Instance)
+    {
+        "Wide Guard", "Quick Guard"
+    };
+
+    // Redirection moves in Doubles (Smogon Issue 36)
+    public static readonly HashSet<string> RedirectionMoves = new(GameNameComparer.Instance)
+    {
+        "Follow Me", "Rage Powder", "Spotlight", "Ally Switch"
+    };
+
+    // Doubles Speed Control moves (VGC / Smogon Issue 29)
+    public static readonly HashSet<string> DoublesSpeedControlMoves = new(GameNameComparer.Instance)
+    {
+        "Tailwind", "Trick Room", "Icy Wind", "Electroweb", "String Shot"
+    };
+
+    // Speed control that counts as a team role in species picks (v2 spec §3); Trick Room only on TR teams
+    public static readonly HashSet<string> TeamSpeedControlMoves = new(GameNameComparer.Instance)
+    {
+        "Tailwind", "Thunder Wave", "Icy Wind"
+    };
+
+    // Damage-reducing abilities that synergize with Weakness Policy
+    public static readonly HashSet<string> WeaknessPolicyAbilities = new(GameNameComparer.Instance)
+    {
+        "Multiscale", "Solid Rock", "Filter", "Prism Armor", "Shadow Shield", "Sturdy"
+    };
+
+    // Abilities that negate Life Orb recoil while retaining the full 1.3x damage boost (Smogon competitive staple)
+    public static readonly HashSet<string> LifeOrbSynergyAbilities = new(GameNameComparer.Instance)
+    {
+        "Magic Guard", "Sheer Force"
+    };
+
+    // Dynamic mapping of attacking type to corresponding damage-reducing resist berry (Smogon staple for neutralizing 4x / 2x fatal weaknesses)
+    public static readonly Dictionary<int, string> TypeToResistBerry = new()
+    {
+        { PokemonTypes.Normal, "Chilan Berry" },
+        { PokemonTypes.Fighting, "Chople Berry" },
+        { PokemonTypes.Flying, "Coba Berry" },
+        { PokemonTypes.Poison, "Kebia Berry" },
+        { PokemonTypes.Ground, "Shuca Berry" },
+        { PokemonTypes.Rock, "Charti Berry" },
+        { PokemonTypes.Bug, "Tanga Berry" },
+        { PokemonTypes.Ghost, "Kasib Berry" },
+        { PokemonTypes.Steel, "Babiri Berry" },
+        { PokemonTypes.Fire, "Occa Berry" },
+        { PokemonTypes.Water, "Passho Berry" },
+        { PokemonTypes.Grass, "Rindo Berry" },
+        { PokemonTypes.Electric, "Wacan Berry" },
+        { PokemonTypes.Psychic, "Payapa Berry" },
+        { PokemonTypes.Ice, "Yache Berry" },
+        { PokemonTypes.Dragon, "Haban Berry" },
+        { PokemonTypes.Dark, "Colbur Berry" },
+        { PokemonTypes.Fairy, "Roseli Berry" },
     };
 
     public static readonly string[] MainShopItems =
@@ -788,9 +863,12 @@ public static class CompetitiveDatabase
 
     public static readonly string[] CompetitiveShopItems =
     {
-        "Air Balloon", "Assault Vest", "Choice Band", "Choice Scarf", "Choice Specs", "Eviolite",
-        "Expert Belt", "Focus Sash", "Heavy-Duty Boots", "Leftovers", "Life Orb", "Loaded Dice",
-        "Mental Herb", "Power Herb", "Rocky Helmet"
+        "Ability Shield", "Air Balloon", "Assault Vest", "Blunder Policy", "Booster Energy",
+        "Choice Band", "Choice Scarf", "Choice Specs", "Clear Amulet", "Covert Cloak",
+        "Eject Pack", "Eviolite", "Expert Belt", "Focus Sash", "Heavy-Duty Boots",
+        "Leftovers", "Life Orb", "Loaded Dice", "Mental Herb", "Mirror Herb",
+        "Power Herb", "Punching Glove", "Rocky Helmet", "Room Service", "Safety Goggles",
+        "Throat Spray", "Utility Umbrella", "Weakness Policy", "White Herb"
     };
 
     public static readonly string[] BerryShopItems =
@@ -911,7 +989,7 @@ public static class CompetitiveDatabase
         "Boomburst", "Brave Bird", "Bug Bite", "Bug Buzz", "Bulk Up", "Bullet Punch", "Bullet Seed", "Burning Bulwark",
         "Burning Jealousy", "Calm Mind", "Ceaseless Edge", "Chilly Reception", "Chloroblast", "Circle Throw", "Clanging Scales",
         "Clangorous Soul", "Clear Smog", "Close Combat", "Coil", "Collision Course", "Cosmic Power", "Cotton Guard", "Counter",
-        "Crabhammer", "Cross Chop", "Crunch", "Curse", "Dark Pulse", "Darkest Lariat", "Dazzling Gleam", "Defend Order",
+        "Crabhammer", "Cross Chop", "Crunch", "Curse", "Dark Pulse", "Darkest Lariat", "Dazzling Gleam", "Defend Order", "Defog",
         "Destiny Bond", "Detect", "Diamond Storm", "Dire Claw", "Disable", "Discharge", "Doom Desire", "Double-Edge",
         "Draco Meteor", "Dragon Ascent", "Dragon Claw", "Dragon Dance", "Dragon Darts", "Dragon Energy", "Dragon Hammer",
         "Dragon Pulse", "Dragon Rush", "Dragon Tail", "Drain Punch", "Draining Kiss", "Drill Peck", "Drill Run", "Drum Beating",
@@ -927,7 +1005,7 @@ public static class CompetitiveDatabase
         "Hone Claws", "Horn Drill", "Horn Leech", "Howl", "Hurricane", "Hydro Pump", "Hydro Steam", "Hyper Drill", "Hyper Voice",
         "Hyperspace Hole", "Ice Beam", "Ice Fang", "Ice Hammer", "Ice Punch", "Ice Shard", "Ice Spinner",
         "Icicle Crash", "Icicle Spear", "Infernal Parade", "Infestation", "Iron Defense", "Iron Head", "Iron Tail", "Ivy Cudgel",
-        "Jaw Lock", "Jet Punch", "Judgment", "King's Shield", "Knock Off", "Kowtow Cleave", "Lash Out", "Last Resort",
+        "Jaw Lock", "Jet Punch", "Judgment", "King's Shield", "Knock Off", "Kowtow Cleave", "Lash Out",
         "Last Respects", "Lava Plume", "Leaf Blade", "Leaf Storm", "Leech Life", "Leech Seed", "Light Screen", "Liquidation",
         "Low Kick", "Lovely Kiss", "Lumina Crash", "Lunar Blessing", "Lunar Dance", "Lunge", "Luster Purge", "Mach Punch",
         "Magma Storm", "Make It Rain", "Malignant Chain", "Matcha Gotcha", "Megahorn", "Memento", "Metal Burst", "Meteor Beam",
@@ -981,7 +1059,14 @@ public static class CompetitiveDatabase
     public static readonly HashSet<string> TwoTurnMoves = new(GameNameComparer.Instance)
     {
         "Electro Shot", "Freeze Shock", "Geomancy", "Ice Burn", "Meteor Beam",
-        "Phantom Force", "Shadow Force", "Sky Attack"
+        "Phantom Force", "Shadow Force", "Sky Attack", "Solar Beam", "Solar Blade", "Skull Bash", "Bounce"
+    };
+
+    // Moves that skip the next turn; scored down like charge moves (v2 spec §2)
+    public static readonly HashSet<string> RechargeMoves = new(GameNameComparer.Instance)
+    {
+        "Hyper Beam", "Giga Impact", "Blast Burn", "Frenzy Plant", "Hydro Cannon", "Rock Wrecker",
+        "Roar of Time", "Prismatic Laser", "Eternabeam", "Meteor Assault"
     };
 
     // Stat-drop moves for White Herb / Contrary validation

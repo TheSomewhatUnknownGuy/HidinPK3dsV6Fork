@@ -34,6 +34,43 @@ public sealed partial class ToolsUI : Form
         AddDropLabel(PB_Unpack, "Drop a GARC / DARC / Mini file here\nto unpack it into a folder.\n(Hold CTRL to skip decompression)");
         AddDropLabel(PB_Repack, "Drop a folder (*_g, *_d, *_WD…)\nhere to repack it into a GARC/DARC/Mini.\nUse the combo box above to override format.");
         AddDropLabel(PB_BCLIM, "Drop a .bclim / .bflim image file here\nto convert and view it as a bitmap.");
+
+        PopulateGarcNames();
+    }
+
+    /// <summary>
+    /// Lists every GARC this ROM's version has a registered name for (workstream 6 - the plan's own
+    /// bar for "usable through ToolsUI" was never actually met just by registering a name in
+    /// `GARCReference.cs`; this closes that gap for real - picking a name here resolves its real
+    /// RomFS path and hands it straight to the same unpack path a drag-and-drop already used).
+    /// </summary>
+    private void PopulateGarcNames()
+    {
+        CB_GarcName.Items.Clear();
+        var files = Main.Config?.Files;
+        if (files == null || files.Length == 0)
+        {
+            B_LoadGarc.Enabled = CB_GarcName.Enabled = false;
+            return;
+        }
+
+        foreach (var gr in files.OrderBy(f => f.Name))
+            CB_GarcName.Items.Add(gr.Name);
+        if (CB_GarcName.Items.Count > 0)
+            CB_GarcName.SelectedIndex = 0;
+        B_LoadGarc.Enabled = CB_GarcName.Enabled = true;
+    }
+
+    private void B_LoadGarc_Click(object sender, EventArgs e)
+    {
+        if (CB_GarcName.SelectedItem is not string name) return;
+        string path = Main.Config?.GetGARCPath(name);
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            WinFormsUtil.Error("Couldn't find this GARC on disk.", path ?? name);
+            return;
+        }
+        OpenARC(path, pBar1);
     }
 
     private static void AddDropLabel(Control panel, string text)

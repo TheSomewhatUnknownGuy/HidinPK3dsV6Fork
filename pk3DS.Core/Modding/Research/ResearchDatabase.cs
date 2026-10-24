@@ -430,26 +430,6 @@ public sealed class ResearchDatabase
     }
 
     /// <summary>
-    /// Parses the raw ARM research workbooks and writes an optimized, compressed JSON archive.
-    /// </summary>
-    public static void BuildEmbeddedCorpus(string armResearchFolder, string outputFile, string version = "UM", Action<string> log = null)
-    {
-        log ??= _ => { };
-        var db = Load(armResearchFolder, version, log);
-        var snap = new Snapshot(db) { Fingerprint = Fingerprint(armResearchFolder) };
-        byte[] json = JsonSerializer.SerializeToUtf8Bytes(snap, CacheOpts);
-
-        string dir = Path.GetDirectoryName(outputFile);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        using var fs = File.Create(outputFile);
-        using var gz = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionLevel.Optimal);
-        gz.Write(json, 0, json.Length);
-        log($"  embedded corpus built for {version}: {outputFile} ({db.Sheets.Count} sheets, {json.Length} uncompressed bytes)");
-    }
-
-    /// <summary>
     /// The corpus for a version: the folder when there is one, the built-in copy otherwise.
     /// </summary>
     public static ResearchDatabase LoadBest(string armResearchFolder, string version,

@@ -1,0 +1,26 @@
+{
+  "Name": "Lunar Blessing Status Cure Fix",
+  "Description": "OPEN CONCERN ADDED 2026-09-12 - a SEPARATE, independent hardcoded routine was found this session, distinct from the 0x101E00 alias chain this file's RESOLVED note (below) addresses. A standalone detour function at Battle.cro 0xFFE80 (own PUSH{R4-R11,LR} prologue, unrelated call sites) holds a 9-entry literal table at 0x100094-0x1000B4 listing move ids 754/755/830/845/849/850/878/879/907 (Bolt Beak/Fishious Rend/Stone Axe/Ceaseless Edge/Lunar Blessing/Take Heart/Collision Course/Electro Drift/Fickle Beam), matched via `ldr r12,[pc,#imm]; cmp r7,r12; beq <landing>` where r7 is loaded from [r4,#0x38] (NOT the same match mechanism as the 0x101E00 chain, which compares r5 directly). Move 849 and 850 share landing block 0xFFF78, gated on timing 0xBF (`cmp r6,#0xbf`), which calls 0x100030 -> queues an event (kind 0xA, effect id 0x2A / 42) targeting up to r9 battlers read via `bl 0x87b58` with a fixed +6 slot offset. This is the exact same confirmed-real pattern independently proven for Fickle Beam's native 30%-double-power hook (907 shares this same table, landing block 0xFFFD0) - so it carries the same weight of evidence, and Fickle Beam's package (FickleBeam.json) WAS deleted for exactly this reason (installing a package that also handles move 907 would double-fire). What is NOT yet established: what effect 0x2A actually does, and whether it duplicates, complements, or is unrelated to what this package's own timing-0xBF master-table entry installs. Until effect 0x2A is decoded (or this is verified live in an emulator), treat this package as carrying the same double-fire risk class as FickleBeam.json did, not as safely 'RESOLVED'. The original resolution below is likely still correct for the specific alias-chain question it answered (move 849 genuinely isn't in the 0x101E00 chain's ~32-id list) - that finding and this new one are about two different mechanisms and don't contradict each other, they're just both true and both relevant.\n\nRESOLVED 2026-09-07 - dispatch question settled by a full control-flow trace of Battle.cro (not sampling). Move Dispatcher 0x87304 is called unconditionally from at least 3 confirmed call sites (0x148A8, 0x1496C, 0x14D08), each simply loading the move id into r1 and calling - no EffectSequence check precedes any of them. Inside 0x87304 it matches purely by 16-bit move id: table entry id is loaded via `ldrh r1,[sl + r4*8]` at 0x87320-0x87324 and compared against r5 (the move actually being used, saved from the function's own r1 argument at 0x8730C); the loop increments r4 and bounds-checks against the entry count at 0x873D0, looping back to 0x87320 until every entry has been scanned. The `b #0x101e00` at 0x87328, previously flagged as an unexplained branch that might gate this, was fully traced: 0x101E00 -> 0xFFC80 -> 0xFEC00 -> 0xFE800 is a move-id alias/detour chain that only special-cases ~32 hardcoded custom move ids in the 746-920 range (746,747,748,749,752,753,756,775,776,783,792,807-810,827,854,856,862-864,867,868,882,889,892,903,904,913-915,920). Move 849 is not among them, so the chain falls through to its default arm at 0xFE800 (`cmp r1,r5`) which lands back at 0x8732C with exactly the flags a plain unmodified comparison would have produced. EffectSequence is never read, loaded, or branched on anywhere in this entire traced path. The master-table entry layout `[id:4][handler:4]` was cross-checked against pk3DS.Core/Modding/Research/MechanicInstaller.cs (the tool that writes this very entry) and matches what 0x87304 reads byte-for-byte. Conclusion: this timing-0xBF entry WILL be consulted the same way Purify's confirmed-working entry for move 685 is - EffectSequence 309 neither gates nor bypasses master-table dispatch. Cures user and ally status conditions at timing 0xBF while EffectSequence 309 separately provides the 25% MaxHP heal via its own self-contained battle script - two independent mechanisms that both fire off the same move id, not a switch keyed by EffectSequence. Uses verified standalone status-cure routine cloned from Purify (0xC33F8) with the 50% HP-heal tail and status-gated exit removed.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 849,
+      "Name": "Lunar Blessing",
+      "Slots": [
+        {
+          "Timing": "0xBF",
+          "Code": "F05F2DE90300A0E301A0A0E10290A0E1D211FFEB090050E12100001A0080A0E30500A0E3CD11FFEB007050E20040A0E301B0A0831A00009A060084E2FF0000E2C611FFEBFF6000E20610A0E10A00A0E1923BFFEB00F020E300F020E300FBFEEB0050B0E100F020E30A00000A0920A0E10A10A0E30A00A0E1A010FFEB0450C0E511B0C0E50010A0E10560C0E50A00A0E119E6FEEB0180A0E3014084E2040057E1E4FFFF8AF09FBDE8",
+          "SourceBase": "0xC33F8"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

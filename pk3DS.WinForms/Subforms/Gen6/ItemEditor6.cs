@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -50,6 +50,11 @@ public partial class ItemEditor6 : Form
     {
         if (entry < 1) return;
         files[entry] = ((Item)Grid.SelectedObject).Write();
+        if (entry < itemflavor.Length)
+        {
+            itemflavor[entry] = RTB.Text.Replace("\r\n", "\\n").Replace("\n", "\\n");
+            Main.Config.SetText(TextName.ItemFlavor, itemflavor);
+        }
     }
 
     private void IsFormClosing(object sender, FormClosingEventArgs e)

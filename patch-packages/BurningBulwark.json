@@ -1,0 +1,119 @@
+{
+  "Name": "Burning Bulwark",
+  "Description": "Burning Bulwark (Move 908). Protects the user from attacks and burns any attacker that makes direct contact.",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 908,
+      "Name": "Burning Bulwark",
+      "Slots": [
+        {
+          "Timing": "0x03",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x03",
+            "Name": "Protect"
+          },
+          "TimingByte": 3,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x25",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x25",
+            "Name": "Protect"
+          },
+          "TimingByte": 37,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x26",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x26",
+            "Name": "Protect"
+          },
+          "TimingByte": 38,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x5C",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x5C",
+            "Name": "Protect"
+          },
+          "TimingByte": 92,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xBF",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0xBF",
+            "Name": "Protect"
+          },
+          "TimingByte": 191,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x8E",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x8E",
+            "Name": "Protect"
+          },
+          "TimingByte": 142,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x45",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x45",
+            "Name": "Protect"
+          },
+          "TimingByte": 69,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x61",
+          "Code": "70402DE908D04DE20350A0E1040093E5000050E32400000A0180A0E10260A0E10400A0E3CB1EFAEB060050E11C00001A6100A0E3C71EFAEB000050E31800000A0620A0E10B10A0E30800A0E1A91DFAEB0040A0E10410A0E30410C4E50620A0E10D00A0E13DFDF9EB00009DE504109DE5080084E50C1084E50100A0E31000C4E51100D4E50100C0E31100C4E50300A0E3B01EFAEB1400C4E50410A0E10800A0E113F3F9EB0000A0E30400C5E508D08DE27080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 97,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QjQTeIDUKDhBACT5QAAUOMkAAAKAYCg4QJgoOEEAKDjyx766wYAUOEcAAAaYQCg48ce+usAAFDjGAAACgYgoOELEKDjCACg4akd+usAQKDhBBCg4wQQxOUGIKDhDQCg4T39+esAAJ3lBBCd5QgAhOUMEITlAQCg4xAAxOURANTlAQDA4xEAxOUDAKDjsB766xQAxOUEEKDhCACg4RPz+esAAKDjBADF5QjQjeJwgL3o"
+        },
+        {
+          "Timing": "0xC4",
+          "Code": "70402DE90CD04DE20160A0E10240A0E10400A0E3CF1EFAEB040050E11E00001A6100A0E3CB1EFAEB000050E31A00000A0420A0E10B10A0E30600A0E1AD1DFAEB0050A0E10410A0E3B410C5E10D00A0E10520A0E141FDF9EB00009DE504109DE5080085E50C1085E50100A0E31000C5E51100D5E50100C0E31100C5E50300A0E3B41EFAEB1400C5E50510A0E10600A0E10CD08DE27040BDE815F3F9EA0CD08DE27080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 196,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QzQTeIBYKDhAkCg4QQAoOPPHvrrBABQ4R4AABphAKDjyx766wAAUOMaAAAKBCCg4QsQoOMGAKDhrR366wBQoOEEEKDjtBDF4Q0AoOEFIKDhQf356wAAneUEEJ3lCACF5QwQheUBAKDjEADF5REA1eUBAMDjEQDF5QMAoOO0HvrrFADF5QUQoOEGAKDhDNCN4nBAvegV8/nqDNCN4nCAveg="
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

@@ -54,5 +54,14 @@
   },
   "ItemNames": {
     "${itemId}": "Blunder Policy"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Blunder Policies"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Blunder Policy[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nIt sharply raises Speed when the\nholder misses with a move."
   }
 }

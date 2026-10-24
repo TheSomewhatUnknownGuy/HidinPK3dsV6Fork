@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace pk3DS.Core;
@@ -541,6 +541,50 @@ public static partial class Legal
         },
     ];
 
+    public static HashSet<int> GetLegendaryAndMythicalSet(int maxSpeciesId = 1025)
+    {
+        var set = new HashSet<int>(Legendary_USUM.Concat(Mythical_USUM));
+        // Gen 8
+        for (int s = 888; s <= 892; s++) set.Add(s);
+        for (int s = 894; s <= 898; s++) set.Add(s);
+        set.Add(905);
+        set.Add(808); set.Add(809); set.Add(893);
+
+        // Gen 9
+        for (int s = 984; s <= 995; s++) set.Add(s);
+        for (int s = 1001; s <= 1010; s++) set.Add(s);
+        for (int s = 1014; s <= 1017; s++) set.Add(s);
+        for (int s = 1020; s <= 1025; s++) set.Add(s);
+
+        return set;
+    }
+
+    public static bool CanSpeciesEvolve(int species, GameConfig config = null)
+    {
+        if (species <= 0) return false;
+
+        // Legendaries & Mythicals (only Cosmog 789, Cosmoem 790, and Poipole 803 can evolve)
+        if (GetLegendaryAndMythicalSet().Contains(species))
+        {
+            return species == 789 || species == 790 || species == 803;
+        }
+
+        // Check forward evolutions in Config.Evolutions if available
+        if (config?.Evolutions != null && species < config.Evolutions.Length)
+        {
+            var evoSet = config.Evolutions[species];
+            return evoSet?.PossibleEvolutions != null &&
+                   evoSet.PossibleEvolutions.Any(e => e != null && e.Species > 0 && e.Species != species && e.Method > 0);
+        }
+
+        // Known final evolutions & single-stage Pokémon in Gen 1-7
+        if (FinalEvolutions_7.Contains(species) || FinalEvolutions_6.Contains(species))
+            return false;
+
+        // In Gen 1-7, any non-legendary species not in FinalEvolutions_7 is a pre-evolution
+        return species <= 807;
+    }
+
     public static readonly HashSet<int> BattleForms =
     [
         351, // Castform
@@ -551,6 +595,11 @@ public static partial class Legal
         716, // Xerneas
         746, // Wishiwashi
         778, // Mimikyu
+        888, // Zacian (Crowned)
+        889, // Zamazenta (Crowned)
+        890, // Eternatus (Eternamax)
+        964, // Palafin (Hero)
+        1024, // Terapagos (Terastal/Stellar)
     ];
 
     public static readonly HashSet<int> BattleMegas =
@@ -567,6 +616,12 @@ public static partial class Legal
         428, 475,
         531,
         719,
+
+        // Expansion Megas
+        026, 036, 071, 121, 149, 154, 160, 227, 358, 398,
+        478, 485, 491, 500, 530, 545, 560, 604, 609, 623,
+        652, 655, 658, 668, 670, 678, 687, 689, 691, 701,
+        718, 740, 768, 780, 801, 807, 870, 952, 970, 978, 998,
 
         // USUM
         800, // Ultra Necrozma

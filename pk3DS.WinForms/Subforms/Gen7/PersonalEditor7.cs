@@ -11,6 +11,7 @@ using pk3DS.Core;
 using pk3DS.Core.CTR;
 using pk3DS.Core.Structures.PersonalInfo;
 using pk3DS.Core.Randomizers;
+using pk3DS.WinForms.Controls;
 
 namespace pk3DS.WinForms;
 
@@ -21,16 +22,18 @@ public partial class PersonalEditor7 : Form
     public byte[][] Learnsets => learnsets;
     public byte[][] EggMoves => eggmoves;
     public byte[][] EvolutionFiles => evolutionFiles;
+    public byte[][] EvolutionBaseFiles => evolutionBaseFiles;
     private byte[][] learnsets;
     private byte[][] eggmoves;
     private byte[][] evolutionFiles;
-    public PersonalEditor7(byte[][] infiles, byte[][] learnsets, byte[][] eggmoves, byte[][] evolutionFiles)
+    private byte[][] evolutionBaseFiles;
+    public PersonalEditor7(byte[][] infiles, byte[][] learnsets, byte[][] eggmoves, byte[][] evolutionFiles, byte[][] evolutionBaseFiles = null)
     {
         InitializeComponent();
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
         this.learnsets = learnsets;
         this.eggmoves = eggmoves;
         this.evolutionFiles = evolutionFiles;
+        this.evolutionBaseFiles = evolutionBaseFiles;
         this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form_Closing);
         RTB_Changelog.ReadOnly = true;
         RTB_Changelog.Dock = DockStyle.Fill;
@@ -44,6 +47,7 @@ public partial class PersonalEditor7 : Form
         rstat_boxes = [CHK_rHP, CHK_rATK, CHK_rDEF, CHK_rSPE, CHK_rSPA, CHK_rSPD];
         files = (byte[][])infiles.Clone();
         originalFiles = files.Select(a => (byte[])a.Clone()).ToArray(); // Snapshots YOUR custom ROM data
+        LoadVanillaStats();
         
         foreach (var tb in byte_boxes) tb.TextAlign = HorizontalAlignment.Center;
         foreach (var tb in ev_boxes) tb.TextAlign = HorizontalAlignment.Center;
@@ -102,24 +106,31 @@ public partial class PersonalEditor7 : Form
                 GenerateFullChangelog();
             }
         };
-        CB_ZItem.SelectedIndexChanged += (s, e) => { if (!reading) SaveEntry(); };
-        CB_ZBaseMove.SelectedIndexChanged += (s, e) => { if (!reading) SaveEntry(); };
-        CB_ZMove.SelectedIndexChanged += (s, e) => { if (!reading) SaveEntry(); };
+        CB_ZItem.SelectedIndexChanged += (s, e) => { if (!reading && !LazyCombo.IsExpanding(CB_ZItem)) SaveEntry(); };
+        CB_ZBaseMove.SelectedIndexChanged += (s, e) => { if (!reading && !LazyCombo.IsExpanding(CB_ZBaseMove)) SaveEntry(); };
+        CB_ZMove.SelectedIndexChanged += (s, e) => { if (!reading && !LazyCombo.IsExpanding(CB_ZMove)) SaveEntry(); };
         B_SaveCurrent.Click += (s, e) => { SaveEntry(); WinFormsUtil.Alert("Current Pokémon saved to internal buffer."); };
 
         RegisterAutosave(TP_General.Controls);
         CB_Type1.SelectedIndexChanged += UpdateTypeIcons;
         CB_Type2.SelectedIndexChanged += UpdateTypeIcons;
+        // This whole tutor block used to start at x=300 - a bare 81px gap past the TMs list
+        // (which ends at x=219), well clear of everything else on the tab - and CLB_BeachTutors'
+        // old 490px width ran to x=790, past TC_Pokemon's real 732px client width. Both together
+        // made "Copy Tutors"/"Paste Tutors" (and everything else in this cluster) read as
+        // detached and pushed off to the right. Shifted the whole block to x=235 (right after the
+        // TM list, same 16px gap CLB_MoveTutors uses elsewhere) and narrowed the two wide controls
+        // so nothing runs past the tab's actual width.
         NUD_TutorBase = new NumericUpDown
         {
-            Minimum = 0x28, Maximum = 0x2F, Hexadecimal = true, 
-            Value = 0x29, Location = new Point(370, 370), Size = new Size(50, 20),
+            Minimum = 0x28, Maximum = 0x2F, Hexadecimal = true,
+            Value = 0x29, Location = new Point(305, 370), Size = new Size(50, 20),
             Enabled = false // Locked — ASM patch expects base 0x29
         };
-        L_TutorBase = new Label { Text = "Base:", Location = new Point(300, 373), Size = new Size(70, 20) };
-        B_AlignTutors = new Button { 
-            Text = "Align", 
-            Location = new Point(430, 366), 
+        L_TutorBase = new Label { Text = "Base:", Location = new Point(235, 373), Size = new Size(70, 20) };
+        B_AlignTutors = new Button {
+            Text = "Align",
+            Location = new Point(365, 366),
             Size = new Size(55, 26),
             FlatStyle = FlatStyle.Flat,
             ForeColor = Color.White,
@@ -127,16 +138,16 @@ public partial class PersonalEditor7 : Form
             Cursor = Cursors.Hand
         };
         B_AlignTutors.FlatAppearance.BorderSize = 0;
-        L_ContinuousTutors = new CheckBox { Text = "Continuous Mapping (ASM)", Location = new Point(495, 370), Size = new Size(200, 20), Checked = true, Enabled = false };
+        L_ContinuousTutors = new CheckBox { Text = "Continuous Mapping (ASM)", Location = new Point(430, 370), Size = new Size(200, 20), Checked = true, Enabled = false };
 
         TP_MoveTutors.Controls.Add(L_TutorBase);
         TP_MoveTutors.Controls.Add(NUD_TutorBase);
         TP_MoveTutors.Controls.Add(B_AlignTutors);
         TP_MoveTutors.Controls.Add(L_ContinuousTutors);
 
-        B_CopyTutors = new Button { 
-            Text = "📋 Copy Tutors", 
-            Location = new Point(300, 405), 
+        B_CopyTutors = new Button {
+            Text = "📋 Copy Tutors",
+            Location = new Point(235, 405),
             Size = new Size(130, 30),
             FlatStyle = FlatStyle.Flat,
             ForeColor = Color.White,
@@ -145,9 +156,9 @@ public partial class PersonalEditor7 : Form
         };
         B_CopyTutors.FlatAppearance.BorderSize = 0;
 
-        B_PasteTutors = new Button { 
-            Text = "📥 Paste Tutors", 
-            Location = new Point(440, 405), 
+        B_PasteTutors = new Button {
+            Text = "📥 Paste Tutors",
+            Location = new Point(375, 405),
             Size = new Size(130, 30),
             FlatStyle = FlatStyle.Flat,
             ForeColor = Color.White,
@@ -164,20 +175,20 @@ public partial class PersonalEditor7 : Form
         L_NewTutors.Visible = false;
         L_Special.Visible = false; // Get rid of Special Tutors text
         CLB_NewTutors.Visible = false;
-        CLB_BeachTutors.Location = new Point(300, 35);
-        CLB_BeachTutors.Width = 490;
+        CLB_BeachTutors.Location = new Point(235, 35);
+        CLB_BeachTutors.Width = 425;
         CLB_BeachTutors.Height = 275;
         CLB_BeachTutors.MultiColumn = true;
         CLB_BeachTutors.ColumnWidth = 150;
 
-        L_DebugTutors = new RichTextBox 
-        { 
-            ReadOnly = true, 
-            BackColor = Color.Black, 
-            ForeColor = Color.Yellow, 
+        L_DebugTutors = new RichTextBox
+        {
+            ReadOnly = true,
+            BackColor = Color.Black,
+            ForeColor = Color.Yellow,
             Font = new Font("Consolas", 8),
-            Location = new Point(300, 315), 
-            Size = new Size(490, 45),
+            Location = new Point(235, 315),
+            Size = new Size(425, 45),
             BorderStyle = BorderStyle.None
         };
         TP_MoveTutors.Controls.Add(L_DebugTutors);
@@ -194,7 +205,7 @@ public partial class PersonalEditor7 : Form
     {
         foreach (Control c in controls)
         {
-            if (c is ComboBox cb) cb.SelectedIndexChanged += (s, e) => { if (!reading) SaveEntry(false); };
+            if (c is ComboBox cb) cb.SelectedIndexChanged += (s, e) => { if (!reading && !LazyCombo.IsExpanding(cb)) SaveEntry(false); };
             else if (c is CheckBox chk) chk.CheckedChanged += (s, e) => { if (!reading) SaveEntry(false); };
             else if (c is NumericUpDown nud) nud.ValueChanged += (s, e) => { if (!reading) SaveEntry(false); };
             
@@ -372,6 +383,7 @@ public partial class PersonalEditor7 : Form
         CLB_BeachTutors.Items.Clear();
 
         int tmCount = TMs.Length > 0 ? Math.Min(TMs.Length, 128) : 100;
+        if (pk3DS.Core.Modding.PassiveGuard.Enabled) tmCount = Math.Min(tmCount, pk3DS.Core.Modding.PassiveGuard.TmCap); // bits 104-127 are passives
 
         if (TMs.Length == 0) // No ExeFS to grab TMs from - names unavailable, so number them.
         {
@@ -403,18 +415,18 @@ public partial class PersonalEditor7 : Form
         {
             cb.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cb.AutoCompleteSource = AutoCompleteSource.ListItems;
-            cb.Items.AddRange(items);
+            LazyCombo.Attach(cb, items);
         }
 
-        CB_ZItem.Items.AddRange(items);
+        LazyCombo.Attach(CB_ZItem, items);
         CB_ZItem.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         CB_ZItem.AutoCompleteSource = AutoCompleteSource.ListItems;
 
-        CB_ZBaseMove.Items.AddRange(moves);
+        LazyCombo.Attach(CB_ZBaseMove, moves);
         CB_ZBaseMove.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         CB_ZBaseMove.AutoCompleteSource = AutoCompleteSource.ListItems;
 
-        CB_ZMove.Items.AddRange(moves);
+        LazyCombo.Attach(CB_ZMove, moves);
         CB_ZMove.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         CB_ZMove.AutoCompleteSource = AutoCompleteSource.ListItems;
 
@@ -422,8 +434,10 @@ public partial class PersonalEditor7 : Form
         {
             cb.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cb.AutoCompleteSource = AutoCompleteSource.ListItems;
-            cb.Items.AddRange(abilities);
+            LazyCombo.Attach(cb, abilities);
         }
+
+        InitializePassiveRows();
 
         foreach (ComboBox cb in typing_boxes)
         {
@@ -483,6 +497,16 @@ public partial class PersonalEditor7 : Form
 
     private void B_InsertForm_Click(object sender, EventArgs e)
     {
+        var romKind = pk3DS.Core.Modding.Insertion.RomLayout.DetectFromRomFs(Main.RomFSPath, out _, out _);
+        var refusal = pk3DS.Core.Modding.Insertion.RomLayout.Refusal(
+            pk3DS.Core.Modding.UhuruGuard.Active ? pk3DS.Core.Modding.Insertion.RomKind.Uhuru : romKind,
+            species: false);
+        if (refusal != null)
+        {
+            WinFormsUtil.Error(refusal);
+            return;
+        }
+
         if (entry < 1) return;
         if (entry > -1) SaveEntry(); // save current entry before insertion
         
@@ -499,43 +523,12 @@ public partial class PersonalEditor7 : Form
         learnsets = form.ResultLevelUp;
         eggmoves = form.ResultEggMoves;
 
-        // ── Phase 2: Persist to GARCs immediately ──
-        try
-        {
-            // Save Personal GARC (with reconstructed Master Table)
-            byte[][] personalWithTable = [.. files, RebuildMasterTable(files)];
-            Main.Config.GARCPersonal.Files = personalWithTable;
-            Main.Config.GARCPersonal.Save();
-
-            // Save Evolution GARC
-            var evoGarc = Main.Config.GetGARCData("evolution");
-            evoGarc.Files = evolutionFiles;
-            evoGarc.Save();
-
-            // Save Learnset GARC
-            Main.Config.GARCLearnsets.Files = learnsets;
-            Main.Config.GARCLearnsets.Save();
-
-            // Save EggMove GARC
-            var eggGarc = Main.Config.GetGARCData("eggmove");
-            if (eggGarc != null)
-            {
-                eggGarc.Files = eggmoves;
-                eggGarc.Save();
-            }
-
-            // Memory cleanup after heavy GARC operations
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-        }
-        catch (Exception ex)
-        {
-            WinFormsUtil.Error("Failed to save GARCs after insertion.", ex.Message);
-        }
-
-        // ── Phase 3: Rebuild internal tables (like reference tool's update_species_list) ──
+        // The insertion pipeline has already committed the staged tables. Re-read its output into
+        // the editor's live configuration before rebuilding the derived views.
         Main.Config.InitializePersonal();
         Main.Config.InitializeLearnset();
+        Main.Config.InitializeEvos();
+        Main.Config.Info?.RecalculateLimits(Main.Config);
         
         // Refresh names reference from config (it was expanded in FormInsertion)
         species = Main.Config.GetText(TextName.SpeciesNames);
@@ -690,6 +683,11 @@ public partial class PersonalEditor7 : Form
     private static void SetCBIndex(ComboBox cb, int index)
     {
         if (cb == null) return;
+        if (LazyCombo.IsLazy(cb))
+        {
+            LazyCombo.SetIndex(cb, index >= 0 && index < LazyCombo.Count(cb) ? index : 0);
+            return;
+        }
         if (index >= 0 && index < cb.Items.Count)
             cb.SelectedIndex = index;
         else
@@ -726,6 +724,9 @@ public partial class PersonalEditor7 : Form
 
         TB_CatchRate.Text = pkm.CatchRate.ToString("000");
         TB_Stage.Text = pkm.EvoStage.ToString("0");
+        TB_LowestEvo.Text = evolutionBaseFiles != null && entry < evolutionBaseFiles.Length && evolutionBaseFiles[entry]?.Length >= 2
+            ? BitConverter.ToUInt16(evolutionBaseFiles[entry], 0).ToString()
+            : "";
 
         SetCBIndex(CB_HeldItem1, pkm.Items[0]);
         SetCBIndex(CB_HeldItem2, pkm.Items[1]);
@@ -743,6 +744,11 @@ public partial class PersonalEditor7 : Form
         SetCBIndex(CB_Ability1, pkm.Abilities[0]);
         SetCBIndex(CB_Ability2, pkm.Abilities[1]);
         SetCBIndex(CB_Ability3, pkm.Abilities[2]);
+        if (passive_boxes != null)
+        {
+            var passives = ((PersonalInfoSM)pkm).Passives;
+            for (int i = 0; i < 3; i++) SetCBIndex(passive_boxes[i], Math.Min(passives[i], pk3DS.Core.Modding.PassiveGuard.MaxId)); // a stored id above 345 shows as the last entry
+        }
 
         TB_FormeCount.Text = pkm.FormeCount.ToString("000");
         TB_FormeSprite.Text = pkm.FormeSprite.ToString("000");
@@ -779,6 +785,7 @@ public partial class PersonalEditor7 : Form
         }
         ReadDexEntry();
         UpdateDebugLabel(sm);
+        UpdateDynamicDiff(this, EventArgs.Empty);
     }
 
     private void UpdateDebugLabel(PersonalInfoSM sm)
@@ -906,16 +913,18 @@ public partial class PersonalEditor7 : Form
 
         pkm.CatchRate = ParseByte(TB_CatchRate.Text);
         pkm.EvoStage = ParseByte(TB_Stage.Text);
+        if (evolutionBaseFiles != null && entry < evolutionBaseFiles.Length && evolutionBaseFiles[entry]?.Length >= 2)
+            BitConverter.GetBytes(ParseUInt16(TB_LowestEvo.Text)).CopyTo(evolutionBaseFiles[entry], 0);
 
         pkm.Types = [CB_Type1.SelectedIndex, CB_Type2.SelectedIndex];
-        pkm.Items = [CB_HeldItem1.SelectedIndex, CB_HeldItem2.SelectedIndex, CB_HeldItem3.SelectedIndex];
+        pkm.Items = [LazyCombo.GetIndex(CB_HeldItem1), LazyCombo.GetIndex(CB_HeldItem2), LazyCombo.GetIndex(CB_HeldItem3)];
 
         pkm.Gender = ParseByte(TB_Gender.Text);
         pkm.HatchCycles = ParseByte(TB_HatchCycles.Text);
         pkm.BaseFriendship = ParseByte(TB_Friendship.Text);
         pkm.EXPGrowth = (byte)CB_EXPGroup.SelectedIndex;
         pkm.EggGroups = [CB_EggGroup1.SelectedIndex, CB_EggGroup2.SelectedIndex];
-        pkm.Abilities = [CB_Ability1.SelectedIndex, CB_Ability2.SelectedIndex, CB_Ability3.SelectedIndex];
+        pkm.Abilities = [LazyCombo.GetIndex(CB_Ability1), LazyCombo.GetIndex(CB_Ability2), LazyCombo.GetIndex(CB_Ability3)];
 
         pkm.FormeSprite = ParseUInt16(TB_FormeSprite.Text);
         pkm.FormeCount = ParseByte(TB_FormeCount.Text);
@@ -931,6 +940,7 @@ public partial class PersonalEditor7 : Form
             pkm.TMHM[i] = CLB_TM.GetItemChecked(i);
 
         PersonalInfoSM sm = (PersonalInfoSM)pkm;
+        if (passive_boxes != null) sm.Passives = passive_boxes.Select(cb => Math.Max(LazyCombo.GetIndex(cb), 0)).ToArray();
         // Save Special Tutors (Bits 0-7)
         for (int i = 0; i < CLB_MoveTutors.Items.Count && i < 8; i++)
             sm.TutorFlags[i] = CLB_MoveTutors.GetItemChecked(i);
@@ -944,9 +954,9 @@ public partial class PersonalEditor7 : Form
         }
 
         // Save Z-Move data
-        sm.SpecialZ_Item = CB_ZItem.SelectedIndex;
-        sm.SpecialZ_BaseMove = CB_ZBaseMove.SelectedIndex;
-        sm.SpecialZ_ZMove = CB_ZMove.SelectedIndex;
+        sm.SpecialZ_Item = LazyCombo.GetIndex(CB_ZItem);
+        sm.SpecialZ_BaseMove = LazyCombo.GetIndex(CB_ZBaseMove);
+        sm.SpecialZ_ZMove = LazyCombo.GetIndex(CB_ZMove);
 
         UpdateDebugLabel(sm);
 
@@ -995,9 +1005,53 @@ public partial class PersonalEditor7 : Form
     }
 
 
+    private ComboBox[] passive_boxes;
+
+    /// <summary>
+    /// Rom Nueva + passive rows: a "Passives" tab with three "(None)"-first ability dropdowns, created only while the Passive Abilities
+    /// setting is on (the bytes belong to the TM list otherwise). Ids 0..345, the range the mod reads. A tab rather than the General
+    /// tab because that page is full: the form is fixed at 760x680 and has no free row.
+    /// </summary>
+    private void InitializePassiveRows()
+    {
+        if (!pk3DS.Core.Modding.PassiveGuard.Enabled || passive_boxes != null) return;
+        var names = new string[pk3DS.Core.Modding.PassiveGuard.MaxId + 1];
+        for (int i = 0; i < names.Length; i++)
+            names[i] = i == 0 ? "(None)" : i < abilities.Length ? abilities[i] : $"Ability {i}";
+
+        var tab = new TabPage("Passives") { Name = "TP_Passives" };
+        tab.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(640, 0),
+            Location = new Point(20, 20),
+            Text = "Passive abilities (Rom Nueva +): up to three fixed abilities this Pokémon always has, on top of its normal one.\n\n" +
+                   "The game ignores a slot that is empty, a duplicate, equal to a normal ability, or above id 345, and ids 322-345 " +
+                   "(combined abilities) do nothing as a passive. Pick the species at the top, then set its passives here.",
+        });
+        passive_boxes = new ComboBox[3];
+        for (int i = 0; i < 3; i++)
+        {
+            tab.Controls.Add(new Label { Text = $"Passive {i + 1}:", AutoSize = true, Location = new Point(20, 124 + i * 36) });
+            var cb = passive_boxes[i] = new ComboBox
+            {
+                Name = $"CB_Passive{i + 1}",
+                Location = new Point(100, 120 + i * 36),
+                Size = new Size(220, 21),
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems,
+            };
+            LazyCombo.Attach(cb, names);
+            LazyCombo.SetIndex(cb, 0);
+            cb.SelectedIndexChanged += (s, e) => { if (!reading && !LazyCombo.IsExpanding(cb)) SaveEntry(false); };
+            tab.Controls.Add(cb);
+        }
+        TC_Pokemon.TabPages.Insert(1, tab);
+    }
+
     private void SaveEntry(bool updateChangelog = true)
     {
-        if (entry < 0 || entry >= files.Length) return;
+        if (entry < 0 || entry >= files.Length || pkm == null) return;
         SavePersonal();
         byte[] edits = pkm.Write();
         files[entry] = edits;
@@ -1198,7 +1252,7 @@ public partial class PersonalEditor7 : Form
             lines.Add($"Hatch Cycles: {TB_HatchCycles.Text}");
             lines.Add($"Height: {TB_Height.Text} m, Weight: {TB_Weight.Text} kg, Color: {CB_Color.Text}");
 
-            if (CB_ZBaseMove.SelectedIndex > 0)
+            if (LazyCombo.GetIndex(CB_ZBaseMove) > 0)
                 lines.Add($"{CB_ZBaseMove.Text} + {CB_ZItem.Text} => {CB_ZMove.Text}");
             lines.Add("");
         }
@@ -1283,15 +1337,14 @@ public partial class PersonalEditor7 : Form
         int.TryParse(TB_BaseSPD.Text, out int spd);
         int.TryParse(TB_BaseSPE.Text, out int spe);
 
-        bool isNewSpecies = entry > 807 && entry <= 1025;
-        bool isAlt = entry > Main.Config.MaxSpeciesID && !isNewSpecies;
+        bool isAlt = entry > Main.Config.MaxSpeciesID;
         int[] origValues = new int[6];
         string prefix = isAlt ? "Base Form" : "Vanilla";
 
-        if (isAlt && baseForms != null && entry < baseForms.Length)
+        if (isAlt && baseForms != null && entry < baseForms.Length && baseForms[entry] >= 0 && baseForms[entry] < files.Length)
         {
             int baseID = baseForms[entry];
-            var bPkm = (baseID >= 0 && baseID < files.Length) ? PersonalTable.GetInfo(files[baseID], Main.Config.Version) : null;
+            var bPkm = PersonalTable.GetInfo(files[baseID], Main.Config.Version);
             if (bPkm != null)
             {
                 origValues[0] = bPkm.HP;
@@ -1302,19 +1355,31 @@ public partial class PersonalEditor7 : Form
                 origValues[5] = bPkm.SPE;
             }
         }
-        else if (isNewSpecies || vanillaStats == null || entry >= vanillaStats.Length || vanillaStats[entry] == null)
+        else if (vanillaStats != null && entry < vanillaStats.Length && vanillaStats[entry] != null && vanillaStats[entry].Any(v => v > 0))
         {
-            // For new species, Vanilla BST Diff is 0 against its own stats
-            origValues[0] = hp;
-            origValues[1] = atk;
-            origValues[2] = def;
-            origValues[3] = spa;
-            origValues[4] = spd;
-            origValues[5] = spe;
+            origValues = vanillaStats[entry];
+        }
+        else if (originalFiles != null && entry < originalFiles.Length && originalFiles[entry] != null && originalFiles[entry].Length >= 6)
+        {
+            var oPkm = PersonalTable.GetInfo(originalFiles[entry], Main.Config.Version);
+            if (oPkm != null)
+            {
+                origValues[0] = oPkm.HP;
+                origValues[1] = oPkm.ATK;
+                origValues[2] = oPkm.DEF;
+                origValues[3] = oPkm.SPA;
+                origValues[4] = oPkm.SPD;
+                origValues[5] = oPkm.SPE;
+            }
         }
         else
         {
-            origValues = vanillaStats[entry];
+            origValues[0] = pkm.HP;
+            origValues[1] = pkm.ATK;
+            origValues[2] = pkm.DEF;
+            origValues[3] = pkm.SPA;
+            origValues[4] = pkm.SPD;
+            origValues[5] = pkm.SPE;
         }
 
         SetDiffLabel(L_DiffHP, hp, origValues[0]);
@@ -1332,27 +1397,27 @@ public partial class PersonalEditor7 : Form
 
         if (diff > 0)
         {
-            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} ({diff} more than {origBST})";
-            L_StatDiff.ForeColor = Color.Green;
+            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} (+{diff} compared to {origBST})";
+            L_StatDiff.ForeColor = Color.FromArgb(40, 180, 80);
         }
         else if (diff < 0)
         {
-            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} ({Math.Abs(diff)} less than {origBST})";
-            L_StatDiff.ForeColor = Color.Red;
+            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} ({diff} compared to {origBST})";
+            L_StatDiff.ForeColor = Color.FromArgb(230, 70, 70);
         }
         else
         {
-            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} (0 more than {origBST})";
+            L_StatDiff.Text = $"{prefix} BST Diff: {curBST} (0 compared to {origBST})";
             L_StatDiff.ForeColor = Color.Gray; 
         }
     }
 
-    // Missing method restored
     private void SetDiffLabel(Label l, int current, int original)
     {
+        if (l == null) return;
         int diff = current - original;
-        if (diff > 0) { l.Text = $"+{diff}"; l.ForeColor = Color.Green; }
-        else if (diff < 0) { l.Text = $"{diff}"; l.ForeColor = Color.Red; }
+        if (diff > 0) { l.Text = $"+{diff}"; l.ForeColor = Color.FromArgb(40, 180, 80); }
+        else if (diff < 0) { l.Text = $"{diff}"; l.ForeColor = Color.FromArgb(230, 70, 70); }
         else { l.Text = "0"; l.ForeColor = Color.Gray; } 
     }
 
@@ -1410,12 +1475,12 @@ public partial class PersonalEditor7 : Form
             TB_BaseHP.Text, TB_BaseATK.Text, TB_BaseDEF.Text, TB_BaseSPA.Text, TB_BaseSPD.Text, TB_BaseSPE.Text,
             CB_Type1.SelectedIndex.ToString(), CB_Type2.SelectedIndex.ToString(),
             TB_CatchRate.Text, TB_HatchCycles.Text, TB_Friendship.Text, TB_Gender.Text,
-            CB_Ability1.SelectedIndex.ToString(), CB_Ability2.SelectedIndex.ToString(), CB_Ability3.SelectedIndex.ToString(),
+            LazyCombo.GetIndex(CB_Ability1).ToString(), LazyCombo.GetIndex(CB_Ability2).ToString(), LazyCombo.GetIndex(CB_Ability3).ToString(),
             CB_EggGroup1.SelectedIndex.ToString(), CB_EggGroup2.SelectedIndex.ToString(),
             TB_Height.Text, TB_Weight.Text, CB_Color.SelectedIndex.ToString(),
             TB_BaseExp.Text, CB_EXPGroup.SelectedIndex.ToString(), TB_CallRate.Text,
             TB_HPEVs.Text, TB_ATKEVs.Text, TB_DEFEVs.Text, TB_SPAEVs.Text, TB_SPDEVs.Text, TB_SPEEVs.Text,
-            CB_HeldItem1.SelectedIndex.ToString(), CB_HeldItem2.SelectedIndex.ToString(), CB_HeldItem3.SelectedIndex.ToString()
+            LazyCombo.GetIndex(CB_HeldItem1).ToString(), LazyCombo.GetIndex(CB_HeldItem2).ToString(), LazyCombo.GetIndex(CB_HeldItem3).ToString()
         };
 
         // Also copy Move Tutor/TM data into in-memory clipboard
@@ -1446,7 +1511,7 @@ public partial class PersonalEditor7 : Form
         TB_BaseSPA.Text = p[3]; TB_BaseSPD.Text = p[4]; TB_BaseSPE.Text = p[5];
         CB_Type1.SelectedIndex = int.Parse(p[6]); CB_Type2.SelectedIndex = int.Parse(p[7]);
         TB_CatchRate.Text = p[8]; TB_HatchCycles.Text = p[9]; TB_Friendship.Text = p[10]; TB_Gender.Text = p[11];
-        CB_Ability1.SelectedIndex = int.Parse(p[12]); CB_Ability2.SelectedIndex = int.Parse(p[13]); CB_Ability3.SelectedIndex = int.Parse(p[14]);
+        LazyCombo.SetIndex(CB_Ability1, int.Parse(p[12])); LazyCombo.SetIndex(CB_Ability2, int.Parse(p[13])); LazyCombo.SetIndex(CB_Ability3, int.Parse(p[14]));
         CB_EggGroup1.SelectedIndex = int.Parse(p[15]); CB_EggGroup2.SelectedIndex = int.Parse(p[16]);
         
         TB_Height.Text = p[17]; 
@@ -1461,9 +1526,9 @@ public partial class PersonalEditor7 : Form
 
         if (p.Length >= 32)
         {
-            CB_HeldItem1.SelectedIndex = int.Parse(p[29]);
-            CB_HeldItem2.SelectedIndex = int.Parse(p[30]);
-            CB_HeldItem3.SelectedIndex = int.Parse(p[31]);
+            LazyCombo.SetIndex(CB_HeldItem1, int.Parse(p[29]));
+            LazyCombo.SetIndex(CB_HeldItem2, int.Parse(p[30]));
+            LazyCombo.SetIndex(CB_HeldItem3, int.Parse(p[31]));
         }
 
         // Restore TM/Tutor selections if they were copied
@@ -1544,30 +1609,83 @@ public partial class PersonalEditor7 : Form
         System.Media.SystemSounds.Asterisk.Play();
     }
 
-    private void B_MaxCatch_Click(object sender, EventArgs e) { TB_CatchRate.Text = "255"; SaveEntry(); }
-    private void B_ZeroHatch_Click(object sender, EventArgs e) { TB_HatchCycles.Text = "0"; SaveEntry(); }
+    private void B_MaxCatch_Click(object sender, EventArgs e)
+    {
+        if (entry < 1 || entry >= files.Length || pkm == null) return;
+        TB_CatchRate.Text = "255";
+        pkm.CatchRate = 255;
+        SaveEntry();
+    }
+
+    private void B_ZeroHatch_Click(object sender, EventArgs e)
+    {
+        if (entry < 1 || entry >= files.Length || pkm == null) return;
+        TB_HatchCycles.Text = "000";
+        pkm.HatchCycles = 0;
+        SaveEntry();
+    }
 
     private void B_MaxCatchAll_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Apply Max Catch Rate (255) to ALL Pokémon?") != DialogResult.Yes) return;
-        for (int i = 1; i < files.Length; i++) {
-            Main.SpeciesStat[i].CatchRate = 255;
-            files[i] = Main.SpeciesStat[i].Write();
+        int entryLen = files.FirstOrDefault(f => f != null && f.Length < 0x1000)?.Length ?? 84;
+        for (int i = 1; i < files.Length; i++)
+        {
+            if (files[i] == null || files[i].Length != entryLen)
+                continue;
+
+            PersonalInfo pi = null;
+            if (Main.SpeciesStat != null && i < Main.SpeciesStat.Length && Main.SpeciesStat[i] != null)
+                pi = Main.SpeciesStat[i];
+            else
+                pi = PersonalTable.GetInfo(files[i], Main.Config.Version);
+
+            if (pi != null)
+            {
+                pi.CatchRate = 255;
+                files[i] = pi.Write();
+                if (Main.SpeciesStat != null && i < Main.SpeciesStat.Length)
+                    Main.SpeciesStat[i] = pi;
+            }
         }
-        TB_CatchRate.Text = "255";
-        SaveEntry();
+        if (entry >= 1 && entry < files.Length && pkm != null)
+        {
+            pkm.CatchRate = 255;
+            TB_CatchRate.Text = "255";
+            SaveEntry();
+        }
         WinFormsUtil.Alert("All Pokémon Catch Rates set to 255.");
     }
 
     private void B_ZeroHatchAll_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Apply 0 Hatch Cycles to ALL Pokémon?") != DialogResult.Yes) return;
-        for (int i = 1; i < files.Length; i++) {
-            Main.SpeciesStat[i].HatchCycles = 0;
-            files[i] = Main.SpeciesStat[i].Write();
+        int entryLen = files.FirstOrDefault(f => f != null && f.Length < 0x1000)?.Length ?? 84;
+        for (int i = 1; i < files.Length; i++)
+        {
+            if (files[i] == null || files[i].Length != entryLen)
+                continue;
+
+            PersonalInfo pi = null;
+            if (Main.SpeciesStat != null && i < Main.SpeciesStat.Length && Main.SpeciesStat[i] != null)
+                pi = Main.SpeciesStat[i];
+            else
+                pi = PersonalTable.GetInfo(files[i], Main.Config.Version);
+
+            if (pi != null)
+            {
+                pi.HatchCycles = 0;
+                files[i] = pi.Write();
+                if (Main.SpeciesStat != null && i < Main.SpeciesStat.Length)
+                    Main.SpeciesStat[i] = pi;
+            }
         }
-        TB_HatchCycles.Text = "0";
-        SaveEntry();
+        if (entry >= 1 && entry < files.Length && pkm != null)
+        {
+            pkm.HatchCycles = 0;
+            TB_HatchCycles.Text = "000";
+            SaveEntry();
+        }
         WinFormsUtil.Alert("All Pokémon Hatch Cycles set to 0.");
     }
 
@@ -1584,54 +1702,65 @@ public partial class PersonalEditor7 : Form
         if (files == null || files.Length == 0) return; // Safety check
 
         vanillaStats = new int[files.Length][];
-        string path = Path.Combine(Application.StartupPath, "vanilla_stats.txt");
+        string[] candidatePaths =
+        [
+            Path.Combine(Application.StartupPath, "vanilla_stats.txt"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vanilla_stats.txt"),
+            Path.Combine(Directory.GetCurrentDirectory(), "vanilla_stats.txt")
+        ];
 
-        if (File.Exists(path))
+        string path = candidatePaths.FirstOrDefault(File.Exists);
+
+        if (path != null)
         {
-            // Read from the permanent backup
-            string[] lines = File.ReadAllLines(path);
-            for (int i = 0; i < lines.Length; i++)
+            try
             {
-                if (i >= files.Length) break;
-                string[] parts = lines[i].Split(',');
-                if (parts.Length == 6)
+                string[] lines = File.ReadAllLines(path);
+                for (int i = 0; i < lines.Length && i < files.Length; i++)
                 {
-                    vanillaStats[i] = new int[6];
-                    for (int j = 0; j < 6; j++)
-                        int.TryParse(parts[j], out vanillaStats[i][j]);
+                    string[] parts = lines[i].Split(',');
+                    if (parts.Length == 6)
+                    {
+                        vanillaStats[i] = new int[6];
+                        for (int j = 0; j < 6; j++)
+                            int.TryParse(parts[j].Trim(), out vanillaStats[i][j]);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading vanilla_stats.txt: {ex.Message}");
             }
         }
         else
         {
             try
             {
-                // First run: Create the permanent backup file using ALL entries in files
+                string targetPath = candidatePaths[0];
                 List<string> lines = new List<string>();
                 for (int i = 0; i < files.Length; i++)
                 {
                     vanillaStats[i] = new int[6];
-                    
-                    if (i > 0 && files[i] != null && files[i].Length >= 6)
+                    if (i > 0 && files[i] != null && files[i].Length > 0)
                     {
-                        vanillaStats[i][0] = files[i][0]; // HP
-                        vanillaStats[i][1] = files[i][1]; // ATK
-                        vanillaStats[i][2] = files[i][2]; // DEF
-                        vanillaStats[i][3] = files[i][4]; // SPA 
-                        vanillaStats[i][4] = files[i][5]; // SPD 
-                        vanillaStats[i][5] = files[i][3]; // SPE 
+                        var info = PersonalTable.GetInfo(files[i], Main.Config.Version);
+                        if (info != null)
+                        {
+                            vanillaStats[i][0] = info.HP;
+                            vanillaStats[i][1] = info.ATK;
+                            vanillaStats[i][2] = info.DEF;
+                            vanillaStats[i][3] = info.SPA;
+                            vanillaStats[i][4] = info.SPD;
+                            vanillaStats[i][5] = info.SPE;
+                        }
                     }
-                    
                     lines.Add($"{vanillaStats[i][0]},{vanillaStats[i][1]},{vanillaStats[i][2]},{vanillaStats[i][3]},{vanillaStats[i][4]},{vanillaStats[i][5]}");
                 }
-                
-                File.WriteAllLines(path, lines);
-                WinFormsUtil.Alert("Created 'vanilla_stats.txt' successfully!", 
-                                   $"It is located at:\n{path}");
+                File.WriteAllLines(targetPath, lines);
             }
             catch (Exception ex)
             {
-                WinFormsUtil.Alert("Failed to create vanilla_stats.txt.", "Error details:", ex.Message);
+                Console.WriteLine($"Error creating vanilla_stats.txt: {ex.Message}");
             }
         }
     }
@@ -1641,21 +1770,6 @@ public partial class PersonalEditor7 : Form
         RandSettings.SetFormSettings(this, TP_Randomizer.Controls);
     }
 
-    private byte[] RebuildMasterTable(byte[][] entries)
-    {
-        if (entries == null || entries.Length == 0) return [];
-        byte[] firstValid = entries.FirstOrDefault(e => e != null && e.Length < 0x1000); // Master tables are huge
-        if (firstValid == null) return [];
-        int len = firstValid.Length;
-
-        var actualEntries = entries.Where(f => f != null && f.Length == len).ToList();
-        byte[] table = new byte[actualEntries.Count * len];
-        for (int i = 0; i < actualEntries.Count; i++)
-        {
-            actualEntries[i].CopyTo(table, i * len);
-        }
-        return table;
-    }
 
 
 }

@@ -1,0 +1,35 @@
+{
+  "Name": "Name Rater Traded Pokemon",
+  "Description": "Allows the Name Rater to rename traded Pokemon with OT/ID mismatch by unconditionally setting r5 to 1 in IsMyPokemon.",
+  "Category": "Quality of Life",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "CodeBin": {
+    "LoadBase": 1048576,
+    "Blocks": [],
+    "Patches": [
+      {
+        "Name": "name-rater-unconditional-rename",
+        "Symbol": "_ZNK8Savedata8MyStatus11IsMyPokemonERKN3pml8pokepara9CoreParamE",
+        "Offset": 104,
+        "Original": "0150A013",
+        "Patched": "0150A0E3",
+        "BranchOffset": 0,
+        "Link": false,
+        "Retargets": [],
+        "OriginalBytes": "AVCgEw==",
+        "PatchedBytes": "AVCg4w=="
+      }
+    ]
+  },
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

@@ -34,16 +34,63 @@ public sealed class CodeSpaceAllocator
 
     /// <summary>Bytes treated as padding when scanning: 0xCC traps and plain zero fill.</summary>
     private static readonly byte[] PaddingBytes = [0xCC, 0x00];
+    private const int MinimumPaddingRun = 0x40;
 
     public ResearchTarget Target { get; }
     public IReadOnlyList<(uint Start, uint End)> Granted => _granted;
 
-    public CodeSpaceAllocator(byte[] binary, ResearchDatabase db, ResearchTarget target)
+    private readonly int _textEnd;
+
+    /// <param name="keepOut">Ranges never to hand out (Uhuru's own code, earlier installs).</param>
+    /// <param name="textEnd">Where code.bin's executable .text ends (file offset); CRO targets scan the whole file. After text growth, pass <see cref="CodeGrowth.TextEndFor"/> using the grown exheader; the default remains the stock text boundary.</param>
+    public CodeSpaceAllocator(byte[] binary, ResearchDatabase db, ResearchTarget target,
+                              IEnumerable<(uint Start, int Size)> keepOut = null,
+                              int textEnd = ResearchEngine.CodeTextRegionEnd)
     {
         _binary = binary ?? throw new ArgumentNullException(nameof(binary));
         Target = target;
+        _textEnd = textEnd;
         _registry = db?.FreeSpaceFor(target) ?? [];
+        foreach (var (start, size) in keepOut ?? [])
+            Exclude(start, size);
     }
+
+    /// <summary>
+    /// The one allocator for code.bin blocks. Keep-out = <paramref name="placedByInstalls"/> plus, on Uhuru,
+    /// its changed regions and caves. First-fit by ascending address, never at or past <paramref name="textEnd"/>.
+    /// The default limit is the stock boundary and deliberately does not expose pages added by <see cref="CodeGrowth"/>.
+    /// </summary>
+    public static CodeSpaceAllocator ForCodeBin(byte[] code, IEnumerable<(uint Start, int Size)> placedByInstalls = null,
+                                                int textEnd = ResearchEngine.CodeTextRegionEnd)
+    {
+        var keep = (placedByInstalls ?? []).ToList();
+        if (UhuruGuard.Active) keep.AddRange(UhuruGuard.KeepOut("code.bin").Select(k => (k.Item1, k.Item2)));
+        return new CodeSpaceAllocator(code, null, ResearchTarget.CodeBin, keep, textEnd);
+    }
+
+    /// <summary>Largest remaining 4-aligned pad run honoring keep-out and grants (for refusal messages).</summary>
+    public (int Offset, int Length) LargestFree()
+    {
+        int limit = ScanLimit();
+        int best = 0, bestAt = 0, runStart = -1;
+        for (int i = 0; i <= limit; i++)
+        {
+            bool pad = i < limit && IsAvailablePadding(i);
+            if (pad) { if (runStart < 0) runStart = i; continue; }
+            if (runStart >= 0)
+            {
+                int runLength = i - runStart;
+                int s = (runStart + 3) & ~3, len = i - s;
+                if (runLength >= MinimumPaddingRun && len > best) { best = len; bestAt = s; }
+                runStart = -1;
+            }
+        }
+        return (bestAt, best);
+    }
+
+    private int ScanLimit() => Target == ResearchTarget.CodeBin ? Math.Min(_binary.Length, _textEnd) : _binary.Length;
+
+    private bool IsAvailablePadding(int offset) => PaddingBytes.Contains(_binary[offset]) && !Overlaps((uint)offset, 1);
 
     /// <summary>
     /// Reserves <paramref name="size"/> bytes, 4-byte aligned. Returns a failed grant (rather than
@@ -56,10 +103,11 @@ public sealed class CodeSpaceAllocator
 
         foreach (var region in _registry)
         {
-            // Room is measured from the END of whatever already occupies the region.
-            uint start = region.Offset + (uint)Math.Max(0, region.Length);
-            start = (start + 3u) & ~3u;
-            if (region.Room < need) continue;
+            // Room is measured from the END of whatever already occupies the region; the bytes lost
+            // to aligning the start count against it, or a grant could run up to 3 bytes past.
+            uint end = region.Offset + (uint)Math.Max(0, region.Length);
+            uint start = (end + 3u) & ~3u;
+            if (region.Room - (int)(start - end) < need) continue;
             if (start + need > _binary.Length) continue;
             if (Overlaps(start, (uint)need)) continue;
 
@@ -78,30 +126,35 @@ public sealed class CodeSpaceAllocator
     /// <summary>Fallback: find a run of padding long enough, avoiding anything already granted.</summary>
     private SpaceGrant ScanForPadding(int need)
     {
-        int run = 0;
-        for (int i = 0; i < _binary.Length; i++)
+        int runStart = -1;
+        // code.bin: only .text is executable; a hit in .rodata/.data faults on the first branch in.
+        int limit = ScanLimit();
+        for (int i = 0; i <= limit; i++)
         {
-            bool pad = PaddingBytes.Contains(_binary[i]);
-            if (!pad) { run = 0; continue; }
+            bool pad = i < limit && IsAvailablePadding(i);
+            if (pad) { if (runStart < 0) runStart = i; continue; }
+            if (runStart < 0) continue;
 
-            run++;
-            if (run < need) continue;
-
-            uint start = (uint)(i - need + 1);
-            start = (start + 3u) & ~3u;
-            if (start + need > _binary.Length) { run = 0; continue; }
-            if (Overlaps(start, (uint)need)) { run = 0; continue; }
-
-            // Require the whole aligned window to still be padding after rounding.
-            bool clean = true;
-            for (uint j = start; j < start + need; j++)
-                if (!PaddingBytes.Contains(_binary[j])) { clean = false; break; }
-            if (!clean) { run = 0; continue; }
-
-            _granted.Add((start, start + (uint)need));
-            return new SpaceGrant(start, need, "scan:padding");
+            int runLength = i - runStart;
+            int start = (runStart + 3) & ~3;
+            if (runLength >= MinimumPaddingRun && i - start >= need)
+            {
+                uint at = (uint)start;
+                _granted.Add((at, at + (uint)need));
+                return new SpaceGrant(at, need, "scan:padding");
+            }
+            runStart = -1;
         }
         return SpaceGrant.Fail("no padding run found");
+    }
+
+    /// <summary>
+    /// Marks a range as taken without granting it: blocks earlier installs placed (see
+    /// <see cref="InstallRecord"/>). Their zero-filled tables otherwise look like free padding.
+    /// </summary>
+    public void Exclude(uint start, int size)
+    {
+        if (size > 0) _granted.Add((start, start + (uint)size));
     }
 
     private bool Overlaps(uint start, uint size)

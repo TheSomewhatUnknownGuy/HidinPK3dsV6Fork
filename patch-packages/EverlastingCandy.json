@@ -1,0 +1,38 @@
+{
+  "Name": "Everlasting Candy",
+  "Description": "An unlimited-use Rare Candy. REBUILT 2026-09-02 as PURE DATA - this package now injects no ARM whatsoever, and the previous Bag.cro hook trio plus the code.bin FlipTokuseiIndex chain have been deleted outright because they could never have worked. Disassembly of Bag.cro's real dispatcher (0xC2F0) showed an item's bag-use effect is decided entirely by its own ITEM_DATA: ITEM_MANAGER::GetData(id) loads the record, ITEM_UTIL_GetHealingItemType reads it and returns an effect index 0..0x1B, and a 28-entry jump table branches on that. Nothing on that path looks at the item id, so no amount of id-matching inside an injected routine could ever have selected a behaviour - and the old routine's own check compared r2, which at the real call site is undefined leftover from PokeList::GetPoke. Confirmed in game: a byte-identical clone of a vanilla item reproduces that item's effect with zero injected code. So this is Rare Candy's record (LevelUp - which the Level Cap patch already clamps, since it hooks the shared candy routine rather than this item) plus the flutes' own UseKeep flag, that being vanilla's real 'not consumed on use' mechanism; items 65-69 are the precedent. Batched multi-level use is NOT included: that needs a quantity-picker UI native, still unfound.",
+  "Category": "Medicine",
+  "Requires": [],
+  "Parameters": {
+    "everlastingCandyId": {
+      "Description": "Item ID for the Everlasting Candy (default: 869).",
+      "Type": "item",
+      "Default": "869",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {
+    "${everlastingCandyId}": {
+      "CloneFrom": "50",
+      "ItemKind": "1",
+      "Pocket": "1",
+      "Fields": {
+        "LevelUp": "true",
+        "UseKeep": "true"
+      }
+    }
+  },
+  "ItemNames": {
+    "${everlastingCandyId}": "Everlasting Candy"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${everlastingCandyId}": "A candy that never runs out. Raises a Pokémon's level by one, up to your current level cap, and is not used up."
+  }
+}

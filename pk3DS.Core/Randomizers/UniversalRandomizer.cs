@@ -6,6 +6,8 @@ using pk3DS.Core.Structures.PersonalInfo;
 using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
+using pk3DS.Core.CTR;
+using pk3DS.Core.Randomizers.Competitive;
 
 namespace pk3DS.Core.Randomizers;
 
@@ -20,16 +22,100 @@ public class UniversalRandomizer
     /// </summary>
     private AbilityBanList AbilityBans { get; set; }
 
+    /// <summary>
+    /// Shared code.bin buffer. Loaded once before the first writer, flushed once after the last.
+    /// Every feature that modifies code.bin MUST use this rather than round-tripping from disk,
+    /// otherwise later writers stomp earlier patches and the game white-screens.
+    /// </summary>
+    private byte[] _codeBin;
+    private string _codeBinPath;
+    private bool _codeBinDirty;
+
+    // TM expansion whose item data is written once its code.bin is (see SyncCodeBinToDisk / FlushCodeBin).
+    private ushort[] _pendingTMItemIds;
+    private ushort[] _pendingTMMoves;
+    private int _pendingTMFirstSlot;
+
     public UniversalRandomizer(GameConfig config, UniversalSettings settings, string romfsPath = "")
     {
         Config = config;
         Settings = settings;
-        RomFSPath = romfsPath;
+        RomFSPath = string.IsNullOrWhiteSpace(romfsPath) ? (config?.RomFS ?? "") : romfsPath;
         AbilityBans = new AbilityBanList(config?.GetText(TextName.AbilityNames), settings);
+    }
+
+    /// <summary>Loads code.bin into the shared buffer if not already loaded.</summary>
+    private bool EnsureCodeBin()
+    {
+        if (_codeBin != null) return true;
+        _codeBinPath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Config?.ExeFS);
+        if (string.IsNullOrEmpty(_codeBinPath) || !File.Exists(_codeBinPath)) return false;
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) != null) return false; // Uhuru: every step that patches code.bin is skipped
+        _codeBin = File.ReadAllBytes(_codeBinPath);
+        _codeBinDirty = false;
+        return _codeBin != null && _codeBin.Length > 0;
+    }
+
+    /// <summary>Synchronizes the shared in-memory buffer to disk without releasing it.</summary>
+    private void SyncCodeBinToDisk()
+    {
+        if (_codeBin != null && _codeBinDirty && !string.IsNullOrEmpty(_codeBinPath) && pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) == null)
+        {
+            File.WriteAllBytes(_codeBinPath, _codeBin);
+            _codeBinDirty = false;
+            WritePendingTMItems();
+        }
+    }
+
+    /// <summary>Writes the item data of a TM expansion whose code.bin has just reached disk.</summary>
+    private void WritePendingTMItems()
+    {
+        if (_pendingTMItemIds == null) return;
+        try
+        {
+            pk3DS.Core.Modding.Research.ExpandedTMItems.WriteItemData(Config, _pendingTMItemIds, _pendingTMMoves, _pendingTMFirstSlot);
+        }
+        catch (Exception ex)
+        {
+            LastTMError = "TM item names/descriptions not written: " + ex.Message;
+        }
+        _pendingTMItemIds = null;
+        _pendingTMMoves = null;
+        _pendingTMFirstSlot = 0;
+    }
+
+    /// <summary>Reloads the shared in-memory buffer from disk (e.g. after an external recipe write).</summary>
+    private void ReloadCodeBinFromDisk()
+    {
+        // Uhuru: no shared buffer, so the code.bin steps after a package install stay skipped (and say so) instead of
+        // patching a buffer FlushCodeBin would drop.
+        if (!string.IsNullOrEmpty(_codeBinPath) && File.Exists(_codeBinPath) && pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) == null)
+        {
+            _codeBin = File.ReadAllBytes(_codeBinPath);
+            _codeBinDirty = false;
+        }
+    }
+
+    /// <summary>Flushes the shared code.bin buffer to disk if any writer dirtied it.</summary>
+    private void FlushCodeBin()
+    {
+        if (_codeBin != null && _codeBinDirty && !string.IsNullOrEmpty(_codeBinPath) && pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) == null)
+        {
+            File.WriteAllBytes(_codeBinPath, _codeBin);
+            WritePendingTMItems();
+        }
+        _codeBin = null;
+        _codeBinDirty = false;
     }
 
     public void Execute(Action<string, int> progressCallback = null, Action<SpeciesRandomizer, FormRandomizer> wildRandomizerAction = null, Action<SpeciesRandomizer, FormRandomizer> staticsRandomizerAction = null)
     {
+        // Per-run TM state: an error or pending item data from an earlier run must not be reported or written again.
+        LastTMError = null;
+        _pendingTMItemIds = null;
+        _pendingTMMoves = null;
+        _pendingTMFirstSlot = 0;
+
         // 1. Initialize Seed
         int seed = GenerateSeed(Settings.Seed);
         Util.ReseedRand(seed);
@@ -67,11 +153,33 @@ public class UniversalRandomizer
         speciesRand.Initialize();
         speciesRand.GenerateGlobalMapping(Config.Evolutions);
 
+        // 2b. TM move table. Settled before personal data so TM compatibility below is rolled against
+        // the moves the TMs will actually teach ("prefer same type" needs their types). With TM moves
+        // unchanged this only reads the vanilla table.
+        EnsureCodeBin();
+        ushort[] tmMoveListForInjection = null;
+        // The MaxSpeciesID term is there so trainers get TM moves on Expansion and Uhuru ROMs; it only reads the table.
+        if (Settings.TMHMMovesMode > 0 || Settings.CompetitiveRandomizer || Settings.ExpandTMs ||
+            Config.MaxSpeciesID >= 1025 || Settings.TMHMCompatibilityMode == 1)
+        {
+            if (Settings.TMHMMovesMode > 0)
+                progressCallback?.Invoke("Randomizing TM move table...", 15);
+            tmMoveListForInjection = RandomizeTMMoveTable();
+            if (Settings.TMHMMovesMode > 0 && pk3DS.Core.Modding.UhuruGuard.Active)
+                progressCallback?.Invoke(tmMoveListForInjection != null
+                    ? "WARNING: TM move randomization skipped on Uhuru (code.bin is not patched); trainers use the existing TMs."
+                    : "WARNING: TM move randomization skipped on Uhuru, and the TM table was not found, so trainers get no TM moves.", 15);
+        }
+
         // 3. Personal Data (Base Stats, Abilities, Types, Catch Rates, Held Items, Egg Groups)
         if (Settings.BaseStatsMode > 0 || Settings.AbilitiesMode > 0 || Settings.TypesMode > 0 ||
             Settings.WildSetMinCatchRate || Settings.FieldItemsBanBadItems || Settings.TotemRandomizeHeldItems ||
             Settings.EnforceMaximumBST || Settings.NoEgregiousStats ||
-            Settings.FastEggHatching || Settings.NoEVsFromPokemon)
+            Settings.FastEggHatching || Settings.NoEVsFromPokemon ||
+            Settings.ForceDualTypes ||
+            // Read only inside this block, so selecting just these used to do nothing.
+            Settings.WildRandomizeHeldItems || Settings.TMHMCompatibilityMode > 0 ||
+            Settings.MoveTutorCompatibilityMode > 0 || Settings.FullHMCompatibility)
         {
             progressCallback?.Invoke("Randomizing Pokémon Traits (Base Stats, Abilities, Types)...", 20);
 
@@ -79,7 +187,7 @@ public class UniversalRandomizer
             {
                 ModifyStats = Settings.BaseStatsMode == 2,
                 ShuffleStats = Settings.BaseStatsMode == 1,
-                PreserveBST = true,
+                PreserveBST = Settings.StatVariancePercent == 0,
                 StatDeviation = Settings.StatVariancePercent,
                 TypeCount = Math.Max(1, Config.GetText(pk3DS.Core.TextName.Types).Length),
                 ModifyStatsFollowEvolutions = Settings.BaseStatsFollowEvolutions,
@@ -119,29 +227,44 @@ public class UniversalRandomizer
                 SameTypeChance = Settings.TypesMode == 1 ? 75 : 50,
                 ModifyTypesFollowEvolutions = Settings.TypesMode == 1,
                 ModifyTypesFollowMegas = Settings.TypesFollowMegas,
+                ForceDualTypes = Settings.ForceDualTypes,
 
-                ModifyCatchRate = Settings.WildSetMinCatchRate,
+                // "Minimum catch rate" is a floor, applied further down; re-rolling every species'
+                // rate here first threw away the vanilla values it was meant to protect.
+                ModifyCatchRate = false,
                 ModifyHeldItems = Settings.WildRandomizeHeldItems,
                 ModifyEggGroup = false,
 
-                TMInheritance = Settings.TMFollowEvolutions,
+                // Only with TM compatibility randomized: otherwise this re-propagated vanilla TMs down
+                // evolution lines whenever any other trait was randomized.
+                TMInheritance = Settings.TMFollowEvolutions && Settings.TMHMCompatibilityMode is 1 or 2,
 
-                ModifyLearnsetTM = Settings.TMHMCompatibilityMode is 1 or 2 || Settings.FullHMCompatibility,
-                ModifyLearnsetHM = Settings.TMHMCompatibilityMode is 1 or 2 || Settings.FullHMCompatibility,
+                // Full HM compatibility is applied on its own below; it must not re-roll every TM.
+                ModifyLearnsetTM = Settings.TMHMCompatibilityMode is 1 or 2,
+                ModifyLearnsetHM = Settings.TMHMCompatibilityMode is 1 or 2,
+                ModifyLearnsetSmartly = true,
+                PreferSameTypeTMs = Settings.TMHMCompatibilityMode == 1,
+                MoveIDsTMs = tmMoveListForInjection,
                 ModifyLearnsetTypeTutors = Settings.MoveTutorCompatibilityMode is 1 or 2,
                 ModifyLearnsetMoveTutors = Settings.MoveTutorCompatibilityMode is 1 or 2,
 
-                MegaBSTSync = Settings.CompetitiveRandomizer,
+                MegaBSTSync = Settings.CompetitiveRandomizer || Settings.BaseStatsFollowMegas,
                 UseCompetitiveAbilities = Settings.CompetitiveRandomizer
             };
 
             pRandomizer.Execute();
             pRandomizer.ApplyTypeInheritance();
+            if (Settings.ForceDualTypes)
+                pRandomizer.ApplyForceDualTypes(Config.Personal.Table);
             pRandomizer.ApplyStatInheritance();
             pRandomizer.ApplyAbilityInheritance();
+            pRandomizer.SynchronizeCalyrexRiderTypes(Config.Personal.Table);
 
             if (pRandomizer.MegaBSTSync)
                 pRandomizer.ApplyMegaBSTSync();
+
+            if (Settings.ForceDualTypes)
+                pRandomizer.ApplyForceDualTypes(Config.Personal.Table);
 
             // Runs absolute last so it smooths the final shape of every stat spread, Mega forms
             // included, without touching any Pokemon's total BST.
@@ -190,13 +313,8 @@ public class UniversalRandomizer
                 allFiles[i] = table.Table[i].Write();
             }
 
-            int entryLen = allFiles[0].Length;
-            byte[] masterTable = new byte[count * entryLen];
-            for (int i = 0; i < count; i++)
-            {
-                allFiles[i].CopyTo(masterTable, i * entryLen);
-            }
-            allFiles[count] = masterTable;
+            allFiles[count] = (byte[])Config.GARCPersonal.Files[^1].Clone(); // keeps Uhuru's junk entries and tail
+            pk3DS.Core.Modding.TMCompat.SyncMaster(allFiles);
 
             Config.GARCPersonal.Files = allFiles;
             Config.GARCPersonal.Save();
@@ -207,13 +325,24 @@ public class UniversalRandomizer
         {
             progressCallback?.Invoke("Randomizing Evolutions & Trade Fixes...", 40);
 
-            var eRandomizer = new EvolutionRandomizer(Config, Config.Evolutions);
+            var eRandomizer = new EvolutionRandomizer(Config, Config.Evolutions, speciesRand);
 
             if (Settings.ChangeImpossibleEvos)
                 eRandomizer.ExecuteTrade();
 
+            if (Settings.MakeEvosEasier)
+                eRandomizer.ExecuteMakeEvosEasier();
+
+            if (Settings.RemoveTimeBasedEvos)
+                eRandomizer.ExecuteRemoveTimeBased();
+
             if (Settings.EvolutionsMode == 2)
+            {
+                // Every-level sets each target to species 1 as a placeholder; randomizing right after
+                // fills them in (as EvolutionEditor7 does). Without it everything evolves into Bulbasaur.
                 eRandomizer.ExecuteEvolveEveryLevel();
+                eRandomizer.Execute();
+            }
 
             if (Settings.EvolutionsMode == 1)
                 eRandomizer.Execute();
@@ -234,17 +363,42 @@ public class UniversalRandomizer
         {
             progressCallback?.Invoke("Randomizing Pokémon Movesets...", 55);
 
-            var lRandomizer = new LearnsetRandomizer(Config, Config.Learnsets)
+            const int Metronome = 118;
+            if (Settings.MovesetsMode == 3)
             {
-                STABPercent = Settings.MovesetsMode == 1 ? 70 : 40,
-                STABFirst = true,
-                Learn4Level1 = Settings.GuaranteedLevel1Moves,
-                OrderByPower = Settings.ReorderDamagingMoves,
-                Expand = true,
-                ExpandTo = 25
-            };
-
-            lRandomizer.Execute();
+                // "Metronome Only": every species learns exactly Metronome, at level 1.
+                foreach (var set in Config.Learnsets.Where(z => z != null))
+                {
+                    set.Moves = [Metronome];
+                    set.Levels = [1];
+                }
+            }
+            else if (Settings.MovesetsMode > 0)
+            {
+                var lRandomizer = new LearnsetRandomizer(Config, Config.Learnsets)
+                {
+                    STABPercent = Settings.MovesetsMode == 1 ? 70 : 40,
+                    STABFirst = true,
+                    Learn4Level1 = Settings.GuaranteedLevel1Moves,
+                    Level1Count = Settings.GuaranteedLevel1MovesCount,
+                    OrderByPower = Settings.ReorderDamagingMoves,
+                    Expand = true,
+                    ExpandTo = 25
+                };
+                lRandomizer.Execute();
+            }
+            else
+            {
+                // Movesets unchanged: "guaranteed level-1 moves" only moves the vanilla learnset's
+                // first N entries to level 1. It used to run the full randomizer at 40% STAB.
+                foreach (var set in Config.Learnsets.Where(z => z?.Levels != null))
+                {
+                    var levels = set.Levels;
+                    for (int i = 0; i < Math.Min(Settings.GuaranteedLevel1MovesCount, levels.Length); i++)
+                        levels[i] = 1;
+                    set.Levels = levels;
+                }
+            }
 
             var g = Config.GARCLearnsets;
             if (g != null)
@@ -257,23 +411,34 @@ public class UniversalRandomizer
             }
         }
 
-        ushort[] tmMoveListForInjection = null;
+        // Load code.bin once before any feature that modifies it. Every writer below operates
+        // on this shared buffer; a single flush at the end persists all changes atomically.
+        EnsureCodeBin();
+
         ushort[][] tutorMoveListsForInjection = null;
-        if (Settings.TMHMMovesMode > 0 || Config.MaxSpeciesID >= 1025)
+        if (Settings.MoveTutorMovesMode > 0 || Settings.CompetitiveRandomizer)
         {
-            progressCallback?.Invoke("Randomizing TM move table...", 65);
-            tmMoveListForInjection = RandomizeTMMoveTable();
-        }
-        if (Settings.MoveTutorMovesMode > 0)
-        {
-            progressCallback?.Invoke("Randomizing Move Tutor Moves...", 67);
+            if (Settings.MoveTutorMovesMode > 0)
+                progressCallback?.Invoke("Randomizing Move Tutor Moves...", 67);
             var tutorRand = new TutorRandomizer(RomFSPath, Settings.MoveTutorMovesMode);
             var tutorMoveRand = new MoveRandomizer(Config);
             tutorMoveListsForInjection = tutorRand.Execute(Config.Info.MaxMoveID, tutorMoveRand, Config, Settings.CompetitiveRandomizer);
+            if (tutorRand.UhuruReadOnly)
+                progressCallback?.Invoke("WARNING: move tutor randomization skipped on Uhuru (Shop.cro is not patched); trainers use the existing tutor moves.", 67);
         }
 
+        // 5b. Starters (processed before trainers so RivalCarriesStarter has chosen starters)
+        int[] chosenStarters = null;
+        try
+        {
+            if (Settings.StartersMode > 0)
+                progressCallback?.Invoke("Randomizing Starters...", 68);
+            chosenStarters = RandomizeStarters(speciesRand);
+        }
+        catch { }
+
         // 6. Trainers
-        if (Settings.TrainerPokemonMode > 0 || Settings.TrainerLevelModifierPercent != 0)
+        if (Settings.TrainerPokemonMode > 0 || Settings.TrainerLevelModifierPercent != 0 || Settings.UpgradeVanillaTrainers)
         {
             progressCallback?.Invoke("Randomizing Trainer Teams & Difficulty...", 70);
 
@@ -281,12 +446,41 @@ public class UniversalRandomizer
             var trpoke = Config.GetGARCData("trpoke");
             var moveRand = new MoveRandomizer(Config);
             var teamGen = new Competitive.TeamGenerator();
-            var buildEngine = new Competitive.CompetitiveBuildEngine(Config) { BanList = AbilityBans };
+            var buildEngine = new Competitive.CompetitiveBuildEngine(Config) { BanList = AbilityBans, Weights = Settings.Weights ?? new Competitive.CompetitiveWeights() };
             if (tmMoveListForInjection != null)
                 buildEngine.Learnsets.InjectTMMoves(tmMoveListForInjection);
             if (tutorMoveListsForInjection != null)
                 buildEngine.Learnsets.InjectTutorMoves(tutorMoveListsForInjection);
             string[] itemNames = Config.GetText(TextName.ItemNames);
+
+            bool trainerAllowLegendaries = !Settings.TrainerDontUseLegendaries && Settings.AllowLegendaries;
+            bool trainerAllowMythicals = !Settings.TrainerDontUseLegendaries && Settings.AllowMythicals;
+
+            var trainerSpeciesRand = new SpeciesRandomizer(Config)
+            {
+                G1 = Settings.Gen1,
+                G2 = Settings.Gen2,
+                G3 = Settings.Gen3,
+                G4 = Settings.Gen4,
+                G5 = Settings.Gen5,
+                G6 = Settings.Gen6,
+                G7 = Settings.Gen7,
+                G8 = Settings.Gen8,
+                G9 = Settings.Gen9,
+
+                L = trainerAllowLegendaries,
+                E = trainerAllowMythicals,
+                Shedinja = Settings.AllowShedinja,
+
+                rBST = Settings.TrainerTrySimilarStrength,
+                rType = Settings.MatchType,
+                rEXP = Settings.MatchEXP
+            };
+            trainerSpeciesRand.Initialize();
+            trainerSpeciesRand.GenerateGlobalMapping(Config.Evolutions);
+
+            var legendarySet = Legal.GetLegendaryAndMythicalSet();
+            var allowedLegendaries = trainerSpeciesRand.AllowedSpecies.Where(s => legendarySet.Contains(s)).ToList();
 
             Dictionary<string, List<int>> abilityToFinalSpecies = null;
             if (Settings.CompetitiveRandomizer)
@@ -297,6 +491,7 @@ public class UniversalRandomizer
                 for (int s = 1; s <= maxSpecForIndex; s++)
                 {
                     int finalSpec = GetFinalEvolution(s);
+                    if (!trainerAllowLegendaries && legendarySet.Contains(finalSpec)) continue;
                     var fpi = Config.Personal[finalSpec];
                     if (fpi?.Abilities == null) continue;
                     foreach (int abilId in fpi.Abilities)
@@ -318,18 +513,62 @@ public class UniversalRandomizer
 
                 if (Config.Generation == 7)
                 {
-                    for (int i = 1; i < trd.Length && i < trp.Length; i++)
+                    // Uhuru (b > 0): trdata has 5 blocks, trpoke 7, index = block * b + id. One team per trainer:
+                    // block 0 is randomized, every other block copies its species slot by slot (docs/uhuru/trainer-format.md).
+                    int b = Config.Info.TrainerBaseCount;
+                    // Only when species can change: a level-only run must keep Uhuru's own per-difficulty teams.
+                    bool oneTeam = b > 0 && Settings.UhuruOneTeam && (Settings.TrainerPokemonMode > 0 || Settings.CompetitiveRandomizer);
+                    HashSet<int> keepPwt = b > 0 && Settings.UhuruKeepPwtCast ? [.. TrainerBlocks.UhuruPwtTrainers] : null;
+                    var baseTeams = new Dictionary<int, (int Species, int Form)[]>();
+                    // Blocks that start out identical to block 0 (block 1 on every trainer): computed on the ORIGINAL
+                    // arrays before the loop mutates anything, so they can reuse block 0's output as is.
+                    bool[] sameAsBase = null;
+                    if (oneTeam)
+                    {
+                        sameAsBase = new bool[trd.Length];
+                        for (int k = b; k < trd.Length && k < trp.Length; k++)
+                            sameAsBase[k] = trd[k].AsSpan().SequenceEqual(trd[k % b]) && trp[k].AsSpan().SequenceEqual(trp[k % b]);
+                    }
+                    int loopEnd = b > 0 ? trp.Length : Math.Min(trd.Length, trp.Length);
+
+                    for (int i = 1; i < loopEnd; i++)
                     {
                         if (trp[i].Length < 4) continue;
-                        var trainer = new TrainerData7(trd[i], trp[i]);
+                        int id = TrainerBlocks.BaseId(i, b), blk = TrainerBlocks.Block(i, b);
+                        if (b > 0 && (id == 0 || (keepPwt != null && keepPwt.Contains(id)))) continue;
+                        if (sameAsBase != null && i < sameAsBase.Length && sameAsBase[i])
+                        {
+                            trd[i] = trd[id];
+                            trp[i] = trp[id];
+                            continue;
+                        }
+
+                        // trpoke blocks 5/6 have no trdata record of their own: use block 3/4's (this run's output) with the team length.
+                        bool ownRecord = i < trd.Length;
+                        TrainerData7 trainer;
+                        int di = i;
+                        if (ownRecord)
+                            trainer = new TrainerData7(trd[i], trp[i]);
+                        else
+                        {
+                            di = TrainerBlocks.TrdataBlockFor(blk) * b + id;
+                            int n = TrainerBlocks.TeamCount(trp[i].Length);
+                            var rec = (byte[])trd[di].Clone();
+                            rec[3] = (byte)n;
+                            trainer = new TrainerData7(rec, trp[i], n);
+                        }
                         if (trainer.Pokemon == null || trainer.Pokemon.Count == 0) continue;
+
+                        // Block 0's species for this trainer, when this is a later block (null = pick normally).
+                        (int Species, int Form)[] forced = null;
+                        if (oneTeam && blk > 0) baseTeams.TryGetValue(id, out forced);
 
                         if (Settings.BetterTrainerMovesets || Settings.CompetitiveRandomizer || Settings.MasterAIMode > 0)
                             trainer.Flag = true;
 
                         bool fullAI = Settings.CompetitiveRandomizer
                                    || Settings.MasterAIMode == 2
-                                   || (Settings.MasterAIMode == 1 && TrainerTiers.Of(trainer, i) != TrainerTiers.Tier.Regular);
+                                   || (Settings.MasterAIMode == 1 && TrainerTiers.Of(trainer, id) != TrainerTiers.Tier.Regular);
 
                         if (fullAI)
                         {
@@ -340,7 +579,7 @@ public class UniversalRandomizer
                         bool shouldAddHeldItems = Settings.AddHeldItemsBossTrainers || Settings.AddHeldItemsImportantTrainers || Settings.AddHeldItemsRegularTrainers || Settings.CompetitiveRandomizer;
                         int[] sensibleItems = [217, 229, 158, 270, 268, 297, 287, 275, 538, 540, 640, 269, 271, 272, 231, 232, 233, 234, 235];
 
-                        bool isTutorialBattle = FirstRivalBattle.Matches(i, trainer);
+                        bool isTutorialBattle = FirstRivalBattle.Matches(id, trainer);
 
                         // 1. Team Expansion FIRST so full team size is known
                         int addCount = 0;
@@ -355,7 +594,7 @@ public class UniversalRandomizer
                             int targetCount = Math.Min(6, trainer.Pokemon.Count + addCount);
                             while (trainer.Pokemon.Count < targetCount)
                             {
-                                ushort extraSpecies = (ushort)speciesRand.GetRandomSpecies(trainer.Pokemon[0].Species);
+                                ushort extraSpecies = (ushort)trainerSpeciesRand.GetRandomSpecies(trainer.Pokemon[0].Species);
                                 if ((Settings.ForceFullyEvolvedAtLevel && avgLevel >= Settings.ForceFullyEvolvedLevel) || Settings.CompetitiveRandomizer)
                                     extraSpecies = GetFinalEvolution(extraSpecies);
                                 var newPk = new TrainerPoke7
@@ -368,9 +607,19 @@ public class UniversalRandomizer
                             trainer.NumPokemon = trainer.Pokemon.Count;
                         }
 
+                        // Apply Battle Style (e.g. Doubles) FIRST so team format & size are known to team builder
+                        if (ownRecord) ApplyBattleStyle(trainer);
+                        else if (trainer.Mode == BattleMode.Doubles && trainer.Pokemon.Count == 1)
+                        {
+                            // Blocks 5/6 follow the block 3/4 record's style (the game reads that one); only the missing partner is added.
+                            trainer.Pokemon.Add(trainer.Pokemon[0].Clone());
+                            trainer.NumPokemon = trainer.Pokemon.Count;
+                        }
+                        bool isDoubles = trainer.Mode == BattleMode.Doubles;
+
                         // 2. Generate Archetype & Roles for full team
                         var archetype = teamGen.GetRandomArchetype();
-                        var roles = teamGen.GetRolesForArchetype(archetype, trainer.Pokemon.Count);
+                        var roles = teamGen.GetRolesForArchetype(archetype, trainer.Pokemon.Count, isDoubles);
                         var archetypeSpec = teamGen.GetSpecification(archetype);
                         bool assignedMega = Settings.NoMegaEvolution;
                         bool assignedZCrystal = Settings.NoZMoves;
@@ -382,18 +631,34 @@ public class UniversalRandomizer
                         // Both reset for every trainer: they are about one team, not the whole game.
                         var placedSpecies = new HashSet<int>();
                         var teamTypes = new HashSet<int>();
-                        bool forceDiverse = TrainerTiers.Pick(trainer, i,
+                        var tier = TrainerTiers.Of(trainer, id);
+                        bool isBoss = tier == TrainerTiers.Tier.Boss;
+                        bool isImportant = tier == TrainerTiers.Tier.Important;
+                        bool forceDiverse = TrainerTiers.Pick(trainer, id,
                             Settings.TrainerDiverseTypesBoss,
                             Settings.TrainerDiverseTypesImportant,
                             Settings.TrainerDiverseTypesRegular);
+
+                        int guaranteedBossLegendarySlot = -1;
+                        if (trainerAllowLegendaries && allowedLegendaries.Count > 0 && isBoss)
+                        {
+                            bool rivalStarterOnLast = Settings.RivalCarriesStarter && chosenStarters != null && TryGetRivalStarter(id, out _);
+                            if (trainer.Pokemon.Count >= 2)
+                                guaranteedBossLegendarySlot = rivalStarterOnLast ? trainer.Pokemon.Count - 2 : trainer.Pokemon.Count - 1;
+                            else if (trainer.Pokemon.Count == 1)
+                                guaranteedBossLegendarySlot = rivalStarterOnLast ? -1 : 0;
+                        }
 
                         int trainerTheme = -1;
                         if (TrainerThemes.UsesThemes(Settings.TrainerPokemonMode))
                         {
                             var speciesBefore = trainer.Pokemon.Select(p => p.Species).ToList();
                             trainerTheme = TrainerThemes.ThemeFor(
-                                Config, Settings.TrainerPokemonMode, trainer, i, speciesBefore);
+                                Config, Settings.TrainerPokemonMode, trainer, id, speciesBefore);
                         }
+
+                        string[] abilityNames = Config.GetText(TextName.AbilityNames);
+                        string[] moveNames = Config.GetText(TextName.MoveNames);
 
                         // 3. Process every Pokemon in the team
                         for (int pkIdx = 0; pkIdx < trainer.Pokemon.Count; pkIdx++)
@@ -402,15 +667,66 @@ public class UniversalRandomizer
                             var role = (pkIdx < roles.Length) ? roles[pkIdx] : Competitive.CompetitiveRole.OffensiveSweeper;
                             int preMapSpecies = pk.Species;
 
-                            if (Settings.TrainerPokemonMode > 0 || Settings.CompetitiveRandomizer)
+                            int rivalStarterSlot = -1;
+                            // A later block's slots already carry block 0's starter (its evolution stage too: that is the "same species" rule).
+                            bool pinned = forced != null && pkIdx < forced.Length;
+                            bool isRivalStarter = forced == null && Settings.RivalCarriesStarter && chosenStarters != null && chosenStarters.Length == 3 &&
+                                                  pkIdx == trainer.Pokemon.Count - 1 && TryGetRivalStarter(id, out rivalStarterSlot);
+
+                            bool isLegendarySlot = false;
+                            if (trainerAllowLegendaries && allowedLegendaries.Count > 0 && !isRivalStarter)
                             {
-                                pk.Species = (ushort)PickTrainerSpecies(speciesRand, pk.Species, trainerTheme);
-                                pk.Species = (ushort)RefineTrainerPick(
-                                    speciesRand, preMapSpecies, pk.Species, placedSpecies, teamTypes, forceDiverse, trainerTheme);
+                                bool isAce = (pkIdx == trainer.Pokemon.Count - 1);
+                                if (isBoss)
+                                {
+                                    if (pkIdx == guaranteedBossLegendarySlot)
+                                        isLegendarySlot = true;
+                                    else
+                                        isLegendarySlot = (Util.Rand.Next(100) < 35);
+                                }
+                                else if (isImportant)
+                                {
+                                    if (isAce)
+                                        isLegendarySlot = (Util.Rand.Next(100) < 70);
+                                    else
+                                        isLegendarySlot = (Util.Rand.Next(100) < 20);
+                                }
+                            }
+
+                            if (pinned)
+                            {
+                                pk.Species = (ushort)forced[pkIdx].Species;
+                                pk.Form = forced[pkIdx].Form;
+                            }
+                            else
+                            {
+                                if (isRivalStarter)
+                                {
+                                    pk.Species = (ushort)GetEvolvedStarterForLevel(chosenStarters[rivalStarterSlot], pk.Level);
+                                }
+                                else if (Settings.TrainerPokemonMode > 0 || Settings.CompetitiveRandomizer)
+                                {
+                                    // Extra slots in a later block: re-pick (up to 20 times) until the base stat total reaches
+                                    // the weakest Pokemon of block 0's team. The competitive reselect below may still override this.
+                                    int floorBst = forced == null ? 0 : forced.Min(f => Config.Personal[f.Species]?.BST ?? 0);
+                                    for (int tries = 0; ; tries++)
+                                    {
+                                        pk.Species = (ushort)PickTrainerSpecies(trainerSpeciesRand, pk.Species, trainerTheme, isLegendarySlot, allowedLegendaries);
+                                        pk.Species = (ushort)RefineTrainerPick(
+                                            trainerSpeciesRand, preMapSpecies, pk.Species, placedSpecies, teamTypes, forceDiverse, trainerTheme, isLegendarySlot, allowedLegendaries);
+                                        if (forced == null || tries >= 20 || (Config.Personal[pk.Species]?.BST ?? 0) >= floorBst) break;
+                                    }
+                                }
+
+                                // A new species must not inherit the old slot's form: Alolan Raticate (form 1)
+                                // replaced by Charizard became form 1 = Mega Charizard X without a stone, and
+                                // the stat lookups below read the base form anyway.
+                                if (pk.Species != preMapSpecies)
+                                    pk.Form = 0;
                             }
 
                             int requiredAbilityId = -1;
-                            if (Settings.CompetitiveRandomizer && archetypeSpec != null)
+                            if (!pinned && Settings.CompetitiveRandomizer && archetypeSpec != null)
                             {
                                 string[] abilityNamesForBias = Config.GetText(TextName.AbilityNames);
                                 var wantedAbilityIds = new List<int>();
@@ -431,8 +747,8 @@ public class UniversalRandomizer
 
                                 foreach (string n in wantedNames)
                                 {
-                                    int id = Array.FindIndex(abilityNamesForBias, a => a.Equals(n, StringComparison.OrdinalIgnoreCase));
-                                    if (id > 0) wantedAbilityIds.Add(id);
+                                    int abilId = Array.FindIndex(abilityNamesForBias, a => a.Equals(n, StringComparison.OrdinalIgnoreCase));
+                                    if (abilId > 0) wantedAbilityIds.Add(abilId);
                                 }
 
                                 var typesStillNeeded = new HashSet<int>(archetypeSpec.RequiredTypes);
@@ -453,6 +769,15 @@ public class UniversalRandomizer
                                             .Where(s => Competitive.TeamGenerator.IsStatSuitableForRole(Config.Personal[s], role, archetypeSpec))
                                             .ToList();
 
+                                        var unplaced = pick.Where(s => !placedSpecies.Contains(s)).ToList();
+                                        if (unplaced.Count > 0) pick = unplaced;
+
+                                        if (isLegendarySlot && allowedLegendaries.Count > 0)
+                                        {
+                                            var legPick = pick.Where(s => allowedLegendaries.Contains(s)).ToList();
+                                            if (legPick.Count > 0) pick = legPick;
+                                        }
+
                                         if (archetypeSpec.RequiredTypes.Count > 0 && typesStillNeeded.Count > 0)
                                         {
                                             var typed = pick
@@ -461,7 +786,11 @@ public class UniversalRandomizer
                                             if (typed.Count > 0) pick = typed;
                                         }
 
-                                        if (pick.Count == 0) pick = matches;
+                                        if (pick.Count == 0)
+                                        {
+                                            var unplacedMatches = matches.Where(s => !placedSpecies.Contains(s)).ToList();
+                                            pick = unplacedMatches.Count > 0 ? unplacedMatches : matches;
+                                        }
 
                                         winningSpecies = pick[Util.Rand.Next(pick.Count)];
                                         requiredAbilityId = Array.FindIndex(abilityNamesForBias, a => a.Equals(wanted, StringComparison.OrdinalIgnoreCase));
@@ -472,21 +801,38 @@ public class UniversalRandomizer
 
                                 if (!foundWantedAbility)
                                 {
-                                    // Manifesto 0.6 fixes this budget; it lives in CompetitiveRules
-                                    // so the document and the generator cannot drift apart again.
-                                    const int maxArchetypeFitAttempts = Competitive.CompetitiveRules.ConstrainedPickAttempts;
+                                    // Manifesto 0.6's retry budget; the default lives in CompetitiveRules, the live value in the weights file.
+                                    int maxArchetypeFitAttempts = buildEngine.Weights.ConstrainedPickAttempts;
                                     int candidateSpecies = pk.Species;
+                                    double bestScore = double.NegativeInfinity;
+                                    int bestCandidate = GetFinalEvolution(candidateSpecies);
+
+                                    var existingTeamTypes = trainer.Pokemon.Take(pkIdx)
+                                        .Select(p => Config.Personal[p.Species]?.Types)
+                                        .Where(t => t != null)
+                                        .ToList();
+                                    bool trickRoomTeam = archetype == Competitive.TeamArchetype.TrickRoom;
+                                    var teamRoles = Competitive.CompetitiveBuildEngine.RolesOf(
+                                        trainer.Pokemon.Take(pkIdx).SelectMany(p => p.Moves), moveNames, trickRoomTeam);
+
                                     for (int attempt = 0; attempt < maxArchetypeFitAttempts; attempt++)
                                     {
                                         int evaluatedSpecies = GetFinalEvolution(candidateSpecies);
                                         var candidatePI = Config.Personal[evaluatedSpecies];
                                         winningSpecies = evaluatedSpecies;
+
+                                        if (placedSpecies.Contains(evaluatedSpecies) && attempt < maxArchetypeFitAttempts - 1)
+                                        {
+                                            goto NextAttempt;
+                                        }
+
                                         if (wantedAbilityIds.Count > 0)
                                         {
                                             int matchAbilId = candidatePI?.Abilities?.FirstOrDefault(a => wantedAbilityIds.Contains(a)) ?? 0;
                                             if (matchAbilId > 0)
                                             {
                                                 requiredAbilityId = matchAbilId;
+                                                bestCandidate = evaluatedSpecies;
                                                 break;
                                             }
                                         }
@@ -495,16 +841,44 @@ public class UniversalRandomizer
                                                   candidatePI?.Types?.Any(typesStillNeeded.Contains) == true ||
                                                   attempt >= maxArchetypeFitAttempts / 2))
                                         {
-                                            break;
+                                            var candidateRoles = Competitive.CompetitiveBuildEngine.RolesOf(
+                                                buildEngine.Learnsets.GetLegalMoves(evaluatedSpecies), moveNames, trickRoomTeam);
+                                            double totalScore = Competitive.TeamSynergy.Score(
+                                                candidatePI?.Types, candidateRoles, existingTeamTypes, teamRoles,
+                                                Competitive.CompetitiveDatabase.CompetitiveThreeTypeCores, buildEngine.Weights);
+
+                                            if (totalScore > bestScore)
+                                            {
+                                                bestScore = totalScore;
+                                                bestCandidate = evaluatedSpecies;
+                                            }
+                                            // Good enough synergy is taken at once; otherwise keep the best seen
+                                            if (totalScore >= buildEngine.Weights.SynergyAcceptScore || attempt >= maxArchetypeFitAttempts / 2)
+                                            {
+                                                winningSpecies = bestCandidate;
+                                                break;
+                                            }
                                         }
 
-                                        candidateSpecies = speciesRand.GetRandomSpecies(preMapSpecies);
+                                        NextAttempt:
+                                        if (isLegendarySlot && allowedLegendaries.Count > 0)
+                                        {
+                                            candidateSpecies = allowedLegendaries[Util.Rand.Next(allowedLegendaries.Count)];
+                                        }
+                                        else
+                                        {
+                                            candidateSpecies = (Settings.TrainerPokemonMode == TrainerThemes.RandomEvenDistribution)
+                                                ? trainerSpeciesRand.GetEvenDistributionSpecies()
+                                                : trainerSpeciesRand.GetRandomSpecies(preMapSpecies);
+                                        }
                                     }
+                                    if (bestScore > double.NegativeInfinity)
+                                        winningSpecies = bestCandidate;
                                 }
                                 pk.Species = (ushort)winningSpecies;
                             }
 
-                            if ((Settings.ForceFullyEvolvedAtLevel && pk.Level >= Settings.ForceFullyEvolvedLevel) || Settings.CompetitiveRandomizer)
+                            if (!pinned && ((Settings.ForceFullyEvolvedAtLevel && pk.Level >= Settings.ForceFullyEvolvedLevel) || Settings.CompetitiveRandomizer))
                                 pk.Species = GetFinalEvolution(pk.Species);
 
                             if (Settings.TrainerLevelModifierPercent != 0)
@@ -514,7 +888,6 @@ public class UniversalRandomizer
                                 pk.Shiny = (int)(Util.Random32() % 100) < 5;
 
                             var pi = Config.Personal[pk.Species];
-                            string[] abilityNames = Config.GetText(TextName.AbilityNames);
 
                             if (Settings.CompetitiveRandomizer)
                             {
@@ -531,28 +904,21 @@ public class UniversalRandomizer
 
                             if (Settings.CompetitiveRandomizer)
                             {
-                                string[] moveNames = Config.GetText(TextName.MoveNames);
-                                pk.Moves = buildEngine.BuildCompetitiveMoveset(pk.Species, role, pi, moveRand, abilName, archetype, Config.Moves);
-                                var (evs, nature) = buildEngine.BuildEVsAndNature(pi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom);
+                                role = Competitive.CompetitiveBuildEngine.AdaptRoleForPokemon(pi, role);
+                                pk.Moves = buildEngine.BuildCompetitiveMoveset(pk.Species, role, pi, moveRand, abilName, archetype, Config.Moves, isDoubles: isDoubles, level: pk.Level, teamAbilities: teamAbilitiesCovered);
+                                var (evs, nature) = buildEngine.BuildEVsAndNature(pi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, level: pk.Level);
                                 pk.EVs = evs.Select(b => (int)b).ToArray();
                                 pk.Nature = nature;
 
-                                int[] ivs = Settings.TrainerFullIVs
-                                    ? [31, 31, 31, 31, 31, 31]
-                                    : [Util.Rand.Next(32), Util.Rand.Next(32), Util.Rand.Next(32), Util.Rand.Next(32), Util.Rand.Next(32), Util.Rand.Next(32)];
-                                // Trick Room teams need 0 Speed IV to be as slow as possible,
-                                // regardless of the Full IVs toggle (TrainerPoke7.IVs = [HP, Atk, Def, SpA, SpD, Spe]).
-                                if (archetype == Competitive.TeamArchetype.TrickRoom)
-                                    ivs[5] = 0;
-                                pk.IVs = ivs;
+                                pk.IVs = buildEngine.BuildIvs(pi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, moveNames, Settings.TrainerFullIVs);
 
-                                pk.Item = (int)buildEngine.AssignItem(pk.Species, pi, abilName, pk.Moves, role, itemNames, moveNames, Config.Moves, ref assignedMega, ref assignedZCrystal, archetype, teamAbilitiesCovered);
+                                pk.Item = (int)buildEngine.AssignItem(pk.Species, pi, abilName, pk.Moves, role, itemNames, moveNames, Config.Moves, ref assignedMega, ref assignedZCrystal, archetype, teamAbilitiesCovered, isDoubles: isDoubles);
 
                                 string heldItemName = pk.Item > 0 && pk.Item < itemNames.Length ? itemNames[pk.Item] : "";
                                 if (Competitive.CompetitiveValidator.IsMegaStone(heldItemName) &&
                                     Competitive.CompetitiveDatabase.MegaStoneMap.TryGetValue(pk.Species, out var heldStones))
                                 {
-                                    int stoneIdx = Array.FindIndex(heldStones, s => s.Equals(heldItemName, StringComparison.OrdinalIgnoreCase));
+                                    int stoneIdx = Array.FindIndex(heldStones, s => GameNameComparer.Instance.Equals(s, heldItemName));
                                     var megaFormIdxs = Competitive.CompetitiveDatabase.GetMegaFormIndices(pk.Species, Config.Personal.Table);
                                     if (stoneIdx >= 0 && stoneIdx < megaFormIdxs.Length)
                                     {
@@ -566,28 +932,39 @@ public class UniversalRandomizer
                                             abilName = megaAbilName;
                                         }
 
-                                        pk.Moves = buildEngine.BuildCompetitiveMoveset(pk.Species, role, megaPi, moveRand, abilName, archetype, Config.Moves);
-                                        var (megaEvs, megaNature) = buildEngine.BuildEVsAndNature(megaPi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom);
+                                        role = Competitive.CompetitiveBuildEngine.AdaptRoleForPokemon(megaPi, role, isMega: true);
+                                        pk.Moves = buildEngine.BuildCompetitiveMoveset(pk.Species, role, megaPi, moveRand, abilName, archetype, Config.Moves, isDoubles: isDoubles, level: pk.Level, teamAbilities: teamAbilitiesCovered);
+                                        var (megaEvs, megaNature) = buildEngine.BuildEVsAndNature(megaPi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, level: pk.Level);
                                         pk.EVs = megaEvs.Select(b => (int)b).ToArray();
                                         pk.Nature = megaNature;
                                         pi = megaPi;
+
+                                        pk.IVs = buildEngine.BuildIvs(megaPi, role, pk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, moveNames, Settings.TrainerFullIVs);
                                     }
                                 }
 
                                 Competitive.CompetitiveValidator.ValidateAndSanitize(
                                     pk, pi, abilName, role, itemNames,
-                                    moveNames, Config.Moves, buildEngine.Learnsets);
+                                    moveNames, Config.Moves, buildEngine.Learnsets, isDoubles: isDoubles);
                             }
                             else
                             {
-                                if (Settings.BetterTrainerMovesets)
+                                // A slot the user didn't change keeps its vanilla build unless they opted in:
+                                // "Trainer level +20%" alone used to rewrite gym leaders' items and moves.
+                                bool slotChanged = pk.Species != preMapSpecies;
+                                bool upgrade = slotChanged || Settings.UpgradeVanillaTrainers;
+                                if (Settings.BetterTrainerMovesets && upgrade)
                                     pk.Moves = moveRand.GetRandomMoveset(pk.Species);
                                 if (shouldAddHeldItems && (pk.Item == 0 || Settings.WildRandomizeHeldItems))
+                                {
                                     pk.Item = sensibleItems[Util.Random32() % sensibleItems.Length];
+                                    upgrade = true;
+                                }
 
-                                Competitive.CompetitiveValidator.ValidateAndSanitize(
-                                    pk, pi, abilName, role, itemNames,
-                                    Config.GetText(TextName.MoveNames), Config.Moves, buildEngine.Learnsets);
+                                if (upgrade)
+                                    Competitive.CompetitiveValidator.ValidateAndSanitize(
+                                        pk, pi, abilName, role, itemNames,
+                                        Config.GetText(TextName.MoveNames), Config.Moves, buildEngine.Learnsets, isDoubles: isDoubles);
                             }
 
                             // Recorded at the end, using whatever the slot finally settled on - the
@@ -595,6 +972,12 @@ public class UniversalRandomizer
                             placedSpecies.Add(pk.Species);
                             foreach (int t in TypeRestrictions.TypesOf(Config, pk.Species))
                                 teamTypes.Add(t);
+
+                            // Rom Nueva + passives were chosen for the old species, so a re-rolled slot starts with none. A slot the
+                            // run kept keeps its passives (the record is edited in place), and Pokémon added above start with none.
+                            // Passives are not randomized themselves (follow-up F3).
+                            if (pk3DS.Core.Modding.PassiveGuard.Enabled && pk.Species != preMapSpecies)
+                                pk.Passives = [0, 0, 0];
                         }
 
                         // Ensure Mega Stone and/or Z-Crystal on competitive / boss teams if not assigned yet
@@ -603,37 +986,85 @@ public class UniversalRandomizer
                             if (!assignedMega)
                             {
                                 int megaIdx = trainer.Pokemon.FindIndex(p => Competitive.CompetitiveDatabase.MegaStoneMap.ContainsKey(p.Species));
-                                if (megaIdx < 0)
+                                if (megaIdx >= 0)
                                 {
-                                    // Transform slot 0 into a Mega-capable species
-                                    var megaKeys = Competitive.CompetitiveDatabase.MegaStoneMap.Keys.ToArray();
-                                    int chosenMegaSpecies = megaKeys[Util.Rand.Next(megaKeys.Length)];
-                                    trainer.Pokemon[0].Species = (ushort)chosenMegaSpecies;
-                                    megaIdx = 0;
+                                    var megaPk = trainer.Pokemon[megaIdx];
+                                    ushort megaItem = buildEngine.TryAssignMegaStone(megaPk.Species, itemNames, ref assignedMega);
+                                    if (megaItem > 0)
+                                    {
+                                        megaPk.Item = megaItem;
+                                        string heldItemName = itemNames.ElementAtOrDefault(megaItem) ?? "";
+                                        if (Competitive.CompetitiveDatabase.MegaStoneMap.TryGetValue(megaPk.Species, out var heldStones))
+                                        {
+                                            int stoneIdx = Array.FindIndex(heldStones, s => GameNameComparer.Instance.Equals(s, heldItemName));
+                                            var megaFormIdxs = Competitive.CompetitiveDatabase.GetMegaFormIndices(megaPk.Species, Config.Personal.Table);
+                                            if (stoneIdx >= 0 && stoneIdx < megaFormIdxs.Length)
+                                            {
+                                                var megaPi = Config.Personal[megaFormIdxs[stoneIdx]];
+                                                string megaAbilName = Competitive.CompetitiveBuildEngine.ResolveAbilityName(megaPi, 1, abilityNames);
+                                                var adaptedMegaRole = Competitive.CompetitiveBuildEngine.AdaptRoleForPokemon(megaPi, roles[megaIdx], isMega: true);
+                                                megaPk.Moves = buildEngine.BuildCompetitiveMoveset(megaPk.Species, adaptedMegaRole, megaPi, moveRand, megaAbilName, archetype, Config.Moves, isDoubles: isDoubles, level: megaPk.Level, teamAbilities: teamAbilitiesCovered);
+                                                var (megaEvs, megaNature) = buildEngine.BuildEVsAndNature(megaPi, adaptedMegaRole, megaPk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, level: megaPk.Level);
+                                                megaPk.EVs = megaEvs.Select(b => (int)b).ToArray();
+                                                megaPk.Nature = megaNature;
+
+                                                megaPk.IVs = buildEngine.BuildIvs(megaPi, adaptedMegaRole, megaPk.Moves, archetype == Competitive.TeamArchetype.TrickRoom, moveNames, Settings.TrainerFullIVs);
+
+                                                Competitive.CompetitiveValidator.ValidateAndSanitize(
+                                                    megaPk, megaPi, megaAbilName, adaptedMegaRole, itemNames,
+                                                    moveNames, Config.Moves, buildEngine.Learnsets, isDoubles: isDoubles);
+                                            }
+                                        }
+                                    }
                                 }
-                                var megaPk = trainer.Pokemon[megaIdx];
-                                ushort megaItem = buildEngine.TryAssignMegaStone(megaPk.Species, itemNames, ref assignedMega);
-                                if (megaItem > 0) megaPk.Item = megaItem;
                             }
 
                             if (!assignedZCrystal && Config.Generation == 7)
                             {
-                                var zPk = trainer.Pokemon.FirstOrDefault(p => p.Item == 0 || !Competitive.CompetitiveValidator.IsMegaStone(itemNames.ElementAtOrDefault(p.Item)));
+                                var zPk = trainer.Pokemon.FirstOrDefault(p => p.Item == 0);
                                 if (zPk != null)
                                 {
+                                    int zIdx = trainer.Pokemon.IndexOf(zPk);
                                     var zpi = Config.Personal[zPk.Species];
-                                    ushort zItem = buildEngine.TryAssignZCrystal(zPk.Species, zpi, zPk.Moves, itemNames, Config.GetText(TextName.MoveNames), Config.Moves, ref assignedZCrystal);
-                                    if (zItem > 0) zPk.Item = zItem;
+                                    ushort zItem = buildEngine.TryAssignZCrystal(zPk.Species, zpi, zPk.Moves, itemNames, moveNames, Config.Moves, ref assignedZCrystal);
+                                    if (zItem > 0)
+                                    {
+                                        zPk.Item = zItem;
+                                        string zAbilName = (zIdx >= 0 && zIdx < roles.Length) ? Competitive.CompetitiveBuildEngine.ResolveAbilityName(zpi, zPk.Ability, abilityNames) : "";
+                                        Competitive.CompetitiveValidator.ValidateAndSanitize(
+                                            zPk, zpi, zAbilName, (zIdx >= 0 && zIdx < roles.Length) ? roles[zIdx] : CompetitiveRole.OffensiveSweeper,
+                                            itemNames, moveNames, Config.Moves, buildEngine.Learnsets, isDoubles: isDoubles);
+                                    }
                                 }
                             }
                         }
 
-                        ApplyBattleStyle(trainer);
+                        if (Settings.CompetitiveRandomizer)
+                        {
+                            var teamPIs = trainer.Pokemon.Select(p => Config.Personal[p.Species]).ToArray();
+                            Competitive.CompetitiveValidator.ValidateTeam(
+                                trainer.Pokemon.ToArray(),
+                                teamPIs,
+                                teamAbilitiesCovered.ToArray(),
+                                roles,
+                                itemNames,
+                                moveNames,
+                                Config.Moves,
+                                archetype,
+                                buildEngine.Learnsets,
+                                isDoubles: isDoubles);
+                        }
 
                         if (isTutorialBattle) FirstRivalBattle.Enforce(trainer);
 
+                        if (oneTeam && blk == 0)
+                            baseTeams[id] = trainer.Pokemon.Select(p => (p.Species, p.Form)).ToArray();
+
+                        if (!ownRecord && trainer.Pokemon.Count > 0)
+                            trainer.Pokemon[0].Friendship = TrainerBlocks.TeamSizeOverride(trainer.Pokemon.Count, trd[di][3]);
+
                         trainer.Write(out byte[] outTrData, out byte[] outTrPoke);
-                        trd[i] = outTrData;
+                        if (ownRecord) trd[i] = outTrData; // blocks 5/6 never write a trdata record: they share block 3/4's
                         trp[i] = outTrPoke;
                     }
                 }
@@ -649,7 +1080,7 @@ public class UniversalRandomizer
                         {
                             if (pk == null) continue;
                             if (Settings.TrainerPokemonMode > 0 || Settings.CompetitiveRandomizer)
-                                pk.Species = (ushort)speciesRand.GetMappedSpecies(pk.Species);
+                                pk.Species = (ushort)trainerSpeciesRand.GetMappedSpecies(pk.Species);
 
                             if ((Settings.ForceFullyEvolvedAtLevel && pk.Level >= Settings.ForceFullyEvolvedLevel) || Settings.CompetitiveRandomizer)
                                 pk.Species = GetFinalEvolution(pk.Species);
@@ -680,7 +1111,7 @@ public class UniversalRandomizer
                             int targetCount = Math.Min(6, teamList.Count + addCount);
                             while (teamList.Count < targetCount)
                             {
-                                ushort extraSpecies = (ushort)speciesRand.GetRandomSpecies(teamList[0].Species);
+                                ushort extraSpecies = (ushort)trainerSpeciesRand.GetRandomSpecies(teamList[0].Species);
                                 if ((Settings.ForceFullyEvolvedAtLevel && avgLevel >= Settings.ForceFullyEvolvedLevel) || Settings.CompetitiveRandomizer)
                                     extraSpecies = GetFinalEvolution(extraSpecies);
                                 var newPk = new TrainerData6.Pokemon(new byte[trainer.Team[0].Write(trainer.Item, trainer.Moves).Length], trainer.Item, trainer.Moves)
@@ -710,6 +1141,15 @@ public class UniversalRandomizer
                 trdata.Save();
                 trpoke.Save();
             }
+        }
+
+        // 6b. Uhuru: shuffle the PWT pool (script 217). The trainer set is unchanged, so "Keep PWT cast" stays right.
+        if (Settings.UhuruShufflePwtPool && Config.Info.TrainerBaseCount > 0)
+        {
+            progressCallback?.Invoke("Shuffling the PWT pool...", 80);
+            string pwtResult = ShufflePwtPool();
+            if (!string.IsNullOrEmpty(pwtResult))
+                progressCallback?.Invoke(pwtResult, 80);
         }
 
         // 7. Wild Encounters
@@ -775,9 +1215,11 @@ public class UniversalRandomizer
         // 9a2b. Research Center recipes the user asked for
         if (Settings.InstallPatches is { Count: > 0 })
         {
+            SyncCodeBinToDisk();
             progressCallback?.Invoke("Installing selected patches...", 94);
             foreach (string line in InstallSelectedRecipes())
                 progressCallback?.Invoke(line, 94);
+            ReloadCodeBinFromDisk();
         }
 
         // 9a2c. Custom EXP Multiplier
@@ -785,7 +1227,7 @@ public class UniversalRandomizer
         {
             progressCallback?.Invoke($"Applying {Settings.ExpMultiplier}x EXP Multiplier patch...", 94);
             var expLog = new List<string>();
-            ApplyExpMultiplier(Config, Settings.ExpMultiplier, expLog);
+            ApplyExpMultiplierShared(Settings.ExpMultiplier, expLog);
             foreach (string line in expLog)
                 progressCallback?.Invoke(line, 94);
         }
@@ -799,18 +1241,26 @@ public class UniversalRandomizer
                 progressCallback?.Invoke(typeResult, 94);
         }
 
-        // 9b. Starters
-        if (Settings.StartersMode > 0)
-        {
-            progressCallback?.Invoke("Randomizing Starters...", 92);
-            RandomizeStarters(speciesRand);
-        }
+        // Flush the shared code.bin buffer. Every feature above operated on the same in-memory
+        // copy; this single write persists all of their changes without any stomping.
+        FlushCodeBin();
+        // A TM error from the TM step, or from the item-data write in SyncCodeBinToDisk or the flush. Reported once, here.
+        if (LastTMError != null) progressCallback?.Invoke("WARNING: " + LastTMError, 94);
+
+        // 9b. Starters (already processed before trainers)
 
         // 9c. In-game trades
         if (Settings.TradesMode > 0)
         {
             progressCallback?.Invoke("Randomizing In-Game Trades...", 93);
             RandomizeTrades(speciesRand);
+        }
+
+        // 9d. Overworld Field Items
+        if (Settings.FieldItemsMode > 0)
+        {
+            progressCallback?.Invoke("Randomizing Overworld Field Items...", 95);
+            RandomizeFieldItems();
         }
 
         // 10. Pickup items
@@ -824,21 +1274,46 @@ public class UniversalRandomizer
     }
 
     /// <summary>
+    /// Shuffles Uhuru's PWT pool in amxscript (a/0/9/2, script 217) with the run's seeded RNG.
+    /// Returns a warning when it could not, else null.
+    /// </summary>
+    private string ShufflePwtPool()
+    {
+        try
+        {
+            var g = Config.GetGARCData("amxscript");
+            if (g?.Files == null || g.Files.Length <= 217) return "WARNING: PWT shuffle skipped. This ROM has no script 217.";
+            var fp = new pk3DS.Core.Modding.FacilityPools(g.Files[217], 217);
+            if (pk3DS.Core.Modding.FacilityPoolShuffle.ShufflePwt(fp, Util.Rand) == 0) return null;
+            g.Files[217] = fp.ToBytes();
+            g.Save();
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return "WARNING: PWT shuffle skipped. " + ex.Message;
+        }
+    }
+
+    /// <summary>
     /// The three starters the professor offers.
     /// </summary>
-    private void RandomizeStarters(SpeciesRandomizer speciesRand)
+    private int[] RandomizeStarters(SpeciesRandomizer speciesRand)
     {
         const int stride = 0x14;
         try
         {
             var g = Config.GetGARCData("encounterstatic");
-            if (g?.Files == null || g.Files.Length == 0) return;
+            if (g?.Files == null || g.Files.Length == 0) return null;
 
             byte[] data = g.Files[0];
-            if (data == null || data.Length < 3 * stride) return;
+            if (data == null || data.Length < 3 * stride) return null;
 
             int[] custom = [Settings.CustomStarter1, Settings.CustomStarter2, Settings.CustomStarter3];
             int[] currents = [BitConverter.ToUInt16(data, 0), BitConverter.ToUInt16(data, stride), BitConverter.ToUInt16(data, 2 * stride)];
+
+            if (Settings.StartersMode == 0)
+                return currents;
 
             // Custom starters are exactly what the user typed; a type restriction on top of that
             // would be overriding the one mode that exists to not be random.
@@ -860,10 +1335,11 @@ public class UniversalRandomizer
             g.Save();
 
             UpdateStarterStoryText(chosen);
+            return chosen;
         }
         catch
         {
-            // Never abort the run for this - everything before it has already been written.
+            return null;
         }
     }
 
@@ -1051,8 +1527,19 @@ public class UniversalRandomizer
     /// <summary>
     /// The species this trainer slot starts from, before duplicate and diversity refinement.
     /// </summary>
-    private int PickTrainerSpecies(SpeciesRandomizer speciesRand, int original, int theme)
+    private int PickTrainerSpecies(SpeciesRandomizer speciesRand, int original, int theme,
+                                   bool isLegendarySlot = false, List<int> allowedLegendaries = null)
     {
+        if (isLegendarySlot && allowedLegendaries != null && allowedLegendaries.Count > 0)
+        {
+            if (theme >= 0)
+            {
+                var typed = allowedLegendaries.Where(s => Config.Personal[s]?.Types?.Contains(theme) == true).ToList();
+                if (typed.Count > 0) return typed[Util.Rand.Next(typed.Count)];
+            }
+            return allowedLegendaries[Util.Rand.Next(allowedLegendaries.Count)];
+        }
+
         // A themed trainer's slots must land on the theme, so that wins over how the mode would
         // otherwise pick: an even-distribution draw that ignored the theme would simply undo it.
         if (theme >= 0)
@@ -1069,15 +1556,30 @@ public class UniversalRandomizer
     /// Re-picks a trainer's slot when it repeats a species, or a type the team already covers.
     /// </summary>
     private int RefineTrainerPick(SpeciesRandomizer speciesRand, int original, int chosen,
-                                  HashSet<int> placed, HashSet<int> teamTypes, bool diverse, int theme = -1)
+                                  HashSet<int> placed, HashSet<int> teamTypes, bool diverse, int theme = -1,
+                                  bool isLegendarySlot = false, List<int> allowedLegendaries = null)
     {
         bool avoid = Settings.TrainerAvoidDuplicates;
         if (theme >= 0) diverse = false;
         if (!avoid && !diverse) return chosen;
 
-        int Reroll() => theme >= 0
-            ? speciesRand.GetRandomSpeciesType(original, theme)
-            : speciesRand.GetRandomSpecies(original);
+        int Reroll()
+        {
+            if (isLegendarySlot && allowedLegendaries != null && allowedLegendaries.Count > 0)
+            {
+                if (theme >= 0)
+                {
+                    var typed = allowedLegendaries.Where(s => Config.Personal[s]?.Types?.Contains(theme) == true).ToList();
+                    if (typed.Count > 0) return typed[Util.Rand.Next(typed.Count)];
+                }
+                return allowedLegendaries[Util.Rand.Next(allowedLegendaries.Count)];
+            }
+            if (theme >= 0)
+                return speciesRand.GetRandomSpeciesType(original, theme);
+            if (Settings.TrainerPokemonMode == TrainerThemes.RandomEvenDistribution)
+                return speciesRand.GetEvenDistributionSpecies();
+            return speciesRand.GetRandomSpecies(original);
+        }
 
         bool InRange(int s) => s > 0 && s <= Config.MaxSpeciesID;
         bool NotDuplicate(int s) => !avoid || !placed.Contains(s);
@@ -1301,10 +1803,10 @@ public class UniversalRandomizer
 
         try
         {
-            var g = Config.GetGARCData("pickup");
-            if (g?.Files == null || g.Files.Length == 0) return;
+            var g = Config.GetlzGARCData("pickup");
+            if (g == null || g.FileCount == 0) return;
 
-            byte[] data = g.Files[0];
+            byte[] data = g[0];
             if (data == null || data.Length < 4) return;
 
             int rows = BitConverter.ToUInt16(data, 0) - 1;
@@ -1348,7 +1850,7 @@ public class UniversalRandomizer
                 BitConverter.GetBytes((ushort)item).CopyTo(data, offset);
             }
 
-            g.Files[0] = data;
+            g[0] = data;
             g.Save();
         }
         catch
@@ -1376,23 +1878,26 @@ public class UniversalRandomizer
         return BitConverter.ToInt32(hash, 0);
     }
 
-    private static void ApplyFullTMCompatibility(PersonalInfo[] table)
+    private void ApplyFullTMCompatibility(PersonalInfo[] table)
     {
+        // The located TM count (128 once expanded). _codeBin is null on Uhuru, where the stock table is 100.
+        int maxTm = _codeBin == null ? 100 : (pk3DS.Core.Modding.TMTable.Locate(_codeBin, out _)?.Count ?? 100);
         for (int i = 1; i < table.Length; i++)
         {
             var tmhm = table[i].TMHM;
             if (tmhm == null)
                 continue;
 
-            for (int j = 0; j < Math.Min(100, tmhm.Length); j++)
+            for (int j = 0; j < Math.Min(maxTm, tmhm.Length); j++)
                 tmhm[j] = true;
 
             table[i].TMHM = tmhm;
         }
     }
 
-    private static void ApplyFullHMCompatibility(PersonalInfo[] table)
+    private void ApplyFullHMCompatibility(PersonalInfo[] table)
     {
+        if (Config.Generation != 6) return;
         for (int i = 1; i < table.Length; i++)
         {
             var tmhm = table[i].TMHM;
@@ -1404,6 +1909,183 @@ public class UniversalRandomizer
 
             table[i].TMHM = tmhm;
         }
+    }
+
+    private static bool TryGetRivalStarter(int trainerIndex, out int starterIndex)
+    {
+        // Hau's variants (variant 0: Grass player, variant 1: Fire player, variant 2: Water player)
+        // Hau takes the weak starter: (variant + 2) % 3
+        int[] hauBases = [491, 12, 74, 77, 215, 218, 438, 447, 450, 494, 350, 356];
+        foreach (int b in hauBases)
+        {
+            if (trainerIndex >= b && trainerIndex <= b + 2)
+            {
+                int variant = trainerIndex - b;
+                starterIndex = (variant + 2) % 3;
+                return true;
+            }
+        }
+
+        // Kukui's variants (variant 0, 1, 2)
+        // Kukui takes the strong starter: (variant + 1) % 3
+        int[] kukuiBases = [477];
+        foreach (int b in kukuiBases)
+        {
+            if (trainerIndex >= b && trainerIndex <= b + 2)
+            {
+                int variant = trainerIndex - b;
+                starterIndex = (variant + 1) % 3;
+                return true;
+            }
+        }
+
+        starterIndex = -1;
+        return false;
+    }
+
+    private int GetEvolvedStarterForLevel(int baseStarter, int level)
+    {
+        if (baseStarter <= 0 || baseStarter > Config.MaxSpeciesID) return baseStarter;
+        var evos = Config.Evolutions;
+        if (evos == null || baseStarter >= evos.Length) return baseStarter;
+
+        int stage = level >= 34 ? 2 : (level >= 16 ? 1 : 0);
+        int current = baseStarter;
+        for (int i = 0; i < stage; i++)
+        {
+            if (current >= evos.Length) break;
+            var next = evos[current]?.PossibleEvolutions?.FirstOrDefault(e => e != null && e.Species > 0 && e.Species != current);
+            if (next == null) break;
+            current = next.Species;
+        }
+        return current;
+    }
+
+    private void RandomizeFieldItems()
+    {
+        if (Config.Generation != 7) return;
+        try
+        {
+            var ed = Config.GetlzGARCData("encdata");
+            if (ed == null || ed.FileCount < 11) return;
+
+            var itemNames = Config.GetText(TextName.ItemNames);
+            int maxItem = Config.Info.MaxItemID > 0 ? Config.Info.MaxItemID : 800;
+            if (itemNames != null && itemNames.Length > 0)
+                maxItem = Math.Min(maxItem, itemNames.Length - 1);
+            var zFilter = new ZCrystalFilter(itemNames);
+
+            // Collect all existing field items if in shuffle mode
+            var collectedItems = new List<ushort>();
+            int worldCount = ed.FileCount / 11;
+
+            if (Settings.FieldItemsMode == 1) // Shuffle
+            {
+                for (int w = 0; w < worldCount; w++)
+                {
+                    int index = w * 11;
+                    if (index >= ed.FileCount) break;
+                    byte[] edFile = ed[index];
+                    if (edFile == null || edFile.Length < 4) continue;
+                    byte[][] envData = Mini.UnpackMini(edFile, "ED");
+                    if (envData == null || envData.Length <= 10) continue;
+                    byte[][] itemDataFull = Mini.UnpackMini(envData[10], "EI");
+                    if (itemDataFull == null || itemDataFull.Length == 0) continue;
+
+                    foreach (var itemData in itemDataFull)
+                    {
+                        if (itemData == null || itemData.Length < 4) continue;
+                        int count = BitConverter.ToInt32(itemData, 0);
+                        for (int i = 0; i < count; i++)
+                        {
+                            int dataId = 4 + i * 64 + 48;
+                            if (dataId + 2 <= itemData.Length)
+                            {
+                                ushort it = BitConverter.ToUInt16(itemData, dataId);
+                                if (it > 0) collectedItems.Add(it);
+                            }
+                        }
+                    }
+                }
+                collectedItems = collectedItems.OrderBy(_ => Util.Rand.Next()).ToList();
+            }
+
+            int shuffleIdx = 0;
+            for (int w = 0; w < worldCount; w++)
+            {
+                int index = w * 11;
+                if (index >= ed.FileCount) break;
+                byte[] edFile = ed[index];
+                if (edFile == null || edFile.Length < 4) continue;
+                byte[][] envData = Mini.UnpackMini(edFile, "ED");
+                if (envData == null || envData.Length <= 10) continue;
+                byte[][] itemDataFull = Mini.UnpackMini(envData[10], "EI");
+                if (itemDataFull == null || itemDataFull.Length == 0) continue;
+
+                bool modified = false;
+                foreach (var itemData in itemDataFull)
+                {
+                    if (itemData == null || itemData.Length < 4) continue;
+                    int count = BitConverter.ToInt32(itemData, 0);
+                    for (int i = 0; i < count; i++)
+                    {
+                        int dataId = 4 + i * 64 + 48;
+                        if (dataId + 2 <= itemData.Length)
+                        {
+                            ushort currentItem = BitConverter.ToUInt16(itemData, dataId);
+                            if (currentItem == 0) continue;
+
+                            ushort newItem = currentItem;
+                            if (Settings.FieldItemsMode == 1) // Shuffle
+                            {
+                                if (shuffleIdx < collectedItems.Count)
+                                    newItem = collectedItems[shuffleIdx++];
+                            }
+                            else // Random
+                            {
+                                newItem = (ushort)GetRandomFieldItem(maxItem, zFilter, itemNames);
+                            }
+
+                            BitConverter.GetBytes(newItem).CopyTo(itemData, dataId);
+                            modified = true;
+                        }
+                    }
+                }
+
+                if (modified)
+                {
+                    envData[10] = Mini.PackMini(itemDataFull, "EI");
+                    ed[index] = Mini.PackMini(envData, "ED");
+                }
+            }
+
+            ed.Save();
+        }
+        catch
+        {
+            // A missing or malformed encdata GARC must not halt the overall process
+        }
+    }
+
+    private int GetRandomFieldItem(int maxItem, ZCrystalFilter zFilter, string[] itemNames)
+    {
+        for (int tries = 0; tries < 200; tries++)
+        {
+            int item = Util.Rand.Next(1, maxItem + 1);
+            if (zFilter != null && zFilter.IsZCrystal(item)) continue;
+            if (Legal.Pouch_Key_SM.Contains((ushort)item)) continue;
+            if (Settings.FieldItemsBanBadItems)
+            {
+                if (Array.IndexOf(PickupBannedItems, item) >= 0) continue;
+            }
+            if (itemNames != null && item < itemNames.Length)
+            {
+                string nm = itemNames[item]?.Trim();
+                if (string.IsNullOrEmpty(nm) || nm is "???" or "-----") continue;
+            }
+            return item;
+        }
+        return 1; // Master Ball fallback
     }
 
     private static void ApplyFullTutorCompatibility(PersonalInfo[] table)
@@ -1479,6 +2161,7 @@ public class UniversalRandomizer
                 lists.Add([.. current]);
             }
 
+            if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(croPath) is { } uhuruShop) return "WARNING: cheap Rare Candies skipped. " + uhuruShop;
             byte[] rebuilt = MartLayout.Rebuild(cro, lists, [], out _);
             var after = MartLayout.Read(rebuilt);
             if (!after.Valid || after.Validate(rebuilt).Count > 0)
@@ -1512,12 +2195,42 @@ public class UniversalRandomizer
                 return log;
             }
 
+            // NOTE: a pre-expansion step was tried here (CROUtil.ExpandSegment('c', 0x10000) before
+            // the install loop) to fix "reserve exhausted" refusals for large InstallPatches
+            // selections. Reverted 2026-09-12 after direct testing showed it actively introduces the
+            // relocation corruption that crashes the game in battle. The exact cause is still
+            // unproven; see docs/uhuru/cro-growth-diagnosis.md. Do not restore blanket growth here.
+
             var db = pk3DS.Core.Modding.Research.ResearchDatabase.LoadEmbedded(version);
             var map = pk3DS.Core.Modding.Research.BattleMechanicMap.Build(File.ReadAllBytes(battleCro), db, battleCro);
             var book = pk3DS.Core.Modding.Research.Recipes.Discover(db, version);
 
             int done = 0, skipped = 0;
             bool warnedAboutSpace = false;
+
+            // Ids this loop has already handed out, even though the id-name table on disk will not
+            // show them as taken until Apply for that recipe actually returns. Without this, two
+            // recipes early in a long InstallPatches list can both be offered the same "free" id if
+            // GameConfig's in-memory text tables do not turn around between iterations as fast as
+            // this loop does - the same reserved-set fix RunRecipeBatch uses in the Research Center,
+            // here for the exact same reason: an unattended randomizer run has no one watching to
+            // notice a silent collision.
+            var reserved = new HashSet<int>();
+            var installedNames = new List<string>();
+#nullable enable
+            byte[]? codeBinNow = null;
+            try
+            {
+                string? exeFs = Config?.ExeFS;
+                if (exeFs != null)
+                {
+                    string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(exeFs);
+                    if (File.Exists(codePath)) codeBinNow = File.ReadAllBytes(codePath);
+                }
+            }
+            catch { /* best-effort; a failed read just skips the on-disk half of the check */ }
+#nullable restore
+
             foreach (string name in Settings.InstallPatches)
             {
                 var recipe = book.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -1528,10 +2241,36 @@ public class UniversalRandomizer
                     continue;
                 }
 
+                // PC Anywhere and Move Relearner Replaces Cafe each overwrite LIVE pristine code.bin
+                // functions at their own injection site (confirmed: neither's trampoline lands in
+                // free space), so each corrupts the base game even installed completely alone -
+                // observed as Evolution-sequence crashes. Checked unconditionally, before the
+                // pairwise conflict below.
+                if (pk3DS.Core.Modding.Research.RecipeConflicts.TryFindUnsafe(name, out string unsafeReason))
+                {
+                    log.Add($"WARNING: '{name}' was skipped - unsafe on its own: {unsafeReason}");
+                    skipped++;
+                    continue;
+                }
+
+                // A recipe can pass every byte-range/branch-target check on its own and still corrupt
+                // a sibling that's already installed, if it patches the body of a vanilla function the
+                // sibling calls into by address (see RecipeConflicts - confirmed for PC Anywhere +
+                // Move Relearner Replaces Cafe, which together crash the Bag). Checked against names
+                // actually installed so far this run AND the current on-disk code.bin (catches the
+                // other side having been installed manually before this randomizer run), so installing
+                // just one side of a known-bad pair is never blocked by the other merely being requested.
+                if (pk3DS.Core.Modding.Research.RecipeConflicts.TryFindConflict(name, installedNames, codeBinNow, out string conflictReason))
+                {
+                    log.Add($"WARNING: '{name}' was skipped - {conflictReason}");
+                    skipped++;
+                    continue;
+                }
+
                 // Ids for anything that claims a slot. Shared with the Research Center so an
                 // unattended install places things exactly where the editor would have.
                 var problems = new List<string>();
-                var values = pk3DS.Core.Modding.Research.RecipeIdAllocator.AssignIds(recipe, Config, problems);
+                var values = pk3DS.Core.Modding.Research.RecipeIdAllocator.AssignIds(recipe, Config, problems, reserved);
                 if (problems.Count > 0)
                 {
                     log.Add($"WARNING: '{name}' was skipped - {problems[0]}.");
@@ -1550,7 +2289,11 @@ public class UniversalRandomizer
                 }
 
                 var applied = pk3DS.Core.Modding.Research.RecipeInstaller.Apply(recipe, Config, battleCro, db, map, values);
-                if (applied.Ok) done++;
+                if (applied.Ok)
+                {
+                    done++;
+                    installedNames.Add(name);
+                }
                 else
                 {
                     skipped++;
@@ -1569,7 +2312,7 @@ public class UniversalRandomizer
                     {
                         warnedAboutSpace = true;
                         log.Add("NOTE: Battle.cro is out of room for more item packages (a stock one fits about four). " +
-                                "Installing them one at a time does not help - expanding its code segment does.");
+                                "Installing them one at a time does not help - enable Options: Allow code.bin and CRO growth to expand its code segment.");
                     }
                 }
 
@@ -1592,6 +2335,24 @@ public class UniversalRandomizer
     /// <summary>
     /// Dynamically scales battle EXP yield in code.bin by hooking the loaded species EXP formula.
     /// </summary>
+    /// <summary>
+    /// Instance overload: applies the EXP multiplier to the shared code.bin buffer.
+    /// </summary>
+    private bool ApplyExpMultiplierShared(int multiplier, List<string> log)
+    {
+        if (multiplier < 1 || multiplier > 255) return false;
+        if (_codeBin == null || _codeBin.Length < 0x100000)
+        {
+            log?.Add("WARNING: code.bin not loaded; EXP multiplier patch skipped.");
+            return false;
+        }
+        return ApplyExpMultiplier(_codeBin, Config, multiplier, log, markDirty: () => _codeBinDirty = true);
+    }
+
+    /// <summary>
+    /// Applies the EXP multiplier patch to a code.bin buffer. Dynamically locates free space
+    /// for the payload rather than hardcoding an address that collides with Level Cap / TM space.
+    /// </summary>
     public static bool ApplyExpMultiplier(GameConfig config, int multiplier, List<string> log)
     {
         if (config == null || multiplier < 1 || multiplier > 255) return false;
@@ -1601,27 +2362,31 @@ public class UniversalRandomizer
             log?.Add("WARNING: ExeFS/code.bin not found; EXP multiplier patch skipped.");
             return false;
         }
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(codePath) is { } uhuruExp)
+        {
+            log?.Add("WARNING: EXP multiplier skipped. " + uhuruExp);
+            return false;
+        }
+        byte[] code = File.ReadAllBytes(codePath);
+        bool ok = ApplyExpMultiplier(code, config, multiplier, log, markDirty: null);
+        if (ok) File.WriteAllBytes(codePath, code);
+        return ok;
+    }
 
+    private static bool ApplyExpMultiplier(byte[] code, GameConfig config, int multiplier, List<string> log, Action markDirty)
+    {
         string v = pk3DS.Core.Modding.Research.ResearchVersion.Resolve(config);
         int hookOfs;
-        byte[] branchBytes;
         if (v == "US")
-        {
             hookOfs = 0x3AB188;
-            branchBytes = [0x32, 0x3A, 0x04, 0xEB]; // bl #0x4B9A58
-        }
         else if (v == "UM")
-        {
             hookOfs = 0x3AB190;
-            branchBytes = [0x30, 0x3A, 0x04, 0xEB]; // bl #0x4B9A58
-        }
         else
         {
             log?.Add($"WARNING: EXP Multiplier patch is not supported for {v}.");
             return false;
         }
 
-        int payloadOfs = 0x4B9A58;
         byte multByte = (byte)multiplier;
         byte[] payloadBytes = [
             0xB2, 0x02, 0xD0, 0xE1,     // ldrh r0, [r0, #0x2b2]
@@ -1631,17 +2396,24 @@ public class UniversalRandomizer
             0x02, 0x80, 0xBD, 0xE8      // pop {r1, pc}
         ];
 
-        byte[] code = File.ReadAllBytes(codePath);
-        if (hookOfs + 4 > code.Length || payloadOfs + payloadBytes.Length > code.Length)
+        // The one allocator picks the place (first-fit in .text; on Uhuru it keeps out of Uhuru's code).
+        var grant = pk3DS.Core.Modding.Research.CodeSpaceAllocator.ForCodeBin(code).Allocate(payloadBytes.Length, "EXP multiplier");
+        int payloadOfs = grant.Success ? (int)grant.Offset : -1;
+
+        if (payloadOfs < 0 || hookOfs + 4 > code.Length || payloadOfs + payloadBytes.Length > code.Length)
         {
-            log?.Add("WARNING: code.bin too small for EXP multiplier patch.");
+            log?.Add("WARNING: code.bin has no free space for EXP multiplier payload.");
             return false;
         }
 
+        // Encode BL from hook to the dynamically chosen payload address.
+        uint blInst = pk3DS.Core.Modding.CodeBinPatcher.SynthesizeBranch((uint)hookOfs, (uint)payloadOfs, link: true);
+        byte[] branchBytes = BitConverter.GetBytes(blInst);
+
         Array.Copy(branchBytes, 0, code, hookOfs, 4);
         Array.Copy(payloadBytes, 0, code, payloadOfs, payloadBytes.Length);
-        File.WriteAllBytes(codePath, code);
-        log?.Add($"EXP Multiplier: {multiplier}x applied to code.bin.");
+        markDirty?.Invoke();
+        log?.Add($"EXP Multiplier: {multiplier}x applied at 0x{payloadOfs:X} in code.bin.");
         return true;
     }
 
@@ -1652,11 +2424,10 @@ public class UniversalRandomizer
     {
         try
         {
-            string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Config?.ExeFS);
-            if (!File.Exists(codePath))
-                return "WARNING: code.bin was not found, so the type chart was not changed.";
+            byte[] code = _codeBin;
+            if (code == null || code.Length == 0)
+                return "WARNING: code.bin was not loaded, so the type chart was not changed.";
 
-            byte[] code = File.ReadAllBytes(codePath);
             int offset = TypeEffectivenessTable.Locate(code);
             if (offset < 0)
                 return "WARNING: the type chart could not be found in code.bin, so it was not changed.";
@@ -1672,7 +2443,7 @@ public class UniversalRandomizer
                 return $"WARNING: the new type chart was rejected ({problems[0]}); nothing was changed.";
 
             updated.WriteTo(code, offset);
-            File.WriteAllBytes(codePath, code);
+            _codeBinDirty = true;
 
             return log.Count > 0 ? log[0] : "Type chart rewritten.";
         }
@@ -1686,14 +2457,15 @@ public class UniversalRandomizer
     {
         try
         {
-            string croPath = Path.Combine(RomFSPath, "Battle.cro");
-            string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Config?.ExeFS);
+            string croDir = !string.IsNullOrWhiteSpace(RomFSPath) ? RomFSPath : (Config?.RomFS ?? "");
+            string croPath = Path.Combine(croDir, "Battle.cro");
 
             if (!File.Exists(croPath))
                 return "WARNING: Battle.cro was not found, so level caps were not installed.";
 
             byte[] cro = File.ReadAllBytes(croPath);
-            byte[] code = File.Exists(codePath) ? File.ReadAllBytes(codePath) : null;
+            // Use the shared code.bin buffer rather than reading from disk independently.
+            byte[] code = _codeBin;
 
             bool ultraMoon = string.Equals(
                 pk3DS.Core.Modding.Research.ResearchVersion.Resolve(Config), "UM", StringComparison.OrdinalIgnoreCase);
@@ -1725,12 +2497,13 @@ public class UniversalRandomizer
                     code, pk3DS.Core.Modding.Research.CodeSpaceBudget.LevelCapBytes, "Level caps");
             }
 
+            if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(croPath) is { } uhuruCap) return "WARNING: level caps skipped. " + uhuruCap;
             var sites = pk3DS.Core.Modding.Research.LevelCapPatch.Install(cro, code, table);
             if (sites.Count == 0)
                 return "WARNING: no level cap hook site was found, so nothing was installed.";
 
             pk3DS.Core.CTR.CROUtil.SaveCro(croPath, cro);
-            if (code != null) File.WriteAllBytes(codePath, code);
+            if (code != null) _codeBinDirty = true;
 
             return $"Level caps installed: {sites.Count} site(s), {table.Entries.Count} checkpoints, final cap {Settings.LevelCapFinal}.";
         }
@@ -1742,46 +2515,36 @@ public class UniversalRandomizer
 
     private ushort[] RandomizeTMMoveTable()
     {
-        if (string.IsNullOrWhiteSpace(Config.ExeFS) || !Directory.Exists(Config.ExeFS))
-            return null;
-
-        string[] files = Directory.GetFiles(Config.ExeFS);
-        if (files.Length == 0)
-            return null;
-
-        string codeFile = files.FirstOrDefault(file => File.Exists(file) && Path.GetFileNameWithoutExtension(file).Contains("code", StringComparison.OrdinalIgnoreCase));
-        if (codeFile == null)
-            return null;
-
-        byte[] code = File.ReadAllBytes(codeFile);
-        if (code.Length < 0x100000)
-            return null;
-
-        int count = DetectTMCount(code);
-        if (count <= 0)
-            count = 100;
-
-        bool expansionPackActive = Settings.ExpandTMs && Config.MaxSpeciesID >= 1025;
-        if (expansionPackActive && count < 128)
-            count = 128;
-
-        if (!Settings.ExpandTMs && count > 100)
-            count = 100;
-
-        int offset = DetectTMOffset(code);
-        if (offset < 0)
-            return null;
-
-        ushort[] defaultMoves = new ushort[count];
-        for (int i = 0; i < count; i++)
+        LastTMError = null;
+        byte[] code = _codeBin;
+        // Uhuru: EnsureCodeBin refuses the shared (writable) buffer, but the TM table is still read for trainer movesets.
+        bool readOnly = code == null && pk3DS.Core.Modding.UhuruGuard.Active && File.Exists(_codeBinPath);
+        if (readOnly) code = File.ReadAllBytes(_codeBinPath);
+        if (code == null || code.Length < 0x100000)
         {
-            int moveOffset = GetTMOffset(code, offset, i);
-            if (moveOffset >= 0 && moveOffset + 1 < code.Length)
-                defaultMoves[i] = BitConverter.ToUInt16(code, moveOffset);
+            if (Settings.ExpandTMs) LastTMError = "TM expansion skipped: code.bin is missing or too small.";
+            return null;
         }
 
-        ushort[] tmlist = pk3DS.Core.Modding.ResearchEngine.GetTMMoveArray(code, count, defaultMoves);
+        var t = pk3DS.Core.Modding.TMTable.Locate(code, out string err);
+        if (t == null)
+        {
+            LastTMError = err;
+            return null;
+        }
 
+        ushort[] tmlist = t.ReadMoves(code);
+        if (readOnly)
+        {
+            if (Settings.ExpandTMs)
+                LastTMError = "TM expansion skipped on Uhuru: the TM table is read-only here.";
+            return tmlist;
+        }
+        if (Settings.TMHMMovesMode == 0 && !Settings.ExpandTMs)
+            return tmlist;
+
+        // The pool the TM slots are drawn from. Expansion's new slots draw from the same pool.
+        List<int> pool;
         if (Settings.TMHMMovesMode > 0)
         {
             var moveNames = Config.GetText(TextName.MoveNames);
@@ -1791,234 +2554,104 @@ public class UniversalRandomizer
             if (Settings.CompetitiveRandomizer)
             {
                 validMoves = Enumerable.Range(1, Math.Min(maxMoveID, moveNames.Length - 1))
-                    .Where(m => !Legal.Z_Moves.Contains(m) &&
-                                moveNames[m] != "—" && moveNames[m] != "———" &&
+                    .Where(m => Legal.IsUsableMove(m, moveNames) &&
                                 (Competitive.CompetitiveDatabase.CompetitiveMoves.Contains(moveNames[m]) ||
                                  Competitive.CompetitiveDatabase.SituationalMoves.Contains(moveNames[m])))
+                    .Distinct()
                     .ToList();
             }
             else
             {
                 validMoves = Enumerable.Range(1, Math.Min(maxMoveID, moveNames.Length - 1))
-                    .Where(m => !Legal.Z_Moves.Contains(m) && moveNames[m] != "—" && moveNames[m] != "———")
+                    .Where(m => Legal.IsUsableMove(m, moveNames))
+                    .Distinct()
                     .ToList();
 
                 if (Settings.TMHMMovesMode == 2)
                 {
-                    // Exclude game-breaking moves (OHKO, Spore, Swagger, Dark Void, etc.)
                     HashSet<int> banned = [12, 32, 90, 105, 166, 329, 462, 479];
                     validMoves = validMoves.Where(m => !banned.Contains(m)).ToList();
                 }
             }
 
+            if (validMoves.Count < t.Count)
+            {
+                var fallbackMoves = Enumerable.Range(1, Math.Min(maxMoveID, moveNames.Length - 1))
+                    .Where(m => Legal.IsUsableMove(m, moveNames) && !validMoves.Contains(m))
+                    .Distinct()
+                    .ToList();
+                Util.Shuffle(fallbackMoves);
+                validMoves.AddRange(fallbackMoves.Take(t.Count - validMoves.Count));
+            }
+
             if (validMoves.Count > 0)
             {
-                for (int i = 0; i < count; i++)
+                Util.Shuffle(validMoves);
+                for (int i = 0; i < t.Count; i++)
                 {
-                    tmlist[i] = (ushort)validMoves[Util.Rand.Next(validMoves.Count)];
+                    tmlist[i] = (ushort)validMoves[i % validMoves.Count];
                 }
             }
+            pool = validMoves;
+
+            t.Write(code, tmlist, t.ReadItems(code));
+            _codeBinDirty = true;
         }
         else
         {
-            Util.Shuffle(tmlist);
-        }
-
-        if (expansionPackActive && Settings.TMHMMovesMode == 0)
-        {
-            var moveNamesForNewSlots = Config.GetText(TextName.MoveNames);
-            int maxMoveIdForNewSlots = Config.Info.MaxMoveID;
-            var validMovesForNewSlots = Enumerable.Range(1, Math.Min(maxMoveIdForNewSlots, moveNamesForNewSlots.Length - 1))
-                .Where(m => !Legal.Z_Moves.Contains(m) && moveNamesForNewSlots[m] != "—" && moveNamesForNewSlots[m] != "———")
+            // Mode 0 is "Unchanged": the vanilla 100 stay put (shuffling them used to re-point every
+            // species' TM compatibility bits at different moves); only the new slots are filled.
+            var moveNames = Config.GetText(TextName.MoveNames);
+            int maxMoveID = Config.Info.MaxMoveID;
+            pool = Enumerable.Range(1, Math.Min(maxMoveID, moveNames.Length - 1))
+                .Where(m => Legal.IsUsableMove(m, moveNames))
+                .Distinct()
                 .ToList();
-            if (validMovesForNewSlots.Count > 0)
-            {
-                for (int i = 100; i < tmlist.Length && i < 128; i++)
-                    tmlist[i] = (ushort)validMovesForNewSlots[Util.Rand.Next(validMovesForNewSlots.Count)];
-            }
         }
 
-        if (count <= 100)
+        if (!Settings.ExpandTMs)
+            return tmlist;
+        if (t.Layout != pk3DS.Core.Modding.TMTable.Kind.Stock)
         {
-            for (int i = 0; i < count; i++)
-            {
-                int moveOffset = GetTMOffset(code, offset, i);
-                if (moveOffset >= 0 && moveOffset + 1 < code.Length)
-                    BitConverter.GetBytes(tmlist[i]).CopyTo(code, moveOffset);
-            }
-
-            File.WriteAllBytes(codeFile, code);
+            LastTMError = $"TM expansion skipped: the TM table is already expanded ({t.Count} TMs).";
             return tmlist;
         }
 
-        ushort[] defaultItems = GetDefaultTMItems();
-        ushort[] itemlist = pk3DS.Core.Modding.ResearchEngine.GetTMItemArray(code, count, defaultItems);
-
-        if (expansionPackActive)
+        // The new TMs take moves from the same pool, skipping the ones the table already holds.
+        int target = pk3DS.Core.Modding.TMExpansion.EffectiveMax; // 104 while passive abilities own TM bits 104-127
+        int need = target - t.Count;
+        if (need <= 0) { LastTMError = $"TM expansion skipped: the TM table already holds {t.Count} TMs, the most allowed right now ({target})."; return tmlist; }
+        var used = new HashSet<int>(tmlist.Select(m => (int)m));
+        var fresh = pool.Where(m => !used.Contains(m)).ToList();
+        if (fresh.Count < need)
         {
-            pk3DS.Core.Modding.Research.ExpandedTMItems.AssignTo(itemlist, ExpansionPackNewTMItemStartId);
+            LastTMError = $"TM expansion skipped: {fresh.Count} unused moves in the pool, {need} needed.";
+            return tmlist;
+        }
+        Util.Shuffle(fresh);
+        ushort[] newMoves = fresh.Take(need).Select(m => (ushort)m).ToArray();
 
-            int highestNewItemId = pk3DS.Core.Modding.Research.ExpandedTMItems.HighestId(ExpansionPackNewTMItemStartId);
-            LastItemCeilingResult = pk3DS.Core.Modding.Research.ItemCeilingPatcher.Raise(code, highestNewItemId);
-
-            // The expanded icon lookup sends every id at or above 1024 to icon 768, which is the
-            // blank slot; without this the new TMs appear in the bag with no icon.
-            LastTMIconResult = pk3DS.Core.Modding.Research.TMIconPatcher.Retarget(code);
+        byte[] expanded = pk3DS.Core.Modding.Research.ExpandedTMItems.ExpandCode(
+            Config, code, target, newMoves, out ushort[] newItemIds, out string error);
+        if (expanded == null)
+        {
+            LastTMError = "TM expansion skipped: " + error;
+            return tmlist;
         }
 
-        pk3DS.Core.Modding.ResearchEngine.ApplyExpandedTMCodePatch(code, tmlist, itemlist);
-        File.WriteAllBytes(codeFile, code);
+        // ExpandCode returns a fresh buffer of the same length; copy it over the shared one.
+        if (_codeBin.Length == expanded.Length) Array.Copy(expanded, _codeBin, expanded.Length);
+        else _codeBin = expanded;
+        _codeBinDirty = true;
+        _pendingTMItemIds = newItemIds;
+        _pendingTMMoves = newMoves;
+        _pendingTMFirstSlot = t.Count;
 
-        if (expansionPackActive)
-            CreateExpansionPackTMItems(itemlist, tmlist);
-
-        return tmlist;
+        return tmlist.Concat(newMoves).ToArray();
     }
 
-    public ushort ExpansionPackNewTMItemStartId { get; set; } = 1024;
-
-    /// <summary>
-    /// Outcome of the last item-ceiling widening, so callers can report exactly which bounds
-    /// checks were raised (and to what) rather than having it happen invisibly.
-    /// </summary>
-    public pk3DS.Core.Modding.Research.ItemCeilingResult LastItemCeilingResult { get; private set; }
-
-    /// <summary>Outcome of the last TM icon-fallback retarget, for the same reporting reason.</summary>
-    public pk3DS.Core.Modding.Research.TMIconPatcher.Result LastTMIconResult { get; private set; }
-
-    private void CreateExpansionPackTMItems(ushort[] itemlist, ushort[] tmlist)
-    {
-        if (string.IsNullOrWhiteSpace(Config.RomFS) || !Directory.Exists(Config.RomFS)) return;
-
-        var newItemIds = new List<ushort>();
-        for (int i = 100; i < itemlist.Length && i < 128; i++)
-        {
-            if (itemlist[i] > 0) newItemIds.Add(itemlist[i]);
-        }
-        if (newItemIds.Count == 0) return;
-
-        int maxItemID = newItemIds.Max();
-        ushort[] newItemArr = newItemIds.ToArray();
-
-        pk3DS.Core.Modding.ResearchEngine.ApplyExpandedTMItemAttributesPatch(Config.RomFS, maxItemID, newItemArr);
-        pk3DS.Core.Modding.ResearchEngine.ApplyExpandedTMBattleBagPatch(Config.RomFS, maxItemID, newItemArr);
-
-        string[] itemNames = Config.GetText(TextName.ItemNames);
-        if (maxItemID >= itemNames.Length)
-        {
-            int oldLen = itemNames.Length;
-            Array.Resize(ref itemNames, maxItemID + 1);
-            for (int i = oldLen; i < itemNames.Length; i++)
-                itemNames[i] ??= "???";
-        }
-
-        string[] itemDescriptions = Config.GetText(TextName.ItemFlavor);
-        if (maxItemID >= itemDescriptions.Length)
-        {
-            int oldLen = itemDescriptions.Length;
-            Array.Resize(ref itemDescriptions, maxItemID + 1);
-            for (int i = oldLen; i < itemDescriptions.Length; i++)
-                itemDescriptions[i] ??= "???";
-        }
-        string[] moveDescriptions = Config.GetText(TextName.MoveFlavor);
-
-        for (int i = 100; i < itemlist.Length && i < 128; i++)
-        {
-            int itemId = itemlist[i];
-            if (itemId <= 0 || itemId >= itemNames.Length) continue;
-            itemNames[itemId] = $"TM{(i + 1):D3}";
-            if (itemId < itemDescriptions.Length && i < tmlist.Length && tmlist[i] > 0 && tmlist[i] < moveDescriptions.Length)
-                itemDescriptions[itemId] = moveDescriptions[tmlist[i]];
-        }
-
-        Config.SetText(TextName.ItemNames, itemNames);
-        Config.SetText(TextName.ItemFlavor, itemDescriptions);
-        Config.SaveText(TextName.ItemNames);
-        Config.SaveText(TextName.ItemFlavor);
-    }
-
-    private int DetectTMOffset(byte[] code)
-    {
-        byte[] tmSig = [0x0E, 0x02, 0x51, 0x01, 0xD9, 0x01];
-        int foundOfs = pk3DS.Core.Util.IndexOfBytes(code, tmSig, 0x100000, 0);
-        if (foundOfs >= 0)
-            return foundOfs;
-
-        byte[] signature = [0x03, 0x40, 0x03, 0x41, 0x03, 0x42, 0x03, 0x43, 0x03];
-        int fallback = pk3DS.Core.Util.IndexOfBytes(code, signature, 0x400000, 0);
-        if (fallback >= 0)
-        {
-            fallback += signature.Length;
-            if (Config.USUM)
-                fallback += 0x22;
-            return fallback;
-        }
-
-        return -1;
-    }
-
-    private static int GetTMOffset(byte[] code, int offset, int index)
-    {
-        if (index < 100)
-            return offset + (2 * index);
-
-        if (index >= 107 && offset < 0x100000 && code.Length > 0x4BB794 + 2)
-            return 0x4BB794 + (2 * (index - 107));
-
-        return offset + (2 * index);
-    }
-
-    private int DetectTMCount(byte[] codeData)
-    {
-        byte[] customSig = [0x10, 0x40, 0x2D, 0xE9, 0x00, 0x00, 0x50, 0xE3, 0x0C, 0x40, 0x9F, 0x35, 0x00, 0x00, 0xA0, 0x23];
-        byte[] mask = [0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-        int customOfs = pk3DS.Core.Modding.ResearchEngine.IndexOfBytesMasked(codeData, customSig, mask, 0);
-
-        if (customOfs >= 0)
-            return codeData[customOfs + 4];
-
-        int offset = DetectTMOffset(codeData);
-        if (offset < 0)
-            return 0;
-
-        int searchStart = Math.Max(0, offset - 0x2000);
-        int searchEnd = Math.Min(codeData.Length - 4, offset + 0x2000);
-
-        for (int i = searchStart; i < searchEnd; i += 4)
-        {
-            uint word = BitConverter.ToUInt32(codeData, i);
-            if (word == 0xE3500064)
-                return 100;
-            if (word == 0xE350005B)
-                return 128;
-        }
-
-        int bestCount = 0;
-        for (int i = searchStart; i < searchEnd; i += 4)
-        {
-            uint word = BitConverter.ToUInt32(codeData, i);
-            if ((word & 0xFFF00000) != 0xE3500000) continue;
-
-            uint imm8 = word & 0xFF;
-            uint rot = (word >> 8) & 0xF;
-            uint value = rot == 0 ? imm8 : (imm8 >> (int)(rot * 2)) | (imm8 << (int)(32 - rot * 2));
-
-            if (value > 100 && value <= 128 && (int)value > bestCount)
-                bestCount = (int)value;
-        }
-        return bestCount > 0 ? bestCount : 100;
-    }
-
-    private static ushort[] GetDefaultTMItems()
-    {
-        ushort[] items = new ushort[107];
-        for (int i = 0; i < 92; i++) items[i] = (ushort)(328 + i);
-        for (int i = 92; i < 95; i++) items[i] = (ushort)(618 + (i - 92));
-        for (int i = 95; i < 100; i++) items[i] = (ushort)(690 + (i - 95));
-        for (int i = 100; i < 106; i++) items[i] = (ushort)(420 + (i - 100));
-        items[106] = 737;
-        return items;
-    }
+    /// <summary>Why the last TM step was skipped (TM table not found, expansion refused), or null.</summary>
+    public string LastTMError { get; private set; }
 
     // Finds which ability slot (1, 2, or 3=Hidden) holds the given ability ID on this species,
     // or 0 if none of its slots do.
@@ -2032,33 +2665,47 @@ public class UniversalRandomizer
         return 0;
     }
 
-    private ushort GetFinalEvolution(int species)
+    public ushort GetFinalEvolution(int species)
     {
         if (species <= 0) return 1;
+
+        var legendarySet = Legal.GetLegendaryAndMythicalSet();
+        if (legendarySet.Contains(species)) return (ushort)species;
+
         var finalEvos = Config?.Generation == 6 ? Legal.FinalEvolutions_6 : Legal.FinalEvolutions_7;
         if (finalEvos.Contains(species)) return (ushort)species;
 
         if (Config?.Evolutions != null && species < Config.Evolutions.Length)
         {
+            var evoSet = Config.Evolutions[species];
+            bool hasValidEvolutions = evoSet?.PossibleEvolutions != null &&
+                evoSet.PossibleEvolutions.Any(e => e.Species > 0 && e.Species != species && e.Method > 0);
+
+            if (!hasValidEvolutions)
+                return (ushort)species;
+
             int current = species;
             var visited = new HashSet<int> { current };
 
             while (current < Config.Evolutions.Length)
             {
-                if (finalEvos.Contains(current)) return (ushort)current;
+                if (finalEvos.Contains(current) || legendarySet.Contains(current))
+                    return (ushort)current;
 
-                var evoSet = Config.Evolutions[current];
-                if (evoSet?.PossibleEvolutions == null) break;
+                var curEvoSet = Config.Evolutions[current];
+                if (curEvoSet?.PossibleEvolutions == null) break;
 
-                var evo = evoSet.PossibleEvolutions.FirstOrDefault(e => e.Species > 0 && e.Species != current && e.Method > 0);
+                var evo = curEvoSet.PossibleEvolutions.FirstOrDefault(e => e.Species > 0 && e.Species != current && e.Method > 0);
                 if (evo == null || visited.Contains(evo.Species)) break;
 
                 current = evo.Species;
                 visited.Add(current);
             }
-            if (finalEvos.Contains(current)) return (ushort)current;
-            if (current > 0 && current != species) return (ushort)current;
+            if (current > 0) return (ushort)current;
         }
+
+        // If species is beyond the vanilla range and has no evolution entry, it is standalone/final
+        if (species > 807) return (ushort)species;
 
         // Deterministic fallback: map to a final evolution species from the game's final evolution list
         int idx = Math.Abs(species * 37) % finalEvos.Length;

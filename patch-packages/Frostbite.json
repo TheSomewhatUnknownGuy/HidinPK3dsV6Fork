@@ -1,0 +1,65 @@
+{
+  "Name": "Frostbite",
+  "Description": "Reworks Freeze into Frostbite (Legends Arceus): Pokemon can act freely, takes 1/16 Max HP tick damage end of turn, and deals 50% Special damage. KNOWN GAP (found 2026-09-12, not yet fixed): this package does not touch Battle.cro 0x215CC-0x21628, a native block that checks 'move type == Fire' (CMP R0,#0x9 @0x215D8) then loops over party members testing status==3 (the same status id this package repurposes as Frostbite) and calls a helper at 0xE4870 on any match - almost certainly the vanilla 'hit by a Fire-type move thaws Freeze' rule. Since status 3 is shared/repurposed rather than given a distinct id, a Pokemon with the new Frostbite status is likely still incorrectly cured by any nearby Fire-type move, which doesn't match Frostbite's real (Legends Arceus) behavior. Needs 0xE4870 decoded to confirm it's really a cure-status call before a 5th SitePatch neutralizes it here - not yet attempted, flagging honestly rather than guessing a fix.",
+  "Category": "Battle Mechanics",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [
+    {
+      "Name": "battle-frostbite-block",
+      "Code": "06402DE90010A0E10800A0E1C411FEEB040050E3010051030400000A030050E3020051030100000A0000A0E30680BDE80100A0E3030057E30000A0030100A0131EFF2FE1030055E3C992FF0AD992FFEA000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "SourceBase": "0x00FD938",
+      "CodeBytes": "BkAt6QAQoOEIAKDhxBH+6wQAUOMBAFEDBAAACgMAUOMCAFEDAQAACgAAoOMGgL3oAQCg4wMAV+MAAKADAQCgEx7/L+EDAFXjyZL/CtmS/+oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "SourceBaseValue": 1038648
+    }
+  ],
+  "SitePatches": [
+    {
+      "Offset": "0x00018A20",
+      "Original": "010050E3",
+      "Patched": "000000EB",
+      "IsHook": true,
+      "HookTarget": "battle-frostbite-block",
+      "OffsetValue": 100896,
+      "OriginalBytes": "AQBQ4w==",
+      "PatchedBytes": "AAAA6w=="
+    },
+    {
+      "Offset": "0x0002654C",
+      "Original": "0100A0E3",
+      "Patched": "0D0000EB",
+      "IsHook": true,
+      "HookTarget": "battle-frostbite-block",
+      "OffsetValue": 157004,
+      "OriginalBytes": "AQCg4w==",
+      "PatchedBytes": "DQAA6w=="
+    },
+    {
+      "Offset": "0x0002695C",
+      "Original": "1400A0E3",
+      "Patched": "040000EA",
+      "IsHook": false,
+      "OffsetValue": 158044,
+      "OriginalBytes": "FACg4w==",
+      "PatchedBytes": "BAAA6g=="
+    },
+    {
+      "Offset": "0x000E2468",
+      "Original": "2000001A",
+      "Patched": "1100001A",
+      "IsHook": true,
+      "HookTarget": "battle-frostbite-block",
+      "OffsetValue": 926824,
+      "OriginalBytes": "IAAAGg==",
+      "PatchedBytes": "EQAAGg=="
+    }
+  ],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

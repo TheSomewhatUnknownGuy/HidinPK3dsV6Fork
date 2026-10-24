@@ -75,7 +75,7 @@ public static class LevelCapPatch
     ];
 
     /// <summary>The four words the Rare Candy hook expects to find before it is patched.</summary>
-    private static readonly uint[] CandyOriginal =
+    internal static readonly uint[] CandyOriginal =
     [
         0xE3550064, // cmp   r5, #100
         0x83A05064, // movhi r5, #100
@@ -150,9 +150,11 @@ public static class LevelCapPatch
         if (!WordsMatch(code, CandyHook, CandyOriginal, out string why))
             return new("code.bin", false, 0, CandyHook, why + " - this is not a build the Rare Candy hook was written for");
 
-        uint? spot = FindFreeSpace(code, block.Length, CodeTextEnd(code), CandyHook, 0);
-        if (spot is not { } at)
+        // The one allocator: first-fit in .text, and on Uhuru it keeps out of Uhuru's code.
+        var grant = CodeSpaceAllocator.ForCodeBin(code).Allocate(block.Length, "level cap");
+        if (!grant.Success)
             return new("code.bin", false, 0, CandyHook, $"no run of {block.Length} free bytes inside .text");
+        uint at = grant.Offset;
 
         block.CopyTo(code, at);
 
@@ -180,23 +182,6 @@ public static class LevelCapPatch
             if (off + size <= cro.Length) return off + size;
         }
         return (uint)cro.Length;
-    }
-
-    /// <summary>
-    /// End of .text in an ExeFS .code, found by its page padding rather than by reading ExHeader.
-    /// </summary>
-    private static uint CodeTextEnd(byte[] code)
-    {
-        const long MinPadding = 0x100;
-
-        for (long page = 0x1000; page < code.Length; page += 0x1000)
-        {
-            if (code[page] == 0) continue;              // next section must start here
-            long i = page - 1;
-            while (i >= 0 && code[i] == 0) i--;
-            if (page - (i + 1) >= MinPadding) return (uint)page;
-        }
-        return (uint)code.Length;
     }
 
     /// <summary>

@@ -31,6 +31,9 @@ namespace pk3DS.WinForms
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             L_Location = new System.Windows.Forms.Label();
             CB_LocationID = new System.Windows.Forms.ComboBox();
+            B_ExportPgeif = new System.Windows.Forms.Button();
+            B_ImportPgeif = new System.Windows.Forms.Button();
+            B_ClearPgeCache = new System.Windows.Forms.Button();
             tabControl1 = new System.Windows.Forms.TabControl();
             tab_7_ZS = new System.Windows.Forms.TabPage();
             L_7_Info = new System.Windows.Forms.Label();
@@ -48,6 +51,7 @@ namespace pk3DS.WinForms
             RTB_8_Raw = new System.Windows.Forms.RichTextBox();
             tabPage1 = new System.Windows.Forms.TabPage();
             button1 = new System.Windows.Forms.Button();
+            B_AddGroundItem = new System.Windows.Forms.Button();
             dgv = new System.Windows.Forms.DataGridView();
             dgvIndex = new System.Windows.Forms.DataGridViewTextBoxColumn();
             dgvItem = new System.Windows.Forms.DataGridViewComboBoxColumn();
@@ -68,6 +72,11 @@ namespace pk3DS.WinForms
             B_ConvertTrainer = new System.Windows.Forms.Button();
             B_SaveTrainers = new System.Windows.Forms.Button();
             L_ConvertTrainer = new System.Windows.Forms.Label();
+            B_AddTrainer = new System.Windows.Forms.Button();
+            tab_Npcs = new System.Windows.Forms.TabPage();
+            dgvNpcs = new System.Windows.Forms.DataGridView();
+            B_AddNpc = new System.Windows.Forms.Button();
+            B_SaveNpcs = new System.Windows.Forms.Button();
             tabControl1.SuspendLayout();
             tab_7_ZS.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)NUD_7_Count).BeginInit();
@@ -99,7 +108,7 @@ namespace pk3DS.WinForms
             CB_LocationID.Location = new System.Drawing.Point(54, 7);
             CB_LocationID.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             CB_LocationID.Name = "CB_LocationID";
-            CB_LocationID.Size = new System.Drawing.Size(362, 23);
+            CB_LocationID.Size = new System.Drawing.Size(280, 23);
             CB_LocationID.TabIndex = 432;
             CB_LocationID.SelectedIndexChanged += CB_LocationID_SelectedIndexChanged;
             // 
@@ -111,6 +120,7 @@ namespace pk3DS.WinForms
             tabControl1.Controls.Add(tabPage1);
             tabControl1.Controls.Add(tabPage2);
             tabControl1.Controls.Add(tab_Trainers);
+            tabControl1.Controls.Add(tab_Npcs);
             tabControl1.Location = new System.Drawing.Point(18, 38);
             tabControl1.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             tabControl1.Name = "tabControl1";
@@ -285,6 +295,7 @@ namespace pk3DS.WinForms
             // tabPage1
             // 
             tabPage1.Controls.Add(button1);
+            tabPage1.Controls.Add(B_AddGroundItem);
             tabPage1.Controls.Add(dgv);
             tabPage1.Location = new System.Drawing.Point(4, 24);
             tabPage1.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
@@ -306,6 +317,18 @@ namespace pk3DS.WinForms
             button1.Text = "Save";
             button1.UseVisualStyleBackColor = true;
             button1.Click += buttonSave_Click;
+            // 
+            // B_AddGroundItem
+            // 
+            B_AddGroundItem.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+            B_AddGroundItem.Location = new System.Drawing.Point(103, 466);
+            B_AddGroundItem.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            B_AddGroundItem.Name = "B_AddGroundItem";
+            B_AddGroundItem.Size = new System.Drawing.Size(160, 35);
+            B_AddGroundItem.TabIndex = 4;
+            B_AddGroundItem.Text = "+ Add Ground Item";
+            B_AddGroundItem.UseVisualStyleBackColor = true;
+            B_AddGroundItem.Click += B_AddGroundItem_Click;
             // 
             // dgv
             // 
@@ -410,13 +433,49 @@ namespace pk3DS.WinForms
             treeView1.AfterSelect += treeView1_AfterSelect;
             treeView1.MouseDoubleClick += treeView1_MouseDoubleClick;
             // 
+            // B_ExportPgeif
+            // 
+            B_ExportPgeif.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            B_ExportPgeif.Location = new System.Drawing.Point(344, 6);
+            B_ExportPgeif.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            B_ExportPgeif.Name = "B_ExportPgeif";
+            B_ExportPgeif.Size = new System.Drawing.Size(102, 26);
+            B_ExportPgeif.TabIndex = 436;
+            B_ExportPgeif.Text = "Export PGEIF";
+            B_ExportPgeif.UseVisualStyleBackColor = true;
+            B_ExportPgeif.Click += B_ExportPgeif_Click;
+            // 
+            // B_ImportPgeif
+            // 
+            B_ImportPgeif.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            B_ImportPgeif.Location = new System.Drawing.Point(450, 6);
+            B_ImportPgeif.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            B_ImportPgeif.Name = "B_ImportPgeif";
+            B_ImportPgeif.Size = new System.Drawing.Size(102, 26);
+            B_ImportPgeif.TabIndex = 437;
+            B_ImportPgeif.Text = "Import PGEIF";
+            B_ImportPgeif.UseVisualStyleBackColor = true;
+            B_ImportPgeif.Click += B_ImportPgeif_Click;
+            // 
+            // B_ClearPgeCache
+            // 
+            B_ClearPgeCache.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            B_ClearPgeCache.Location = new System.Drawing.Point(556, 6);
+            B_ClearPgeCache.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            B_ClearPgeCache.Name = "B_ClearPgeCache";
+            B_ClearPgeCache.Size = new System.Drawing.Size(116, 26);
+            B_ClearPgeCache.TabIndex = 438;
+            B_ClearPgeCache.Text = "Sync PGE Cache";
+            B_ClearPgeCache.UseVisualStyleBackColor = true;
+            B_ClearPgeCache.Click += B_ClearPgeCache_Click;
+            // 
             // button_dump
             // 
             button_dump.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            button_dump.Location = new System.Drawing.Point(682, 7);
+            button_dump.Location = new System.Drawing.Point(676, 6);
             button_dump.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             button_dump.Name = "button_dump";
-            button_dump.Size = new System.Drawing.Size(104, 28);
+            button_dump.Size = new System.Drawing.Size(104, 26);
             button_dump.TabIndex = 435;
             button_dump.Text = "Dump";
             button_dump.UseVisualStyleBackColor = true;
@@ -445,6 +504,7 @@ namespace pk3DS.WinForms
             // tab_Trainers
             // 
             tab_Trainers.Controls.Add(L_ConvertTrainer);
+            tab_Trainers.Controls.Add(B_AddTrainer);
             tab_Trainers.Controls.Add(B_SaveTrainers);
             tab_Trainers.Controls.Add(B_ConvertTrainer);
             tab_Trainers.Controls.Add(CB_UnusedTrainer);
@@ -520,7 +580,7 @@ namespace pk3DS.WinForms
             B_SaveTrainers.Click += B_SaveTrainers_Click;
             // 
             // L_ConvertTrainer
-            // 
+            //
             L_ConvertTrainer.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
             L_ConvertTrainer.AutoSize = true;
             L_ConvertTrainer.Location = new System.Drawing.Point(5, 465);
@@ -528,12 +588,72 @@ namespace pk3DS.WinForms
             L_ConvertTrainer.Size = new System.Drawing.Size(167, 15);
             L_ConvertTrainer.TabIndex = 6;
             L_ConvertTrainer.Text = "Select Unused Trainer to Copy:";
-            // 
+            //
+            // B_AddTrainer
+            //
+            B_AddTrainer.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+            B_AddTrainer.Location = new System.Drawing.Point(340, 479);
+            B_AddTrainer.Name = "B_AddTrainer";
+            B_AddTrainer.Size = new System.Drawing.Size(150, 25);
+            B_AddTrainer.TabIndex = 7;
+            B_AddTrainer.Text = "Add New Trainer...";
+            B_AddTrainer.UseVisualStyleBackColor = true;
+            B_AddTrainer.Click += B_AddTrainer_Click;
+            //
+            // tab_Npcs
+            //
+            tab_Npcs.Controls.Add(B_SaveNpcs);
+            tab_Npcs.Controls.Add(B_AddNpc);
+            tab_Npcs.Controls.Add(dgvNpcs);
+            tab_Npcs.Location = new System.Drawing.Point(4, 24);
+            tab_Npcs.Name = "tab_Npcs";
+            tab_Npcs.Padding = new System.Windows.Forms.Padding(3);
+            tab_Npcs.Size = new System.Drawing.Size(762, 510);
+            tab_Npcs.TabIndex = 5;
+            tab_Npcs.Text = "NPCs";
+            tab_Npcs.UseVisualStyleBackColor = true;
+            //
+            // dgvNpcs
+            //
+            dgvNpcs.AllowUserToAddRows = false;
+            dgvNpcs.AllowUserToDeleteRows = false;
+            dgvNpcs.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            dgvNpcs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvNpcs.Location = new System.Drawing.Point(6, 6);
+            dgvNpcs.Name = "dgvNpcs";
+            dgvNpcs.Size = new System.Drawing.Size(750, 458);
+            dgvNpcs.TabIndex = 0;
+            //
+            // B_AddNpc
+            //
+            B_AddNpc.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+            B_AddNpc.Location = new System.Drawing.Point(6, 479);
+            B_AddNpc.Name = "B_AddNpc";
+            B_AddNpc.Size = new System.Drawing.Size(150, 25);
+            B_AddNpc.TabIndex = 1;
+            B_AddNpc.Text = "Add New NPC...";
+            B_AddNpc.UseVisualStyleBackColor = true;
+            B_AddNpc.Click += B_AddNpc_Click;
+            //
+            // B_SaveNpcs
+            //
+            B_SaveNpcs.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+            B_SaveNpcs.Location = new System.Drawing.Point(668, 479);
+            B_SaveNpcs.Name = "B_SaveNpcs";
+            B_SaveNpcs.Size = new System.Drawing.Size(88, 25);
+            B_SaveNpcs.TabIndex = 2;
+            B_SaveNpcs.Text = "Save";
+            B_SaveNpcs.UseVisualStyleBackColor = true;
+            B_SaveNpcs.Click += B_SaveNpcs_Click;
+            //
             // OWSE7
-            // 
+            //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(798, 590);
+            Controls.Add(B_ClearPgeCache);
+            Controls.Add(B_ImportPgeif);
+            Controls.Add(B_ExportPgeif);
             Controls.Add(button_dump);
             Controls.Add(tabControl1);
             Controls.Add(L_Location);
@@ -583,6 +703,7 @@ namespace pk3DS.WinForms
         private System.Windows.Forms.DataGridViewTextBoxColumn dgvIndex;
         private System.Windows.Forms.DataGridViewComboBoxColumn dgvItem;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Button B_AddGroundItem;
         private System.Windows.Forms.TabPage tabPage2;
         private System.Windows.Forms.TreeView treeView1;
         private System.Windows.Forms.Panel hexPanel;
@@ -600,5 +721,13 @@ namespace pk3DS.WinForms
         private System.Windows.Forms.Button B_ConvertTrainer;
         private System.Windows.Forms.Button B_SaveTrainers;
         private System.Windows.Forms.Label L_ConvertTrainer;
+        private System.Windows.Forms.Button B_AddTrainer;
+        private System.Windows.Forms.TabPage tab_Npcs;
+        private System.Windows.Forms.DataGridView dgvNpcs;
+        private System.Windows.Forms.Button B_AddNpc;
+        private System.Windows.Forms.Button B_SaveNpcs;
+        private System.Windows.Forms.Button B_ExportPgeif;
+        private System.Windows.Forms.Button B_ImportPgeif;
+        private System.Windows.Forms.Button B_ClearPgeCache;
     }
 }

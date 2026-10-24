@@ -8,6 +8,7 @@ using System.Collections.Generic;
 
 using pk3DS.Core;
 using pk3DS.Core.Structures;
+using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
@@ -24,7 +25,6 @@ public partial class ItemEditor7 : Form
         this.FormClosing += Form_Closing;
         Setup();
         ApplyGridTheme(WinFormsUtil.CurrentTheme == WinFormsUtil.VisualTheme.Dark);
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
     }
 
     private void ApplyGridTheme(bool dark)
@@ -32,7 +32,7 @@ public partial class ItemEditor7 : Form
         Grid.ViewBackColor = dark ? Color.FromArgb(30, 30, 35) : Color.FromArgb(50, 50, 60);
         Grid.ViewForeColor = Color.White;
         Grid.LineColor = dark ? Color.FromArgb(60, 60, 75) : Color.FromArgb(90, 90, 100);
-        Grid.CategoryForeColor = Color.Gold;
+        Grid.CategoryForeColor = WinFormsUtil.Accent(WinFormsUtil.VisualTheme.Dark);   // the grid stays dark in every theme, so it takes the bright accent
         Grid.HelpBackColor = Grid.ViewBackColor;
         Grid.HelpForeColor = Color.LightCyan;
         Grid.CommandsBackColor = Grid.ViewBackColor;
@@ -74,9 +74,11 @@ public partial class ItemEditor7 : Form
         for (int i = firstNew; i < files.Length; i++)
             files[i] = (byte[])files[template].Clone();
 
-        // Names and descriptions have to grow too, or the new ids are invisible to the game.
+        // Names, plurals and descriptions have to grow too, or the new ids are invisible to the game.
         var names = Main.Config.GetText(TextName.ItemNames);
         var flavour = Main.Config.GetText(TextName.ItemFlavor);
+        var plurals = Main.Config.GetText(TextName.ItemNamesPlural);
+        var pluralAlts = Main.Config.GetText(TextName.ItemNamesPluralAlt);
         int oldNames = names.Length;
 
         if (names.Length < files.Length)
@@ -84,6 +86,20 @@ public partial class ItemEditor7 : Form
             Array.Resize(ref names, files.Length);
             for (int i = oldNames; i < names.Length; i++) names[i] = $"New Item {i}";
             Main.Config.SetText(TextName.ItemNames, names);
+        }
+        if (plurals != null && plurals.Length > 0 && plurals.Length < files.Length)
+        {
+            int oldPlurals = plurals.Length;
+            Array.Resize(ref plurals, files.Length);
+            for (int i = oldPlurals; i < plurals.Length; i++) plurals[i] = $"New Items {i}";
+            Main.Config.SetText(TextName.ItemNamesPlural, plurals);
+        }
+        if (pluralAlts != null && pluralAlts.Length > 0 && pluralAlts.Length < files.Length)
+        {
+            int oldPluralAlts = pluralAlts.Length;
+            Array.Resize(ref pluralAlts, files.Length);
+            for (int i = oldPluralAlts; i < pluralAlts.Length; i++) pluralAlts[i] = ItemTextUtil.PluralAlt(names[i]);
+            Main.Config.SetText(TextName.ItemNamesPluralAlt, pluralAlts);
         }
         if (flavour.Length < files.Length)
         {
@@ -236,6 +252,12 @@ public partial class ItemEditor7 : Form
         var items = files.Select(z => new Item(z));
         Clipboard.SetText(TableUtil.GetTable(items, itemlist));
         System.Media.SystemSounds.Asterisk.Play();
+    }
+
+    private void B_Guide_Click(object sender, EventArgs e)
+    {
+        using var dlg = new ItemGuideDialog();
+        dlg.ShowDialog(this);
     }
 
     private void B_MakeMega_Click(object sender, EventArgs e)

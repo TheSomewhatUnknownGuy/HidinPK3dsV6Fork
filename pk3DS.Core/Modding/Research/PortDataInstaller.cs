@@ -67,31 +67,43 @@ public static class PortDataInstaller
         // Names go into every language variant; a hack usually only extends some of them, and the
         // ones it missed will show '???' for anything new.
         int langs = 0;
-        for (int lang = 0; lang <= 9; lang++)
+        int originalLanguage = cfg.Language;
+        try
         {
-            GameConfig lc;
-            string[] names;
+            for (int lang = 0; lang <= 9; lang++)
+            {
+                string[] names;
+                try
+                {
+                    cfg.Language = lang;
+                    cfg.InitializeGameText();
+                    names = cfg.GetText(TextName.ItemNames);
+                }
+                catch { continue; }
+                if (names == null || names.Length == 0) continue;
+
+                bool touched = false;
+                foreach (var item in items)
+                {
+                    if (item.Id >= names.Length || string.IsNullOrEmpty(item.Name)) continue;
+                    string cur = (names[item.Id] ?? "").Trim();
+                    if (cur == item.Name) continue;
+                    if (cur is not ("" or "???" or "-----" or "—")) { log($"  lang {lang}: id {item.Id} already named '{cur}' — left alone"); continue; }
+                    names[item.Id] = item.Name;
+                    touched = true;
+                }
+                if (touched && commit) { cfg.SetText(TextName.ItemNames, names); cfg.SaveText(TextName.ItemNames); }
+                if (touched) langs++;
+            }
+        }
+        finally
+        {
             try
             {
-                lc = new GameConfig(cfg.Version);
-                lc.Initialize(cfg.RomFS, cfg.ExeFS, lang);
-                names = lc.GetText(TextName.ItemNames);
+                cfg.Language = originalLanguage;
+                cfg.InitializeGameText();
             }
-            catch { continue; }
-            if (names.Length == 0) continue;
-
-            bool touched = false;
-            foreach (var item in items)
-            {
-                if (item.Id >= names.Length || string.IsNullOrEmpty(item.Name)) continue;
-                string cur = (names[item.Id] ?? "").Trim();
-                if (cur == item.Name) continue;
-                if (cur is not ("" or "???" or "-----" or "—")) { log($"  lang {lang}: id {item.Id} already named '{cur}' — left alone"); continue; }
-                names[item.Id] = item.Name;
-                touched = true;
-            }
-            if (touched && commit) { lc.SetText(TextName.ItemNames, names); lc.SaveText(TextName.ItemNames); }
-            if (touched) langs++;
+            catch { }
         }
         log($"  item names: {langs} language variant(s){(commit ? " written" : " (dry run)")}");
         return applied;
@@ -142,7 +154,9 @@ public static class PortDataInstaller
     public static Dictionary<string, uint> ResolveStaticSymbols(string romFsPath, IEnumerable<string> names)
     {
         var found = new Dictionary<string, uint>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(romFsPath)) return found;
         string crs = Path.Combine(romFsPath, "static.crs");
+        if (!File.Exists(crs)) crs = Path.Combine(romFsPath, "dll", "static.crs");
         if (!File.Exists(crs)) return found;
 
         byte[] b = File.ReadAllBytes(crs);

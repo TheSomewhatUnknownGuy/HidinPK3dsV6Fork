@@ -42,6 +42,7 @@ namespace pk3DS.Core.Modding
         {
             var info = AnalyzePatchGroup(group, romfs, exefs);
             if (!info.FileExists) return false;
+            if (UhuruGuard.RefusalFor(info.AbsolutePath) != null) return false;
 
             byte[] data = File.ReadAllBytes(info.AbsolutePath);
             bool modified = false;

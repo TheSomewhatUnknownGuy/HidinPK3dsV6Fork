@@ -67,6 +67,8 @@ public static class ExpandedTMText
         int originalLanguage = cfg.Language;
         string[] sourceNames = [];
         string[] sourceFlavor = [];
+        string[] sourcePlural = [];
+        string[] sourcePluralAlt = [];
 
         // Read the fill source first; if English itself is short it still supplies what it has.
         try
@@ -74,6 +76,8 @@ public static class ExpandedTMText
             SwitchTo(cfg, SourceLanguage);
             sourceNames = cfg.GetText(TextName.ItemNames);
             sourceFlavor = cfg.GetText(TextName.ItemFlavor);
+            sourcePlural = cfg.GetText(TextName.ItemNamesPlural);
+            sourcePluralAlt = cfg.GetText(TextName.ItemNamesPluralAlt);
         }
         catch { }
 
@@ -87,7 +91,10 @@ public static class ExpandedTMText
 
                     string[] names = cfg.GetText(TextName.ItemNames);
                     string[] flavor = cfg.GetText(TextName.ItemFlavor);
-                    if (names.Length == 0 && flavor.Length == 0)
+                    string[] plural = cfg.GetText(TextName.ItemNamesPlural);
+                    string[] pluralAlt = cfg.GetText(TextName.ItemNamesPluralAlt);
+
+                    if (names.Length == 0 && flavor.Length == 0 && plural.Length == 0 && pluralAlt.Length == 0)
                     {
                         result.Languages.Add(new LanguageResult { Language = lang, Note = "no item text" });
                         continue;
@@ -96,7 +103,7 @@ public static class ExpandedTMText
                     int nBefore = names.Length, fBefore = flavor.Length;
                     bool grew = false;
 
-                    if (names.Length < requiredCount)
+                    if (names.Length > 0 && names.Length < requiredCount)
                     {
                         names = Grow(names, requiredCount, sourceNames, "???");
                         cfg.SetText(TextName.ItemNames, names);
@@ -104,7 +111,23 @@ public static class ExpandedTMText
                         grew = true;
                     }
 
-                    if (flavor.Length < requiredCount)
+                    if (plural.Length > 0 && plural.Length < requiredCount)
+                    {
+                        plural = Grow(plural, requiredCount, sourcePlural, "???");
+                        cfg.SetText(TextName.ItemNamesPlural, plural);
+                        cfg.SaveText(TextName.ItemNamesPlural);
+                        grew = true;
+                    }
+
+                    if (pluralAlt.Length > 0 && pluralAlt.Length < requiredCount)
+                    {
+                        pluralAlt = Grow(pluralAlt, requiredCount, sourcePluralAlt, "???");
+                        cfg.SetText(TextName.ItemNamesPluralAlt, pluralAlt);
+                        cfg.SaveText(TextName.ItemNamesPluralAlt);
+                        grew = true;
+                    }
+
+                    if (flavor.Length > 0 && flavor.Length < requiredCount)
                     {
                         flavor = Grow(flavor, requiredCount, sourceFlavor, "");
                         cfg.SetText(TextName.ItemFlavor, flavor);

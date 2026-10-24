@@ -1,0 +1,184 @@
+{
+  "Name": "Hidden Power Shards",
+  "Description": "Each Pulse Shard sets IVs (30/31 only, generated from the Hidden Power formula) so Hidden Power becomes that type. REBUILT 2026-09-26 on the bag's real use path, replacing the FlipTokuseiIndex/Ability-Capsule design, which could never run for these items: Bag.cro 0x99D4 sends only item 645 to the Ability Capsule flow, so the old 0x099DC/0x0DCBC hooks forced every custom id into the 'change Ability?' prompt instead. Now the item is an ordinary non-645 clone: Use goes 0x977C -> 0x9C50 -> 0xC2F0, where one shared block (bag-item-effects) hooks both ITEM_RCV_RecoverCheck calls (0xC318 use, 0xDDC8 ABLE label), the no-handler branch (0xC358) and the message fallback (0x80DC). Handlers call code.bin directly (ChangeTalentPower / ChangeEffortPower / SetTokuseiIndex recalc stats themselves; nature is written where GetSeikaku reads it and stats refreshed), with the Ultra Moon +8 drift of 0x4A____ functions probed at runtime. Success plays the stock use sound and a message (bag text file 1, lines 159-164, added by this package); no effect shows 'It won't have any effect.' Consumption follows the item's own UseKeep flag.",
+  "Category": "Item",
+  "Requires": [],
+  "Parameters": {
+    "hpIds": {
+      "Description": "Item IDs for the 16 Hidden Power Shards in type order. Moved off 1024-1039 (2026-09-01): those ids can never work. Bag.cro extracts a slot's item id with 'lsl #22 / lsr #22' at both 0x0DCAC and 0x0099CC, i.e. a 10-BIT field, so 1023 is the highest id the game can represent - the retail item name table is exactly 1024 entries for the same reason. An id of 1024 did not merely go unnamed, it truncated modulo 1024 and aliased Master Ball, which is why these read '???' and reported 'It won't have any effect'. 885-900 is a contiguous run of genuinely free '???' slots below the cap.",
+      "Type": "list",
+      "Default": "885,886,887,888,889,890,891,892,893,894,895,896,897,898,899,900",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {
+    "Bag.cro": {
+      "Blocks": [
+        {
+          "Name": "bag-item-effects",
+          "Code": "1F402DE93B0000EB000050E30600000A00009DE50210A0E3B4A1FFEB010000E2010020E204D08DE21E80BDE81F40BDE8D4A1FFEA0510A0E12E0000EB000050E301D2FF0A0010A0E144009DE5320000EB000050E31ED2FF0A020050E30D00000A0160A0E10030A0E388039FE50020E0E30310A0E161A0FFEB000056E3F2D1FF0A700094E5011C86E244209DE50030A0E3FFBFFFEBECD1FFEA08D04DE200908DE50000A0E304008DE50400A0E10410A0E30520A0E10030A0E318C5FFEB08D08DE20400A0E16AC4FFEBF9D1FFEA010C55E3DAC0FF3A0720A0E10010A0E30900A0E140A1FFEB012C45E20810A0E10900A0E1DAA0FFEBD5C0FFEAE32F8FE20000A0E1040092E4000050E31EFF2F010038A0E1230851E1F9FFFF1A1EFF2FE1F0412DE90040A0E1215CA0E12168A0E1FF6006E2C4029FE5000090E5C0129FE5010050E10080A0030880A013080056E306F18F30070000EA0C0000EA170000EA3E0000EA550000EA6B0000EA7A0000EA8A0000EA9D0000EA0000A0E30010A0E3F081BDE80100A0E30710A0E1F081BDE8190055E3F7FFFF2A0400A0E15CC29FE508C08CE03CFF2FE1050050E1F1FFFF0A0510A0E10B0000EB9F70A0E3F0FFFFEA0400A0E134C29FE508C08CE03CFF2FE1011080E2190051E30010A023010000EB9F70A0E3E6FFFFEAE0402DE90150A0E10C6094E50600A0E108C29FE53CFF2FE10600A0E10010A0E3FCC19FE508C08CE03CFF2FE11450C0E50600A0E1ECC19FE53CFF2FE10150A0E30400A0E10510A0E1DCC19FE508C08CE03CFF2FE10020A0E10400A0E10510A0E1C8C19FE53CFF2FE1015085E2060055E3F2FFFF3AE080BDE80400A0E1B0C19FE508C08CE03CFF2FE10060A0E1020050E30010A0030210A0130400A0E194C19FE53CFF2FE10400A0E18CC19FE508C08CE03CFF2FE1000050E30400001A0400A0E10610A0E16CC19FE53CFF2FE1AFFFFFEAA070A0E3B0FFFFEA1F0055E3ABFFFF8A0060A0E30070A0E30400A0E10610A0E134C19FE508C08CE03CFF2FE1050050E10170A0130400A0E10610A0E10520A0E118C19FE53CFF2FE1016086E2060056E3F0FFFF3A000057E398FFFF0AA170A0E399FFFFEA060055E394FFFF2A0400A0E10510A0E1E0C09FE508C08CE03CFF2FE1000050E38DFFFF0A0400A0E10510A0E10020A0E3C4C09FE53CFF2FE1A270A0E389FFFFEA100055E384FFFF2AC4708FE20000A0E1857087E0057187E00060A0E30620D7E70400A0E10610A0E18CC09FE53CFF2FE1016086E2060056E3F7FFFF3AA370A0E378FFFFEA0060A0E30070A0E30400A0E10610A0E170C09FE508C08CE03CFF2FE1007087E10400A0E10610A0E10020A0E358C09FE53CFF2FE1016086E2060056E3F1FFFF3A000057E363FFFF0AA470A0E364FFFFEA0200A0E30010A0E3F081BDE821000500E0E04A0010402DE98C25320088D54A00142532001CEA4A00844D32000CE84A00804832000CD04A00FCE54A000C4C32001F1F1E1E1E1E1F1F1F1E1E1E1F1F1E1E1E1F1F1F1F1E1E1F1F1F1E1F1E1E1F1F1F1F1E1E1F1E1F1F1E1F1F1F1F1F1E1F1F1E1F1E1F1E1F1F1F1E1F1E1F1E1F1E1F1F1F1F1F1E1F1F1F1E1F1F1F1E1F1F1F1F1F1E1F1E1F1F1F1F1F1F1F1F1F1F00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "SourceBase": "0x018010"
+        }
+      ],
+      "SitePatches": [
+        {
+          "Offset": "0x0C318",
+          "Original": "1ED1FFEB",
+          "Patched": "3C2F00EB",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:recover"
+        },
+        {
+          "Offset": "0x0DDC8",
+          "Original": "72CAFFEB",
+          "Patched": "902800EB",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:recover"
+        },
+        {
+          "Offset": "0x0C358",
+          "Original": "3F0100EA",
+          "Patched": "392F00EA",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:dispatch"
+        },
+        {
+          "Offset": "0x080DC",
+          "Original": "DB0000EA",
+          "Patched": "FE3F00EA",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:message"
+        }
+      ]
+    }
+  },
+  "CodeBin": null,
+  "DataTables": [
+    {
+      "Target": "Bag.cro",
+      "Block": "bag-item-effects",
+      "Offset": "0x48C",
+      "ElementSize": 4,
+      "Values": "${hpIds[0]}+0x50000,${hpIds[1]}+0x1050000,${hpIds[2]}+0x2050000,${hpIds[3]}+0x3050000,${hpIds[4]}+0x4050000,${hpIds[5]}+0x5050000,${hpIds[6]}+0x6050000,${hpIds[7]}+0x7050000,${hpIds[8]}+0x8050000,${hpIds[9]}+0x9050000,${hpIds[10]}+0xA050000,${hpIds[11]}+0xB050000,${hpIds[12]}+0xC050000,${hpIds[13]}+0xD050000,${hpIds[14]}+0xE050000,${hpIds[15]}+0xF050000",
+      "Terminate": true,
+      "Capacity": 96
+    }
+  ],
+  "ItemData": {
+    "${hpIds[0]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[1]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[2]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[3]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[4]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[5]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[6]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[7]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[8]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[9]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[10]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[11]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[12]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[13]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[14]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${hpIds[15]}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    }
+  },
+  "ItemNames": {
+    "${hpIds[0]}": "Fighting Pulse Shard",
+    "${hpIds[1]}": "Flying Pulse Shard",
+    "${hpIds[2]}": "Poison Pulse Shard",
+    "${hpIds[3]}": "Ground Pulse Shard",
+    "${hpIds[4]}": "Rock Pulse Shard",
+    "${hpIds[5]}": "Bug Pulse Shard",
+    "${hpIds[6]}": "Ghost Pulse Shard",
+    "${hpIds[7]}": "Steel Pulse Shard",
+    "${hpIds[8]}": "Fire Pulse Shard",
+    "${hpIds[9]}": "Water Pulse Shard",
+    "${hpIds[10]}": "Grass Pulse Shard",
+    "${hpIds[11]}": "Electric Pulse Shard",
+    "${hpIds[12]}": "Psychic Pulse Shard",
+    "${hpIds[13]}": "Ice Pulse Shard",
+    "${hpIds[14]}": "Dragon Pulse Shard",
+    "${hpIds[15]}": "Dark Pulse Shard"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${hpIds[0]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Fighting-type Hidden Power.",
+    "${hpIds[1]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Flying-type Hidden Power.",
+    "${hpIds[2]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Poison-type Hidden Power.",
+    "${hpIds[3]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Ground-type Hidden Power.",
+    "${hpIds[4]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Rock-type Hidden Power.",
+    "${hpIds[5]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Bug-type Hidden Power.",
+    "${hpIds[6]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Ghost-type Hidden Power.",
+    "${hpIds[7]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Steel-type Hidden Power.",
+    "${hpIds[8]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Fire-type Hidden Power.",
+    "${hpIds[9]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Water-type Hidden Power.",
+    "${hpIds[10]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Grass-type Hidden Power.",
+    "${hpIds[11]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Electric-type Hidden Power.",
+    "${hpIds[12]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Psychic-type Hidden Power.",
+    "${hpIds[13]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Ice-type Hidden Power.",
+    "${hpIds[14]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Dragon-type Hidden Power.",
+    "${hpIds[15]}": "An elemental shard that aligns a Pokémon's Individual Values (IVs) to grant a Dark-type Hidden Power."
+  },
+  "GameTextLines": {
+    "1": {
+      "159": "[VAR PKNICK(0000)]’s Nature changed!",
+      "160": "[VAR PKNICK(0000)]’s Ability changed!",
+      "161": "[VAR PKNICK(0000)]’s potential was\\nmaxed out!",
+      "162": "[VAR PKNICK(0000)]’s potential was\\nlowered!",
+      "163": "[VAR PKNICK(0000)]’s Hidden Power\\nchanged!",
+      "164": "[VAR PKNICK(0000)]’s base stats\\nwere reset!"
+    }
+  }
+}

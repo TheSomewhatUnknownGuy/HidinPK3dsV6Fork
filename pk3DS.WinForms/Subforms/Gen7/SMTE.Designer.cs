@@ -1784,7 +1784,6 @@ this.TB_TrainerName.Location = new System.Drawing.Point(370, 400);
             0,
             0});
         this.CHK_RandomPKM.UseVisualStyleBackColor = true;
-        this.CHK_RandomPKM.CheckedChanged += new System.EventHandler(this.CHK_RandomPKM_CheckedChanged);
         // 
         // Tab_PKM2
         // 

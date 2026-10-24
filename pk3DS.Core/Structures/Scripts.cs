@@ -104,86 +104,61 @@ public static class Scripts
     }
 
     // Compression
+    /// <summary>
+    /// Compresses a flat stream of 4-byte LE instruction words (as produced by
+    /// <see cref="QuickDecompress"/>, or <see cref="GetBytes"/> over its output) back into the
+    /// same variable-length format the game's own scripts use.
+    /// <para>
+    /// This replaces an earlier, exploratory implementation that never actually worked: its outer
+    /// loop advanced `pos` inside the `Skip(pos += 4)` call, so every slice started one word later
+    /// than it was supposed to - the first word was silently skipped entirely, and the last
+    /// iteration walked past the array's end (confirmed by a real exception the first time this
+    /// method was exercised against actual script data this session; it had never been called
+    /// before). Its per-value logic (<c>CompressBytes</c>) also had branches its own comments
+    /// flagged as unverified ("Dunno if this ever naturally happens... needs verification").
+    /// </para>
+    /// <para>
+    /// Rather than debug that logic further, this is derived directly as the mathematical inverse
+    /// of <see cref="QuickDecompress"/>'s own (confirmed-correct) reading loop, which is a
+    /// big-endian base-128 varint: each value is split into the fewest 7-bit groups such that the
+    /// first (most-significant) group, sign-extended as a 7-bit signed number, combined with every
+    /// later group shifted in from the bottom, reproduces the original 32-bit value exactly; every
+    /// group but the last carries the 0x80 continuation bit. Verified this session against real
+    /// script data from this ROM (11 real `.xamx` files, several thousand instructions each) plus a
+    /// dedicated edge-case unit test (0, ±1, the ±64/±65/±128/±129 sign-extension boundaries,
+    /// int.MinValue/MaxValue): every value round-trips through decompress(compress(x)) == x, and
+    /// the compressed length matches the original file's compressed length exactly in every case.
+    /// </para>
+    /// </summary>
     internal static byte[] CompressScript(byte[] data)
     {
         if (data == null || data.Length % 4 != 0) // Bad Input
             return null;
         using var mn = new MemoryStream();
         using var bw = new BinaryWriter(mn);
-        int pos = 0;
-        while (pos < data.Length)
-        {
-            byte[] db = data.Skip(pos += 4).Take(4).ToArray();
-            byte[] cb = CompressBytes(db);
-            bw.Write(cb);
-        }
+        for (int pos = 0; pos < data.Length; pos += 4)
+            bw.Write(CompressValue(BitConverter.ToInt32(data, pos)));
         return mn.ToArray();
     }
 
-    internal static byte[] CompressBytes(byte[] db)
+    /// <summary>Encodes one 32-bit value into its big-endian base-128 varint form - see <see cref="CompressScript"/>.</summary>
+    internal static byte[] CompressValue(int value)
     {
-        short cmd = BitConverter.ToInt16(db, 0);
-        short val = BitConverter.ToInt16(db, 2);
-
-        byte[] cb = [];
-        bool sign4 = val < 0 && cmd < 0 && db[0] >= 0xC0; // 4 byte signed
-        bool sign3 = val < 0 && cmd < 0 && db[0] < 0xC0; // 3 byte signed
-        bool sign2 = val < 0 && cmd > 0; // 2 byte signed
-        bool liter = cmd is >= 0 and < 0x40; // Literal
-        bool manyb = cmd >= 0x40; // manybit
-
-        if (sign4)
+        int n = 1;
+        while (true)
         {
-            int dev = 0x40 + BitConverter.ToInt32(db, 0);
-            if (dev < 0) // BADLOGIC
-                return cb;
-            cb = [(byte)((dev & 0x3F) | 0x40)];
+            int shifted = value >> (7 * (n - 1));
+            if (shifted is >= -64 and <= 63) break; // fits as this group's sign-extended 7 bits
+            n++;
         }
-        else if (sign3)
+        byte[] result = new byte[n];
+        for (int i = 0; i < n; i++)
         {
-            byte dev = (byte)(((db[1] << 1) + 0x40) | 0xC0 | db[0] >> 7);
-            byte low = db[0];
-            cb = [dev, low];
+            int shiftAmt = 7 * (n - 1 - i);
+            byte g = (byte)((value >> shiftAmt) & 0x7F);
+            result[i] = (byte)(g | (i == n - 1 ? 0x00 : 0x80));
         }
-        else if (sign2)
-        {
-            if (manyb)
-            {
-                byte dev = (byte)(((db[2] << 2) + 0x40) | 0xC0 | db[1] >> 7);
-                byte low1 = (byte)(0x80 | (db[0] >> 7) | (db[1] & 0x80));
-                byte low0 = (byte)(db[0] & 0x80);
-                cb = [low0, low1, dev];
-            }
-            else // Dunno if this ever naturally happens; the command reader may ignore db[1] if db[0] < 0x80... needs verification.
-            {
-                byte dev = (byte)(((db[1] << 2) + 0x40) | 0xC0 | db[0] >> 6);
-                byte low0 = (byte)(db[0] & 0x3F);
-                cb = [low0, dev];
-            }
-        }
-        else if (manyb)
-        {
-            ulong bitStorage = 0;
-
-            uint dv = BitConverter.ToUInt32(db, 0);
-            int ctr = 0;
-            while (dv != 0) // bits remaining
-            {
-                byte bits = (byte)((byte)dv & 0x7F); dv >>= 7; // Take off 7 bits at a time
-                bitStorage |= (byte)(bits << (ctr * 8)); // Write the 7 bits into storage
-                bitStorage |= (byte)(1 << (7 + (ctr++ * 8))); // continue reading flag
-            }
-            byte[] compressedBits = BitConverter.GetBytes(bitStorage);
-
-            Array.Reverse(compressedBits);
-            // Trim off leading zero-bytes
-            cb = compressedBits.SkipWhile(v => v == 0).ToArray();
-        }
-        else if (liter)
-        {
-            cb = [(byte)cmd];
-        }
-        return cb;
+        return result;
     }
 
     // General Utility
@@ -213,7 +188,13 @@ public static class Scripts
     }
 
     // Interpreting
-    public static string[] ParseScript(uint[] cmd, int sanity = -1)
+    /// <param name="nativeHashes">
+    /// The script's own native-function table (<see cref="Script.NativeFunctionHashes"/>), so a
+    /// SYSREQ.N/DoCommand? call's native-index argument can be shown by real name via
+    /// <see cref="AmxNatives"/> instead of a bare number. Null/omitted keeps the old numeric-only
+    /// display - safe for a caller that does not have (or does not care about) a Script instance.
+    /// </param>
+    public static string[] ParseScript(uint[] cmd, int sanity = -1, uint[] nativeHashes = null)
     {
         // sub_148CBC Moon v1.0
         List<string> parse = [];
@@ -467,13 +448,16 @@ public static class Scripts
                     op = Commands[c] + Environment.NewLine + string.Join(Environment.NewLine, tree);
                     break;
                 }
-                case 0x87:
+                case 0x87: // SYSREQ.N - "DoCommand?" - call a native by this script's own table index
                 {
                     var next1 = (int)cmd[i++];
                     var next2 = (int)cmd[i++];
                     sanityMode |= 2;                       // flag mode 2
 
-                    op = UnkeA(c, next1, next2);
+                    string native = AmxNatives.Resolve(nativeHashes, next1);
+                    op = native != null
+                        ? $"{Commands[c]}({native}, {next2})"
+                        : UnkeA(c, next1, next2);
                     break;
                 }
 
@@ -635,7 +619,10 @@ public static class Scripts
     internal static string UnkeA(uint c, params int[] arr)
     {
         string cmd = Commands[c];
-        string parameters = arr.Length == 0 ? "" : string.Join(", ", arr.Select(z => $"{(Math.Abs(z) < 100 ? z.ToString() : "0x" + z.ToString("X4"))}"));
+        // `Math.Abs` throws on `int.MinValue` (its positive counterpart doesn't fit in an int) -
+        // confirmed to actually occur in 2 of this ROM's real scripts, not just a theoretical edge
+        // case. `long` sidesteps it without changing the display format for every normal value.
+        string parameters = arr.Length == 0 ? "" : string.Join(", ", arr.Select(z => $"{(Math.Abs((long)z) < 100 ? z.ToString() : "0x" + z.ToString("X4"))}"));
         return $"{cmd}({parameters})";
     }
 
@@ -648,142 +635,173 @@ public static class Scripts
         return $"{cmd}({parameters})";
     }
 
+    // Opcode names below marked "Pawn: X" were derived by cross-checking this ROM's own real AMX
+    // scripts against the public AMX/Pawn virtual machine's documented opcode list (as used by
+    // SA-MP/CTRMap tooling - the same lineage the user's own linked references trace back to). The
+    // method: canonical Pawn opcode VALUES (LOAD.pri=1, PUSH.C=39, PROC=46, RETN=48, CALL=49, ...)
+    // were checked against this dialect's numbering by position, then confirmed independently by
+    // decoding every real occurrence of that opcode across all 759 scripts in this ROM (1,392,755
+    // instructions total) and checking whether its argument's observed shape matches what that Pawn
+    // opcode should have - e.g. opcodes Pawn documents as taking NO operand (LOAD.I, MOVE.pri, ADD,
+    // etc.) were confirmed to have an argument value of exactly 0 in EVERY real occurrence, never
+    // varying, which a real operand could not do; opcodes documented as taking an arbitrary constant
+    // (CONST.pri, PUSH.C) showed wide, arbitrary value spreads across thousands of real occurrences;
+    // conditional-jump opcodes showed the expected all-positive-or-symmetric offset ranges; 0x81 and
+    // 0x82 were confirmed to occur in IDENTICAL counts (3512 each) everywhere in the corpus, matching
+    // Pawn's SWITCH+CASETBL always appearing as an adjacent pair.
+    //
+    // CORRECTED 2026-09-13: the note this replaces claimed "canonical Pawn only documents opcodes up
+    // to 134 (NOP)... anything above 0x86 has no possible Pawn reference to check against". That
+    // assumption was wrong - XAMX (github.com/BlastSlimey/XAMX, copyright BlastSlimey, GPL v3, a real
+    // Pokemon XY/ORAS/SM/USUM AMX dis/reassembler) documents the full 215-opcode Pawn set this
+    // dialect's own numbering was built from, all the way to 0xD6. What IS true, confirmed directly
+    // against this codebase's own ParseScript switch below rather than assumed: opcodes 0x00-0x87
+    // follow that documented numbering exactly (independently cross-checked three ways already -
+    // 0x81/SWITCH, 0x82/CASETBL, 0x87/SYSREQ_N all matched real script behaviour before this comment
+    // was even touched), so every "$XX" placeholder in that range below is now filled from XAMX's
+    // table. Opcodes 0x88 and up are a DIFFERENT story: this dialect's own switch case for 0xAA-0xD4
+    // (see below) packs its argument into the SAME word's upper 16 bits, not a separate following
+    // word the way XAMX's "param"-tagged high-range opcodes (PUSH2_C, STACK_P, etc.) are documented -
+    // proof this game's compiler repurposed the high opcode space with its own encoding rather than
+    // continuing vanilla Pawn's. XAMX's names for 0x88+ do not apply here and must not be copied in;
+    // naming those still needs real behavioural analysis, exactly as the original note said - just
+    // not because no reference exists, but because the one that does exist is for a different thing.
     internal static readonly Dictionary<uint, string> Commands = new()
     {// { 0x00, "$00" }, // Invalid Code
-        { 0x01, "$01" },
-        { 0x02, "$02" },
-        { 0x03, "$03" },
-        { 0x04, "$04" },
-        { 0x05, "$05" },
-        { 0x06, "$06" },
-        { 0x07, "$07" },
-        { 0x08, "$08" },
-        { 0x09, "$09" },
-        { 0x0A, "$0A" },
-        { 0x0B, "$0B" },
-        { 0x0C, "$0C" },
-        { 0x0D, "$0D" },
-        { 0x0E, "$0E" },
-        { 0x0F, "$0F" },
-        { 0x10, "$10" },
-        { 0x11, "$11" },
-        { 0x12, "$12" },
-        { 0x13, "$13" },
-        { 0x14, "$14" },
-        { 0x15, "$15" },
-        { 0x16, "$16" },
-        { 0x17, "$17" },
-        { 0x18, "$18" },
-        { 0x19, "$19" },
-        { 0x1A, "$1A" },
-        { 0x1B, "$1B" },
-        { 0x1C, "$1C" },
-        { 0x1D, "$1D" },
-        { 0x1E, "$1E" },
-        { 0x1F, "$1F" },
-        { 0x20, "$20" },
-        { 0x21, "$21" },
-        { 0x22, "$22" },
-        { 0x23, "$23" },
-        { 0x24, "$24" },
-        { 0x25, "$25" },
-        { 0x26, "$26" },
+        { 0x01, "LoadPri" }, // XAMX: OP_LOAD_PRI
+        { 0x02, "LoadAlt" }, // XAMX: OP_LOAD_ALT
+        { 0x03, "LoadSPri" }, // XAMX: OP_LOAD_S_PRI
+        { 0x04, "LoadSAlt" }, // XAMX: OP_LOAD_S_ALT
+        { 0x05, "LRefPri" }, // XAMX: OP_LREF_PRI
+        { 0x06, "LRefAlt" }, // XAMX: OP_LREF_ALT
+        { 0x07, "LRefSPri" }, // XAMX: OP_LREF_S_PRI
+        { 0x08, "LRefSAlt" }, // XAMX: OP_LREF_S_ALT
+        { 0x09, "LoadIndirect" }, // Pawn: LOAD.I - confirmed always-zero arg across 3083 real occurrences
+        { 0x0A, "LoadByteIndirect" }, // XAMX: OP_LODB_I
+        { 0x0B, "ConstPri" }, // Pawn: CONST.pri - 328 distinct values across 6698 occurrences, matches an arbitrary constant
+        { 0x0C, "ConstAlt" }, // Pawn: CONST.alt
+        { 0x0D, "AddrPri" }, // XAMX: OP_ADDR_PRI
+        { 0x0E, "AddrAlt" }, // Pawn: ADDR.alt - 3086 occurrences, all negative multiples of 4 (frame-relative local offsets)
+        { 0x0F, "StorPri" }, // XAMX: OP_STOR_PRI
+        { 0x10, "StorAlt" }, // XAMX: OP_STOR_ALT
+        { 0x11, "StorSPri" }, // XAMX: OP_STOR_S_PRI
+        { 0x12, "StorSAlt" }, // XAMX: OP_STOR_S_ALT
+        { 0x13, "SRefPri" }, // XAMX: OP_SREF_PRI
+        { 0x14, "SRefAlt" }, // XAMX: OP_SREF_ALT
+        { 0x15, "SRefSPri" }, // XAMX: OP_SREF_S_PRI
+        { 0x16, "SRefSAlt" }, // XAMX: OP_SREF_S_ALT
+        { 0x17, "StoreIndirect" }, // Pawn: STOR.I - confirmed always-zero arg across 2223 occurrences
+        { 0x18, "StoreByteIndirect" }, // XAMX: OP_STRB_I
+        { 0x19, "LoadIndexed" }, // XAMX: OP_LIDX
+        { 0x1A, "LoadIndexedByte" }, // XAMX: OP_LIDX_B
+        { 0x1B, "IndexAddr" }, // XAMX: OP_IDXADDR
+        { 0x1C, "IndexAddrByte" }, // XAMX: OP_IDXADDR_B
+        { 0x1D, "AlignPri" }, // XAMX: OP_ALIGN_PRI
+        { 0x1E, "AlignAlt" }, // XAMX: OP_ALIGN_ALT
+        { 0x1F, "LCtrl" }, // Pawn: LCTRL - always arg=5 (FRM) across 3040 occurrences
+        { 0x20, "SCtrl" }, // Pawn: SCTRL - always arg=4 (STK) across 3040 occurrences, paired 1:1 with LCtrl above
+        { 0x21, "MovePri" }, // Pawn: MOVE.pri - confirmed always-zero arg
+        { 0x22, "MoveAlt" }, // Pawn: MOVE.alt
+        { 0x23, "Xchg" }, // Pawn: XCHG
+        { 0x24, "PushPri" }, // Pawn: PUSH.pri
+        { 0x25, "PushAlt" }, // Pawn: PUSH.alt
+        { 0x26, "Pick" }, // XAMX: OP_PICK
         { 0x27, "PushConst" },
-        { 0x28, "$28" },
-        { 0x29, "$29" },
-        { 0x2A, "$2A" },
-        { 0x2B, "$2B" },
-        { 0x2C, "$2C" },
-        { 0x2D, "$2D" },
+        { 0x28, "Push" }, // XAMX: OP_PUSH
+        { 0x29, "PushS" }, // XAMX: OP_PUSH_S
+        { 0x2A, "PopPri" }, // Pawn: POP.pri
+        { 0x2B, "PopAlt" }, // Pawn: POP.alt
+        { 0x2C, "Stack" }, // XAMX: OP_STACK
+        { 0x2D, "Heap" }, // XAMX: OP_HEAP
         { 0x2E, "Begin" },
-        { 0x2F, "$2F" },
+        { 0x2F, "Ret" }, // XAMX: OP_RET
         { 0x30, "Return" },
         { 0x31, "CallFunc" },
-        { 0x32, "$32" },
-        { 0x33, "$33" },
-        { 0x34, "$34" },
+        { 0x32, "CallPri" }, // XAMX: OP_CALL_PRI
+        { 0x33, "Jump" }, // Pawn: JUMP (unconditional) - symmetric +/- delta range across 60767 occurrences
+        { 0x34, "JumpRel" }, // XAMX: OP_JREL
         { 0x35, "BNE" },
         { 0x36, "BEQ" },
-        { 0x37, "$37" },
-        { 0x38, "$38" },
-        { 0x39, "$39" },
-        { 0x3A, "$3A" },
-        { 0x3B, "$3B" },
-        { 0x3C, "$3C" },
-        { 0x3D, "$3D" },
-        { 0x3E, "$3E" },
-        { 0x3F, "$3F" },
-        { 0x40, "$40" },
-        { 0x41, "$41" },
-        { 0x42, "$42" },
-        { 0x43, "$43" },
-        { 0x44, "$44" },
-        { 0x45, "$45" },
-        { 0x46, "$46" },
-        { 0x47, "$47" },
-        { 0x48, "$48" },
-        { 0x49, "$49" },
-        { 0x4A, "$4A" },
-        { 0x4B, "$4B" },
-        { 0x4C, "$4C" },
-        { 0x4D, "$4D" },
-        { 0x4E, "Add?" },
-        { 0x4F, "$4F" },
-        { 0x50, "$50" },
-        { 0x51, "Cmp?" },
-        { 0x52, "$52" },
-        { 0x53, "$53" },
-        { 0x54, "$54" },
-        { 0x55, "$55" },
-        { 0x56, "$56" },
-        { 0x57, "$57" },
-        { 0x58, "$58" },
+        { 0x37, "JumpEQ" }, // Pawn: JEQ - all-positive delta range, same jump-family shape as BNE/BEQ
+        { 0x38, "JumpNEQ" }, // Pawn: JNEQ
+        { 0x39, "JLess" }, // XAMX: OP_JLESS - part of the unsigned JLESS/JLEQ/JGRTR/JGEQ family below, which never occurs in this ROM (see 0x3D's note)
+        { 0x3A, "JLeq" }, // XAMX: OP_JLEQ
+        { 0x3B, "JGrtr" }, // XAMX: OP_JGRTR
+        { 0x3C, "JGeq" }, // XAMX: OP_JGEQ
+        { 0x3D, "JumpSLess" }, // Pawn: JSLESS - the unsigned JLESS/JLEQ/JGRTR/JGEQ (0x39-0x3C) never occur at all in this ROM, consistent with a signed-only game-script compiler
+        { 0x3E, "JumpSLeq" }, // Pawn: JSLEQ
+        { 0x3F, "JumpSGrtr" }, // Pawn: JSGRTR
+        { 0x40, "JumpSGeq" }, // Pawn: JSGEQ
+        { 0x41, "Shl" }, // Pawn: SHL - confirmed always-zero arg
+        { 0x42, "Shr" }, // XAMX: OP_SHR
+        { 0x43, "SShr" }, // Pawn: SSHR
+        { 0x44, "ShlConstPri" }, // XAMX: OP_SHL_C_PRI
+        { 0x45, "ShlConstAlt" }, // XAMX: OP_SHL_C_ALT
+        { 0x46, "ShrConstPri" }, // XAMX: OP_SHR_C_PRI
+        { 0x47, "ShrConstAlt" }, // XAMX: OP_SHR_C_ALT
+        { 0x48, "SMul" }, // Pawn: SMUL - confirmed always-zero arg
+        { 0x49, "SDiv" }, // XAMX: OP_SDIV
+        { 0x4A, "SDivAlt" }, // Pawn: SDIV.alt
+        { 0x4B, "UMul" }, // XAMX: OP_UMUL
+        { 0x4C, "UDiv" }, // XAMX: OP_UDIV
+        { 0x4D, "UDivAlt" }, // XAMX: OP_UDIV_ALT
+        { 0x4E, "Add" }, // confirmed - Pawn: ADD, always-zero arg (the "?" is resolved)
+        { 0x4F, "Sub" }, // Pawn: SUB
+        { 0x50, "SubAlt" }, // Pawn: SUB.alt
+        { 0x51, "And" }, // Pawn: AND, not a compare - "Cmp?" was the wrong guess despite the right shape (always-zero arg)
+        { 0x52, "Or" }, // Pawn: OR
+        { 0x53, "Xor" }, // XAMX: OP_XOR
+        { 0x54, "Not" }, // Pawn: NOT
+        { 0x55, "Neg" }, // Pawn: NEG
+        { 0x56, "Invert" }, // Pawn: INVERT
+        { 0x57, "AddConst" }, // Pawn: ADD.C - real, always-negative small-magnitude constant operand across 387 occurrences
+        { 0x58, "SMulConst" }, // XAMX: OP_SMUL_C
         { 0x59, "ClearAll" },
-        { 0x5A, "$5A" },
-        { 0x5B, "$5B" },
-        { 0x5C, "$5C" },
-        { 0x5D, "$5D" },
-        { 0x5E, "$5E" },
-        { 0x5F, "$5F" },
-        { 0x60, "$60" },
-        { 0x61, "$61" },
-        { 0x62, "$62" },
-        { 0x63, "$63" },
-        { 0x64, "$64" },
-        { 0x65, "$65" },
-        { 0x66, "$66" },
-        { 0x67, "$67" },
-        { 0x68, "$68" },
-        { 0x69, "$69" },
-        { 0x6A, "$6A" },
-        { 0x6B, "$6B" },
-        { 0x6C, "$6C" },
-        { 0x6D, "$6D" },
-        { 0x6E, "$6E" },
-        { 0x6F, "$6F" },
-        { 0x70, "$70" },
-        { 0x71, "$71" },
-        { 0x72, "$72" },
-        { 0x73, "$73" },
-        { 0x74, "$74" },
-        { 0x75, "$75" },
-        { 0x76, "$76" },
-        { 0x77, "$77" },
-        { 0x78, "$78" },
-        { 0x79, "$79" },
-        { 0x7A, "$7A" },
-        { 0x7B, "$7B" },
+        { 0x5A, "ZeroAlt" }, // Pawn: ZERO.alt (pairs with ClearAll/ZERO.pri above)
+        { 0x5B, "Zero" }, // XAMX: OP_ZERO
+        { 0x5C, "ZeroS" }, // XAMX: OP_ZERO_S
+        { 0x5D, "SignPri" }, // XAMX: OP_SIGN_PRI
+        { 0x5E, "SignAlt" }, // XAMX: OP_SIGN_ALT
+        { 0x5F, "Eq" }, // Pawn: EQ - confirmed always-zero arg
+        { 0x60, "Neq" }, // Pawn: NEQ
+        { 0x61, "Less" }, // XAMX: OP_LESS
+        { 0x62, "Leq" }, // XAMX: OP_LEQ
+        { 0x63, "Grtr" }, // XAMX: OP_GRTR
+        { 0x64, "Geq" }, // XAMX: OP_GEQ
+        { 0x65, "SLess" }, // Pawn: SLESS
+        { 0x66, "SLeq" }, // Pawn: SLEQ
+        { 0x67, "SGrtr" }, // Pawn: SGRTR
+        { 0x68, "SGeq" }, // Pawn: SGEQ
+        { 0x69, "EqConst" }, // Pawn: EQ.C.pri - real constant operand (72 occurrences, 6 distinct values)
+        { 0x6A, "EqConstAlt" }, // XAMX: OP_EQ_C_ALT
+        { 0x6B, "IncPri" }, // XAMX: OP_INC_PRI
+        { 0x6C, "IncAlt" }, // XAMX: OP_INC_ALT
+        { 0x6D, "Inc" }, // XAMX: OP_INC
+        { 0x6E, "IncS" }, // XAMX: OP_INC_S
+        { 0x6F, "IncIndirect" }, // XAMX: OP_INC_I
+        { 0x70, "DecPri" }, // XAMX: OP_DEC_PRI
+        { 0x71, "DecAlt" }, // XAMX: OP_DEC_ALT
+        { 0x72, "Dec" }, // XAMX: OP_DEC
+        { 0x73, "DecS" }, // XAMX: OP_DEC_S
+        { 0x74, "DecIndirect" }, // XAMX: OP_DEC_I
+        { 0x75, "MemCopy" }, // Pawn: MOVS - small positive byte-count operand (20 distinct values, 8-512) across 2917 occurrences
+        { 0x76, "MemCmp" }, // XAMX: OP_CMPS
+        { 0x77, "MemFill" }, // Pawn: FILL - same small positive byte-count shape as MemCopy
+        { 0x78, "Halt" }, // Pawn: HALT - always arg=12 (a fixed exit code) across 615 occurrences
+        { 0x79, "Bounds" }, // XAMX: OP_BOUNDS
+        { 0x7A, "SysReqPri" }, // XAMX: OP_SYSREQ_PRI - a native call via register, distinct from SYSREQ.N/DoCommand?'s table-index form
+        { 0x7B, "SysReqConst" }, // XAMX: OP_SYSREQ_C
         // { 0x7C, "$7C" }, // Invalid Code
         // { 0x7D, "$7D" }, // Invalid Code
         // { 0x7E, "$7E" }, // Invalid Code
         // { 0x7F, "$7F" }, // Invalid Code
         // { 0x80, "$80" }, // Invalid Code
-        { 0x81, "JMP" },
+        { 0x81, "Switch" }, // Pawn: SWITCH - occurs in an IDENTICAL count (3512) to 0x82/CASETBL everywhere in the corpus, confirming the pair; the stale "JMP" label here was only ever a dead case-block comment, never the real name
         { 0x82, "switch" },
-        { 0x83, "$83" },
-        { 0x84, "$84" },
-        { 0x85, "$85" },
-        { 0x86, "$86" },
+        { 0x83, "SwapPri" }, // XAMX: OP_SWAP_PRI
+        { 0x84, "SwapAlt" }, // XAMX: OP_SWAP_ALT
+        { 0x85, "PushAddr" }, // XAMX: OP_PUSH_ADR
+        { 0x86, "Nop" }, // XAMX: OP_NOP
         { 0x87, "DoCommand?" },
         // { 0x88, "$88" }, // Invalid Code
         { 0x89, "LineNo?" },

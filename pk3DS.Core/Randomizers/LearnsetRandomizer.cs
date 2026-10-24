@@ -1,4 +1,4 @@
-﻿using pk3DS.Core.Structures;
+using pk3DS.Core.Structures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +30,8 @@ public class LearnsetRandomizer : IRandomizer
     public int SpreadTo = 75;
     public bool STABFirst = true;
     public bool Learn4Level1 = false;
+    /// <summary>How many leading moves <see cref="Learn4Level1"/> puts at level 1.</summary>
+    public int Level1Count = 4;
     public bool OrderByPower = true;
 
     public bool STAB { set => moverand.rSTAB = value; }
@@ -49,7 +51,7 @@ public class LearnsetRandomizer : IRandomizer
 
         if (Learn4Level1)
         {
-            for (int i = 0; i < Math.Min(4, levels.Length); ++i)
+            for (int i = 0; i < Math.Min(Level1Count, levels.Length); ++i)
                 levels[i] = 1;
         }
 
@@ -67,17 +69,17 @@ public class LearnsetRandomizer : IRandomizer
             levels[0] = 1;
             decimal increment = SpreadTo / (decimal)count;
             for (int i = 1; i < count; i++)
-                levels[i] = (int)(i * increment);
+                levels[i] = Math.Clamp((int)Math.Round(i * increment), levels[i - 1], 100);
             return levels;
         }
         if (levels.Length == count && levels.Length == set.Levels.Length)
             return set.Levels; // don't modify
 
         var exist = set.Levels;
-        int lastlevel = Math.Min(1, exist.LastOrDefault());
+        int lastlevel = Math.Max(1, exist.LastOrDefault());
         exist.CopyTo(levels, 0);
         for (int i = exist.Length; i < levels.Length; i++)
-            levels[i] = Math.Max(100, lastlevel + (exist.Length - i + 1));
+            levels[i] = Math.Min(100, lastlevel + (i - exist.Length + 1));
 
         return levels;
     }
@@ -89,8 +91,11 @@ public class LearnsetRandomizer : IRandomizer
         int[] moves = new int[count];
         if (count == 0)
             return moves;
-        moves[0] = STABFirst ? moverand.GetRandomFirstMove(index) : MoveRandomizer.GetRandomFirstMoveAny();
         var rand = moverand.GetRandomLearnset(index, count - 1);
+        // The first move comes from a separate short list, so it could repeat one of the others
+        // (about 40% of Fire learnsets listed Ember twice). Redraw it; a tiny pool may still repeat.
+        for (int tries = 0; tries < 20 && (tries == 0 || Array.IndexOf(rand, moves[0]) >= 0); tries++)
+            moves[0] = STABFirst ? moverand.GetRandomFirstMove(index) : MoveRandomizer.GetRandomFirstMoveAny();
 
         // STAB Moves (if requested) come first; randomize the order of moves
         Util.Shuffle(rand);
@@ -103,7 +108,15 @@ public class LearnsetRandomizer : IRandomizer
     public int[] GetHighPoweredMoves(int species, int form, int count = 4)
     {
         int index = Config.Personal.GetFormIndex(species, form);
-        var moves = Learnsets[index].Moves.OrderByDescending(move => Config.Moves[move].Power).Distinct().Take(count).ToArray();
+        if (index < 0 || index >= Learnsets.Length || Learnsets[index]?.Moves == null)
+            return new int[count];
+
+        var moves = Learnsets[index].Moves
+            .Where(move => move > 0 && Config?.Moves != null && move < Config.Moves.Length && Config.Moves[move] != null)
+            .OrderByDescending(move => Config.Moves[move].Power)
+            .Distinct()
+            .Take(count)
+            .ToArray();
         Array.Resize(ref moves, count);
         return moves;
     }
@@ -111,6 +124,9 @@ public class LearnsetRandomizer : IRandomizer
     public int[] GetCurrentMoves(int species, int form, int level, int count = 4)
     {
         int i = Config.Personal.GetFormIndex(species, form);
+        if (i < 0 || i >= Learnsets.Length || Learnsets[i] == null)
+            return new int[count];
+
         var moves = Learnsets[i].GetEncounterMoves(level);
         Array.Resize(ref moves, count);
         return moves;

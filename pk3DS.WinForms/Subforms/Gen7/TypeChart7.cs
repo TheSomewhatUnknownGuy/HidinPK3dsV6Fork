@@ -26,18 +26,17 @@ public partial class TypeChart7 : Form
 
     public TypeChart7()
     {
-        if (Main.ExeFSPath == null)
-        { WinFormsUtil.Alert("No exeFS code to load."); Close(); }
-
-        string[] files = Directory.GetFiles(Main.ExeFSPath);
-        if (!File.Exists(files[0]) || !Path.GetFileNameWithoutExtension(files[0]).Contains("code"))
-        { WinFormsUtil.Alert("No .code.bin detected."); Close(); }
-
         InitializeComponent();
 
-        codebin = files[0];
+        // files[0] is banner.bin whenever code.bin has no leading dot, and Close() without a return
+        // kept running into it. Same resolver and early-exit shape as TMEditor7.
+        string codePath = Main.ExeFSPath == null ? null : pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.ExeFSPath);
+        if (codePath == null || !File.Exists(codePath))
+        { WinFormsUtil.Alert("No .code.bin detected."); Close(); return; }
+
+        codebin = codePath;
         exefs = File.ReadAllBytes(codebin);
-        if (exefs.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); }
+        if (exefs.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); return; }
         offset = Util.IndexOfBytes(exefs, Signature, 0x400000, 0) + Signature.Length;
 
         Array.Copy(exefs, offset, chart, 0, chart.Length);
@@ -102,6 +101,7 @@ public partial class TypeChart7 : Form
 
     private void B_Save_Click(object sender, EventArgs e)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(codebin) is { } uhuru) { WinFormsUtil.Alert(uhuru); Close(); return; }
         chart.CopyTo(exefs, offset);
         File.WriteAllBytes(codebin, exefs);
         Close();

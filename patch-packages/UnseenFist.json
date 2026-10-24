@@ -1,0 +1,34 @@
+{
+  "Name": "Unseen Fist",
+  "Description": "Unseen Fist (Ability 260). If the Pok\u00E9mon uses a move that makes direct contact, it hits through the target\u0027s protection.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 260,
+      "Name": "Unseen Fist",
+      "Slots": [
+        {
+          "Timing": "0x3B",
+          "Code": "10402DE90240A0E10300A0E3D11EFAEB040050E10300001A1040BDE80110A0E35700A0E3460BFAEA1080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 59,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "EEAt6QJAoOEDAKDj0R766wQAUOEDAAAaEEC96AEQoONXAKDjRgv66hCAveg="
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

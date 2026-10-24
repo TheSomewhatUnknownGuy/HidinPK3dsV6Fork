@@ -73,7 +73,7 @@ public static class BinaryWriteGuard
     public static bool IsGuarded(string path)
     {
         string name = System.IO.Path.GetFileName(path);
-        if (name.Equals("code.bin", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.TrimStart('.').Equals("code.bin", StringComparison.OrdinalIgnoreCase)) return true;
         if (name.StartsWith("exefs", StringComparison.OrdinalIgnoreCase) && name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) return true;
         return System.IO.Path.GetExtension(path).Equals(".cro", StringComparison.OrdinalIgnoreCase);
     }
@@ -82,10 +82,18 @@ public static class BinaryWriteGuard
     /// Writes <paramref name="data"/> to <paramref name="path"/> if the write is permitted.
     /// Returns false when it was refused, in which case the file on disk is untouched.
     /// </summary>
-    public static bool TryWrite(string path, byte[] data, string reason, string detail = "")
+    public static bool TryWrite(string path, byte[] data, string reason, string detail = "", bool uhuruDiffChecked = false)
     {
         if (string.IsNullOrEmpty(path) || data == null)
             return false;
+
+        // In-place table editors (TM table) may opt in: on Uhuru a same-size code.bin write that misses every Uhuru region is allowed.
+        string? uhuru = uhuruDiffChecked ? UhuruGuard.InPlaceRefusal(path, File.Exists(path) ? File.ReadAllBytes(path) : null, data) : UhuruGuard.RefusalFor(path);
+        if (uhuru != null)
+        {
+            Record(new BinaryWriteRequest { Path = path, Reason = reason }, "REFUSED: " + uhuru);
+            return false;
+        }
 
         if (!IsGuarded(path))
         {

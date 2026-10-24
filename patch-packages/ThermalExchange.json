@@ -1,0 +1,35 @@
+{
+  "Name": "Thermal Exchange",
+  "Description": "Thermal Exchange (Ability 270 - corrected 2026-09-12, was wrongly targeting id 276 which this ROM's live name table actually assigns to Rocky Payload; verified via cfg.GetText(TextName.AbilityNames)). Grants complete immunity to burns (timing 0x7C, reusing Water Veil stock routine 0xDCE94) and boosts the Pokémon's Attack stat by 1 stage when struck by a Fire-type attack (timing 0x60 via event packet dispatch).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 270,
+      "Name": "Thermal Exchange",
+      "Slots": [
+        {
+          "Timing": "0x7C",
+          "Reuse": {
+            "Kind": "Ability",
+            "Id": 41,
+            "Timing": "0x7C",
+            "Name": "Water Veil"
+          }
+        },
+        {
+          "Timing": "0x60",
+          "Code": "70402DE90140A0E10250A0E10300A0E3D01EFAEB050050E11A00000A0400A0E3CC1EFAEB050050E11600001A1900A0E3C81EFAEB090050E31200001A0400A0E10110A0E30520A0E17627FAEB0400A0E10D10A0E30520A0E1A61DFAEB0060A0E10100A0E30400C6E50C50C6E51000C6E51100C6E50600A0E31200C6E50400A0E10610A0E11AF3F9EB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

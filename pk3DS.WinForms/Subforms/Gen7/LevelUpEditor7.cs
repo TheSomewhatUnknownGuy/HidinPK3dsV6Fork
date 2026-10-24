@@ -25,7 +25,6 @@ public partial class LevelUpEditor7 : Form
         var entryNames = Main.Config.Personal.GetPersonalEntryList(altForms, species, Main.Config.MaxSpeciesID, out baseForms, out formVal);
         files = infiles;
         RTB_Changelog.ReadOnly = true;
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
         
         Button b_genChangelog = new Button { Text = "Generate Diff vs Vanilla", Dock = DockStyle.Top, FlatStyle = FlatStyle.Flat, Height = 30 };
         b_genChangelog.Click += (s, e) => GenerateFullChangelog();
@@ -276,26 +275,11 @@ public partial class LevelUpEditor7 : Form
     private void B_RemoveMove_Click(object sender, EventArgs e)
     {
         if (dgv.CurrentRow == null) return;
-        int rowIdx = dgv.CurrentRow.Index;
-        
-        SetList(); // Commit current UI state
-        if (pkm == null) return;
-        
-        var levels = pkm.Levels.ToList();
-        var moves = pkm.Moves.ToList();
-        
-        if (rowIdx < levels.Count)
-        {
-            levels.RemoveAt(rowIdx);
-            moves.RemoveAt(rowIdx);
-            
-            pkm.Levels = [.. levels];
-            pkm.Moves = [.. moves];
-            
-            int dataIndex = entry < files.Length ? entry : baseForms[entry];
-            files[dataIndex] = pkm.Write();
-            GetList();
-        }
+        // Remove the grid row, then save: SetList sorts by level, so a grid index no longer matches pkm after it.
+        dgv.EndEdit();
+        dgv.Rows.RemoveAt(dgv.CurrentRow.Index);
+        SetList();
+        GetList();
     }
 
     private void UpdateCounters(object sender, EventArgs e)
@@ -338,7 +322,9 @@ public partial class LevelUpEditor7 : Form
         else if (ext == ".ts" || ext == ".txt" || ext == ".tsv")
         {
             string text = File.ReadAllText(ofd.FileName);
-            if (text.Contains("- Level")) // Showdown format
+            if (System.Text.RegularExpressions.Regex.IsMatch(text, @"^\d+ - ", System.Text.RegularExpressions.RegexOptions.Multiline)) // Dump All format
+                count = ImportDump(File.ReadAllLines(ofd.FileName));
+            else if (text.Contains("- Level")) // Showdown format
                 count = ImportShowdown(text);
             else // Native Tab-separated
                 count = ImportNative(File.ReadAllLines(ofd.FileName));
@@ -367,7 +353,11 @@ public partial class LevelUpEditor7 : Form
             }
             return count;
         }
-        catch { return 0; }
+        catch (Exception ex)
+        {
+            WinFormsUtil.Error("Could not read the JSON file.", ex.Message);
+            return 0;
+        }
     }
 
     private int ImportShowdown(string text)
@@ -401,6 +391,34 @@ public partial class LevelUpEditor7 : Form
         return count;
     }
 
+    // Round-trips B_Dump_Click output: "NNN Species" header, then "level - Move" rows, blank line between entries.
+    private int ImportDump(string[] lines)
+    {
+        int count = 0, targetId = -1;
+        List<int> levels = [], moves = [];
+        void Flush()
+        {
+            if (targetId > 0 && levels.Count > 0) { ApplyToFiles(targetId, [.. levels], [.. moves]); count++; }
+            levels = []; moves = [];
+        }
+        foreach (string raw in lines)
+        {
+            string line = raw.Trim();
+            var row = System.Text.RegularExpressions.Regex.Match(line, @"^(\d+) - (.+)$");
+            if (row.Success)
+            {
+                int moveId = Array.IndexOf(movelist, row.Groups[2].Value.Trim());
+                if (moveId < 0 && row.Groups[2].Value.StartsWith("Move ")) int.TryParse(row.Groups[2].Value[5..], out moveId);
+                if (targetId > 0 && moveId > 0) { levels.Add(int.Parse(row.Groups[1].Value)); moves.Add(moveId); }
+                continue;
+            }
+            var head = System.Text.RegularExpressions.Regex.Match(line, @"^(\d+)\s");
+            if (head.Success) { Flush(); targetId = int.Parse(head.Groups[1].Value); }
+        }
+        Flush();
+        return count;
+    }
+
     private int ImportNative(string[] lines)
     {
         int count = 0;
@@ -431,8 +449,11 @@ public partial class LevelUpEditor7 : Form
     {
         if (int.TryParse(text, out int id)) return id;
         string clean = text.Trim();
+        // Items start at entry 1, so return the item's entry, not its position; prefer an exact name ("Mew" is not "Mewtwo").
         var items = CB_Species.Items.Cast<ComboItem>().ToArray();
-        return Array.FindIndex(items, i => i.Text.Contains(clean, StringComparison.OrdinalIgnoreCase));
+        var hit = items.FirstOrDefault(i => i.Text.Equals(clean, StringComparison.OrdinalIgnoreCase))
+               ?? items.FirstOrDefault(i => i.Text.Contains(clean, StringComparison.OrdinalIgnoreCase));
+        return hit == null ? -1 : (int)hit.Value;
     }
 
     private void ApplyToFiles(int targetId, int[] levels, int[] moves)
@@ -512,12 +533,13 @@ public partial class LevelUpEditor7 : Form
 
     private void B_Paste_Click(object sender, EventArgs e)
     {
-        if (ClipboardMoves == null || ClipboardLevels == null) return;
+        if (ClipboardMoves == null || ClipboardLevels == null || pkm == null) return;
         
         pkm.Moves = (int[])ClipboardMoves.Clone();
         pkm.Levels = (int[])ClipboardLevels.Clone();
         
-        files[entry] = pkm.Write(); // Commit changes to the file array
+        int dataIndex = entry < files.Length ? entry : baseForms[entry];
+        files[dataIndex] = pkm.Write(); // Commit changes to the file array
         GetList(); // Refresh the DataGridView UI with the new data
     }
     private void Form_Closing(object sender, FormClosingEventArgs e)

@@ -1,0 +1,853 @@
+{
+  "Name": "Tera Shard",
+  "Description": "18 held items, one per type. On switch-in the holder\u0027s type fully becomes the Shard\u0027s type; the holder keeps STAB on its original type(s) as well as the new one. Changes Tera Blast to match. Cannot be Knocked Off, Thief\u0027d, or Trick\u0027d away.",
+  "Category": "Held item",
+  "Requires": [],
+  "Parameters": {
+    "shardIds": {
+      "Description": "Item ids for the 18 Tera Shards, in type order: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost, Steel, Fire, Water, Grass, Electric, Psychic, Ice, Dragon, Dark, Fairy. Order matters; every hook indexes by position (same order as GameIds.Types / the personal table).",
+      "Type": "list",
+      "Default": "885,886,887,888,889,890,891,892,893,894,895,896,897,898,899,900,901,902",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[0]}",
+      "Name": "Normal Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0040A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[0]}",
+            "Timing": "0x6D",
+            "Name": "Normal Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB000050E30800001A0500A0E10010A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[1]}",
+      "Name": "Fighting Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0140A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[1]}",
+            "Timing": "0x6D",
+            "Name": "Fighting Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB010050E30800001A0500A0E10110A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[2]}",
+      "Name": "Flying Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0240A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[2]}",
+            "Timing": "0x6D",
+            "Name": "Flying Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB020050E30800001A0500A0E10210A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[3]}",
+      "Name": "Poison Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0340A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[3]}",
+            "Timing": "0x6D",
+            "Name": "Poison Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB030050E30800001A0500A0E10310A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[4]}",
+      "Name": "Ground Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0440A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[4]}",
+            "Timing": "0x6D",
+            "Name": "Ground Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB040050E30800001A0500A0E10410A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[5]}",
+      "Name": "Rock Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0540A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[5]}",
+            "Timing": "0x6D",
+            "Name": "Rock Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB050050E30800001A0500A0E10510A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[6]}",
+      "Name": "Bug Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0640A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[6]}",
+            "Timing": "0x6D",
+            "Name": "Bug Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB060050E30800001A0500A0E10610A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[7]}",
+      "Name": "Ghost Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0740A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[7]}",
+            "Timing": "0x6D",
+            "Name": "Ghost Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB070050E30800001A0500A0E10710A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[8]}",
+      "Name": "Steel Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0840A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[8]}",
+            "Timing": "0x6D",
+            "Name": "Steel Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB080050E30800001A0500A0E10810A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[9]}",
+      "Name": "Fire Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0940A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[9]}",
+            "Timing": "0x6D",
+            "Name": "Fire Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB090050E30800001A0500A0E10910A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[10]}",
+      "Name": "Water Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0A40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[10]}",
+            "Timing": "0x6D",
+            "Name": "Water Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0A0050E30800001A0500A0E10A10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[11]}",
+      "Name": "Grass Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0B40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[11]}",
+            "Timing": "0x6D",
+            "Name": "Grass Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0B0050E30800001A0500A0E10B10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[12]}",
+      "Name": "Electric Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0C40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[12]}",
+            "Timing": "0x6D",
+            "Name": "Electric Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0C0050E30800001A0500A0E10C10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[13]}",
+      "Name": "Psychic Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0D40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[13]}",
+            "Timing": "0x6D",
+            "Name": "Psychic Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0D0050E30800001A0500A0E10D10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[14]}",
+      "Name": "Ice Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0E40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[14]}",
+            "Timing": "0x6D",
+            "Name": "Ice Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0E0050E30800001A0500A0E10E10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[15]}",
+      "Name": "Dragon Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A0F40A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[15]}",
+            "Timing": "0x6D",
+            "Name": "Dragon Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB0F0050E30800001A0500A0E10F10A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[16]}",
+      "Name": "Dark Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A1040A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[16]}",
+            "Timing": "0x6D",
+            "Name": "Dark Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB100050E30800001A0500A0E11010A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Item",
+      "Id": 0,
+      "IdText": "${shardIds[17]}",
+      "Name": "Fairy Tera Shard",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E3D01E02EB050050E11200001A1140A0E30520A0E11510A0E30600A0E1B11D02EB0010A0E1000090E50020A0E30750C1E51F3004E20620C1E5020580E3833283E1000081E5122B83E30600A0E1B420C1E17040BDE822F301EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 109,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xA7",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 0,
+            "IdText": "${shardIds[17]}",
+            "Timing": "0x6D",
+            "Name": "Fairy Tera Shard"
+          },
+          "TimingByte": 167,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x47",
+          "Code": "70402DE90050A0E10260A0E10300A0E3D01E02EB060050E10C00001A1900A0E3CC1E02EB110050E30800001A0500A0E11110A0E30E2202EB000050E30300000A3500A0E3151CA0E3551081E22D0C02EA7080BDE8",
+          "SourceBase": "0x0",
+          "TimingByte": 71,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 2
+    },
+    {
+      "Kind": "Move",
+      "Id": 0,
+      "IdText": "851",
+      "Name": "Tera Blast",
+      "Slots": [
+        {
+          "Timing": "0x2D",
+          "Code": "70402DE90150A0E10240A0E10200A0E3D01E02EB040050E10A00001A0410A0E10500A0E19B4802EBEB3702EB1F1000E2120051E38008A0017040BDE8A01DA0011900A0E33E0B02EA7080BDE8",
+          "SourceBase": "0x0"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {
+    "${shardIds[0]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "0",
+      "FlingPower": "30"
+    },
+    "${shardIds[1]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "1",
+      "FlingPower": "30"
+    },
+    "${shardIds[2]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "2",
+      "FlingPower": "30"
+    },
+    "${shardIds[3]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "3",
+      "FlingPower": "30"
+    },
+    "${shardIds[4]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "4",
+      "FlingPower": "30"
+    },
+    "${shardIds[5]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "5",
+      "FlingPower": "30"
+    },
+    "${shardIds[6]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "6",
+      "FlingPower": "30"
+    },
+    "${shardIds[7]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "7",
+      "FlingPower": "30"
+    },
+    "${shardIds[8]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "8",
+      "FlingPower": "30"
+    },
+    "${shardIds[9]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "9",
+      "FlingPower": "30"
+    },
+    "${shardIds[10]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "10",
+      "FlingPower": "30"
+    },
+    "${shardIds[11]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "11",
+      "FlingPower": "30"
+    },
+    "${shardIds[12]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "12",
+      "FlingPower": "30"
+    },
+    "${shardIds[13]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "13",
+      "FlingPower": "30"
+    },
+    "${shardIds[14]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "14",
+      "FlingPower": "30"
+    },
+    "${shardIds[15]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "15",
+      "FlingPower": "30"
+    },
+    "${shardIds[16]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "16",
+      "FlingPower": "30"
+    },
+    "${shardIds[17]}": {
+      "CloneFrom": "880",
+      "HeldEffect": "0",
+      "HeldArgument": "17",
+      "FlingPower": "30"
+    }
+  },
+  "ItemNames": {
+    "${shardIds[0]}": "Normal Tera Shard",
+    "${shardIds[1]}": "Fighting Tera Shard",
+    "${shardIds[2]}": "Flying Tera Shard",
+    "${shardIds[3]}": "Poison Tera Shard",
+    "${shardIds[4]}": "Ground Tera Shard",
+    "${shardIds[5]}": "Rock Tera Shard",
+    "${shardIds[6]}": "Bug Tera Shard",
+    "${shardIds[7]}": "Ghost Tera Shard",
+    "${shardIds[8]}": "Steel Tera Shard",
+    "${shardIds[9]}": "Fire Tera Shard",
+    "${shardIds[10]}": "Water Tera Shard",
+    "${shardIds[11]}": "Grass Tera Shard",
+    "${shardIds[12]}": "Electric Tera Shard",
+    "${shardIds[13]}": "Psychic Tera Shard",
+    "${shardIds[14]}": "Ice Tera Shard",
+    "${shardIds[15]}": "Dragon Tera Shard",
+    "${shardIds[16]}": "Dark Tera Shard",
+    "${shardIds[17]}": "Fairy Tera Shard"
+  },
+  "ItemNamesPlural": {
+    "${shardIds[0]}": "Normal Tera Shards",
+    "${shardIds[1]}": "Fighting Tera Shards",
+    "${shardIds[2]}": "Flying Tera Shards",
+    "${shardIds[3]}": "Poison Tera Shards",
+    "${shardIds[4]}": "Ground Tera Shards",
+    "${shardIds[5]}": "Rock Tera Shards",
+    "${shardIds[6]}": "Bug Tera Shards",
+    "${shardIds[7]}": "Ghost Tera Shards",
+    "${shardIds[8]}": "Steel Tera Shards",
+    "${shardIds[9]}": "Fire Tera Shards",
+    "${shardIds[10]}": "Water Tera Shards",
+    "${shardIds[11]}": "Grass Tera Shards",
+    "${shardIds[12]}": "Electric Tera Shards",
+    "${shardIds[13]}": "Psychic Tera Shards",
+    "${shardIds[14]}": "Ice Tera Shards",
+    "${shardIds[15]}": "Dragon Tera Shards",
+    "${shardIds[16]}": "Dark Tera Shards",
+    "${shardIds[17]}": "Fairy Tera Shards"
+  },
+  "ItemNamesPluralAlt": {
+    "${shardIds[0]}": "Normal Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[1]}": "Fighting Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[2]}": "Flying Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[3]}": "Poison Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[4]}": "Ground Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[5]}": "Rock Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[6]}": "Bug Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[7]}": "Ghost Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[8]}": "Steel Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[9]}": "Fire Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[10]}": "Water Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[11]}": "Grass Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[12]}": "Electric Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[13]}": "Psychic Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[14]}": "Ice Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[15]}": "Dragon Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[16]}": "Dark Tera Shard[VAR NUMBRNCH(00FE,0100)]s",
+    "${shardIds[17]}": "Fairy Tera Shard[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${shardIds[0]}": "A crystal shard charged with Normal\nenergy. On switch-in, it makes the holder\npure Normal-type and can\u0027t be removed.",
+    "${shardIds[1]}": "A crystal shard charged with Fighting\nenergy. On switch-in, it makes the holder\npure Fighting-type and can\u0027t be removed.",
+    "${shardIds[2]}": "A crystal shard charged with Flying\nenergy. On switch-in, it makes the holder\npure Flying-type and can\u0027t be removed.",
+    "${shardIds[3]}": "A crystal shard charged with Poison\nenergy. On switch-in, it makes the holder\npure Poison-type and can\u0027t be removed.",
+    "${shardIds[4]}": "A crystal shard charged with Ground\nenergy. On switch-in, it makes the holder\npure Ground-type and can\u0027t be removed.",
+    "${shardIds[5]}": "A crystal shard charged with Rock\nenergy. On switch-in, it makes the holder\npure Rock-type and can\u0027t be removed.",
+    "${shardIds[6]}": "A crystal shard charged with Bug\nenergy. On switch-in, it makes the holder\npure Bug-type and can\u0027t be removed.",
+    "${shardIds[7]}": "A crystal shard charged with Ghost\nenergy. On switch-in, it makes the holder\npure Ghost-type and can\u0027t be removed.",
+    "${shardIds[8]}": "A crystal shard charged with Steel\nenergy. On switch-in, it makes the holder\npure Steel-type and can\u0027t be removed.",
+    "${shardIds[9]}": "A crystal shard charged with Fire\nenergy. On switch-in, it makes the holder\npure Fire-type and can\u0027t be removed.",
+    "${shardIds[10]}": "A crystal shard charged with Water\nenergy. On switch-in, it makes the holder\npure Water-type and can\u0027t be removed.",
+    "${shardIds[11]}": "A crystal shard charged with Grass\nenergy. On switch-in, it makes the holder\npure Grass-type and can\u0027t be removed.",
+    "${shardIds[12]}": "A crystal shard charged with Electric\nenergy. On switch-in, it makes the holder\npure Electric-type and can\u0027t be removed.",
+    "${shardIds[13]}": "A crystal shard charged with Psychic\nenergy. On switch-in, it makes the holder\npure Psychic-type and can\u0027t be removed.",
+    "${shardIds[14]}": "A crystal shard charged with Ice\nenergy. On switch-in, it makes the holder\npure Ice-type and can\u0027t be removed.",
+    "${shardIds[15]}": "A crystal shard charged with Dragon\nenergy. On switch-in, it makes the holder\npure Dragon-type and can\u0027t be removed.",
+    "${shardIds[16]}": "A crystal shard charged with Dark\nenergy. On switch-in, it makes the holder\npure Dark-type and can\u0027t be removed.",
+    "${shardIds[17]}": "A crystal shard charged with Fairy\nenergy. On switch-in, it makes the holder\npure Fairy-type and can\u0027t be removed."
+  }
+}

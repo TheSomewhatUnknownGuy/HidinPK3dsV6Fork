@@ -162,6 +162,15 @@ public sealed class GARCReference
         new(283, "maisonpkS"),
         new(284, "maisontrS"),
 
+        new(018, "evolutionbase"),
+        new(073, "cry"),
+        new(092, "amxscript"),
+        new(094, "models"),
+        new(098, "cutscenemodels"),
+        new(244, "dexportrait"),
+        new(257, "partyicon"),
+        new(062, "menuicon"),
+
         // Varied
         new(030, "gametext", true),
         new(040, "storytext", true),
@@ -188,6 +197,13 @@ public sealed class GARCReference
         .. GARCReference_USUM,
         .. new[] {
             new GARCReference(082, "encdata"),
+            // Same real GARC as "encdata" above - confirmed live this session that its members are
+            // a mix of per-zone tagged sub-containers (wild encounter tables ["EA"], environment ["ED"], background/terrain
+            // ["BG"], and - the one this alias is actually for - "AC"-tagged overworld model/actor
+            // placement containers, each an AC -> CP -> CM tree of raw model data). Registered under
+            // its own name so overworld model tooling doesn't need to reuse the misleading
+            // "encdata" name or hardcode the raw path itself.
+            new GARCReference(082, "owmodels"),
         },
     ];
 
@@ -195,7 +211,8 @@ public sealed class GARCReference
     [
         .. GARCReference_USUM,
         .. new[] {
-            new GARCReference(083, "encdata"),
+            new GARCReference(082, "encdata"),
+            new GARCReference(082, "owmodels"),
         },
     ];
 }

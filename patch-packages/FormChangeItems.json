@@ -1,0 +1,136 @@
+{
+  "Name": "Form Change Items",
+  "Description": "Form Change Items (Reins of Unity \u0026 Cream Reswirler). Enables Calyrex fusion with Glastrier/Spectrier and Alcremie swirl-forme cycling. Item IDs are fully parameterized and not linked to fixed hardcoded slots.",
+  "Category": "Item",
+  "Requires": [],
+  "Parameters": {
+    "reinsOfUnityId": {
+      "Description": "Item ID for Reins of Unity (fusion of Calyrex with Glastrier/Spectrier).",
+      "Type": "item",
+      "Default": "525",
+      "AllowUnnamed": true
+    },
+    "creamReswirlerId": {
+      "Description": "Item ID for Cream Reswirler (cycling Alcremie forms).",
+      "Type": "item",
+      "Default": "526",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {
+    "Bag.cro": {
+      "Blocks": [
+        {
+          "Name": "bag-form-change-block",
+          "Code": "78319FE5030050E164BCFF1A0600A0E194A0FFEB0E0D50E2010040125FBCFF1A0600A0E195A0FFEB000050E35BBCFF0A0400A0E10110A0E30520A0E185E3FFEB000050E355BCFF0A47BCFFEA2C019FE5000051E12300001A000094E583A0FFEB000050E30800000A010050E3020050139CBCFF1A0500A0E10110A0E30420A0E10030A0E394BEFFEB96BCFFEA7C0095E5FAC6FFEB0060A0E1280095E5FF1006E2040090E54DA1FFEB0070B0E18DBCFF0A6CA0FFEB031C40E2800051E30130A003810051130230A0030030A01304708DE508608DE50500A0E10110A0E30420A0E12EC1FFEB7FBCFFEA90C09FE50C0051E11EFF2F01C7A1FFEA80109FE5010054E163D7FF1A000050E36FD7FF0A010050E30200501353D7FF0A73D7FFEA5C109FE5010055E10400001A031C44E2821051E20100001A020050E370DCFF9A031C44E2651051E20300001A34109FE5010055E10000001A69DCFFEA6ADCFFEA0000000000000000000000000000000000000000000000000000000000000000000000000D0200000E0200000000000000000000",
+          "SourceBase": "0x018000",
+          "CodeBytes": "eDGf5QMAUOFkvP8aBgCg4ZSg/+sODVDiAQBAEl+8/xoGAKDhlaD/6wAAUONbvP8KBACg4QEQoOMFIKDhheP/6wAAUONVvP8KR7z/6iwBn+UAAFHhIwAAGgAAlOWDoP/rAABQ4wgAAAoBAFDjAgBQE5y8/xoFAKDhARCg4wQgoOEAMKDjlL7/65a8/+p8AJXl+sb/6wBgoOEoAJXl/xAG4gQAkOVNof/rAHCw4Y28/wpsoP/rAxxA4oAAUeMBMKADgQBREwIwoAMAMKATBHCN5QhgjeUFAKDhARCg4wQgoOEuwf/rf7z/6pDAn+UMAFHhHv8vAceh/+qAEJ/lAQBU4WPX/xoAAFDjb9f/CgEAUOMCAFATU9f/CnPX/+pcEJ/lAQBV4QQAABoDHETighBR4gEAABoCAFDjcNz/mgMcROJlEFHiAwAAGjQQn+UBAFXhAAAAGmnc/+pq3P/qAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADQIAAA4CAAAAAAAAAAAAAA==",
+          "SourceBaseValue": 98304
+        }
+      ],
+      "SitePatches": [
+        {
+          "Offset": "0x007124",
+          "Original": "1D00001A",
+          "Patched": "000000EA",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 28964,
+          "OriginalBytes": "HQAAGg==",
+          "PatchedBytes": "AAAA6g=="
+        },
+        {
+          "Offset": "0x00759C",
+          "Original": "000094E5",
+          "Patched": "110000EA",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 30108,
+          "OriginalBytes": "AACU5Q==",
+          "PatchedBytes": "EQAA6g=="
+        },
+        {
+          "Offset": "0x007AFC",
+          "Original": "ED3900EB",
+          "Patched": "380000EB",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 31484,
+          "OriginalBytes": "7TkA6w==",
+          "PatchedBytes": "OAAA6w=="
+        },
+        {
+          "Offset": "0x0085C8",
+          "Original": "3A3700EB",
+          "Patched": "C50000EB",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 34248,
+          "OriginalBytes": "OjcA6w==",
+          "PatchedBytes": "xQAA6w=="
+        },
+        {
+          "Offset": "0x00DE50",
+          "Original": "0F00001A",
+          "Patched": "3C0000EA",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 56912,
+          "OriginalBytes": "DwAAGg==",
+          "PatchedBytes": "PAAA6g=="
+        },
+        {
+          "Offset": "0x00F2F4",
+          "Original": "0300001A",
+          "Patched": "450000EA",
+          "IsHook": true,
+          "HookTarget": "bag-form-change-block",
+          "OffsetValue": 62196,
+          "OriginalBytes": "AwAAGg==",
+          "PatchedBytes": "RQAA6g=="
+        }
+      ]
+    }
+  },
+  "DataTables": [
+    {
+      "Target": "Bag.cro",
+      "Block": "bag-form-change-block",
+      "Offset": "0x180",
+      "ElementSize": 4,
+      "Values": "${reinsOfUnityId},${creamReswirlerId}",
+      "Terminate": false,
+      "Capacity": 2,
+      "OffsetValue": 384
+    }
+  ],
+  "ItemData": {
+    "${reinsOfUnityId}": {
+      "CloneFrom": "297",
+      "Name": "Reins of Unity",
+      "Pocket": "4",
+      "ItemKind": "0",
+      "Fields": {}
+    },
+    "${creamReswirlerId}": {
+      "CloneFrom": "297",
+      "Name": "Cream Reswirler",
+      "Pocket": "4",
+      "ItemKind": "0",
+      "Fields": {}
+    }
+  },
+  "ItemNames": {
+    "${reinsOfUnityId}": "Reins of Unity",
+    "${creamReswirlerId}": "Cream Reswirler"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${reinsOfUnityId}": "Reins that have the power to bind Pok\u00E9mon. They fuse Calyrex with Glastrier or Spectrier.",
+    "${creamReswirlerId}": "A mystical whisk that can alter an Alcremie\u0027s sweet cream swirl."
+  }
+}

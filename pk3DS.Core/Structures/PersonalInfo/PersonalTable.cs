@@ -10,7 +10,7 @@ public class PersonalTable
         {
             GameVersion.XY => new PersonalInfoXY(data),
             GameVersion.ORASDEMO or GameVersion.ORAS => new PersonalInfoORAS(data),
-            GameVersion.SMDEMO or GameVersion.SM or GameVersion.USUM => new PersonalInfoSM(data),
+            GameVersion.SMDEMO or GameVersion.SM or GameVersion.SN or GameVersion.MN or GameVersion.USUM or GameVersion.US or GameVersion.UM => new PersonalInfoSM(data),
             _ => null,
         };
     }
@@ -32,9 +32,7 @@ public class PersonalTable
             GameVersion.XY => PersonalInfoXY.SIZE,
             GameVersion.ORASDEMO => PersonalInfoORAS.SIZE,
             GameVersion.ORAS => PersonalInfoORAS.SIZE,
-            GameVersion.SMDEMO => PersonalInfoSM.SIZE,
-            GameVersion.SM => PersonalInfoSM.SIZE,
-            GameVersion.USUM => PersonalInfoSM.SIZE,
+            GameVersion.SMDEMO or GameVersion.SM or GameVersion.SN or GameVersion.MN or GameVersion.USUM or GameVersion.US or GameVersion.UM => PersonalInfoSM.SIZE,
             _ => 0,
         };
 
@@ -57,7 +55,11 @@ public class PersonalTable
                 break;
             case GameVersion.SMDEMO:
             case GameVersion.SM:
+            case GameVersion.SN:
+            case GameVersion.MN:
             case GameVersion.USUM:
+            case GameVersion.US:
+            case GameVersion.UM:
                 for (int i = 0; i < d.Length; i++)
                     d[i] = new PersonalInfoSM(entries[i]);
                 break;
@@ -183,15 +185,42 @@ public class PersonalTable
         baseForm = new int[result.Length];
         formVal = new int[result.Length];
 
-        int shift = MaxSpecies > 807 ? (MaxSpecies - 807) : 0;
+        // The alt-form region only ever physically moved ONCE - during the community Expansion
+        // Pack's historical 807->1025 species-table raise, which pushed every alt form (Mega
+        // Venusaur, etc.) outward by exactly 218 slots. `MaxSpecies` here also does double duty as
+        // "how far to loop over base species", which SHOULD keep growing as more species get
+        // inserted past 1025 - but reusing that same, ever-growing value as the SHIFT basis is
+        // wrong: inserting a brand-new custom species at slot 1026+ doesn't move the alt-form
+        // region again, so the shift must stay pinned to the one real historical raise (1025), not
+        // whatever MaxSpecies has grown to since. Confirmed live: after MaxSpeciesID started
+        // tracking the real (larger) table length, Mega Venusaur started resolving to a bogus
+        // "Species 1026 1" slot instead of its real alt-form data - this is that fix.
+        int shiftBasis = Math.Min(MaxSpecies, 1025);
+        int shift = shiftBasis > 807 ? (shiftBasis - 807) : 0;
 
-        // 1. Map Base Species entries (0 .. MaxSpecies)
+        // 1a. Map every base species entry first (0 .. MaxSpecies) - deliberately NOT interleaved
+        // with alt-form assignment below. The two used to run in a single pass, which meant "assign
+        // my own name" and "assign my alt-form's name into some OTHER slot" happened in the same
+        // sweep - so whenever an alt-form pointer landed BELOW MaxSpecies (not the normal case, but
+        // a real one for a still-in-progress expansion table whose alt-form pointers haven't all
+        // been migrated past MaxSpecies yet), that slot's own later "assign my own name" step would
+        // silently clobber the alt-form name a numerically-earlier species had just written there -
+        // e.g. two real base species ending up displayed under an earlier species' alt-form label,
+        // with no error or indication anything was wrong. Splitting the two into separate passes
+        // (base names entirely first, alt-form names layered on second, unconditionally) makes the
+        // result independent of iteration order - an alt-form name always wins for its slot, no
+        // matter whether that slot is also, coincidentally, a valid base-species index.
         for (int i = 0; i <= MaxSpecies && i < species.Length && i < Table.Length; i++)
         {
             result[i] = !string.IsNullOrEmpty(species[i]) ? species[i] : $"Species {i}";
             baseForm[i] = i;
             formVal[i] = 0;
+        }
 
+        // 1b. Layer alt-form names on top - always overwrites whatever base name step 1a put at the
+        // same slot, so a colliding pointer can never lose to it.
+        for (int i = 0; i <= MaxSpecies && i < Table.Length; i++)
+        {
             if (i >= AltForms.Length || AltForms[i] == null || AltForms[i].Length <= 1) continue;
             int altformpointer = this[i].FormStatsIndex;
             if (altformpointer <= 0) continue;

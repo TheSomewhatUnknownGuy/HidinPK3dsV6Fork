@@ -1,0 +1,26 @@
+{
+  "Name": "Electromorphosis",
+  "Description": "Electromorphosis (Ability 280). When the Pokémon takes damage from an attack (timing 0x60), flashes the ability banner and activates the Charge state (effect 0x43 via 0x82D44) to double the power of the next Electric-type attack.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 280,
+      "Name": "Electromorphosis",
+      "Slots": [
+        {
+          "Timing": "0x60",
+          "Code": "70402DE90140A0E10250A0E10400A0E3D01EFAEB050050E10A00001A4B00A0E3CC1EFAEB000050E30600000A0400A0E10110A0E30520A0E17A27FAEB4300A0E30110A0E33E0BFAEB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

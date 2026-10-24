@@ -7,7 +7,7 @@
     "itemId": {
       "Description": "Item id to install Booster Energy on. Must be a free slot or already named Booster Energy.",
       "Type": "item",
-      "Default": "867",
+      "Default": "868",
       "ExpectName": "Booster Energy",
       "AllowUnnamed": true
     }
@@ -57,5 +57,14 @@
   },
   "ItemNames": {
     "${itemId}": "Booster Energy"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Booster Energies"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Booster Energy[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis capsule activates Protosynthesis\nor Quark Drive once."
   }
 }

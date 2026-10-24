@@ -83,13 +83,50 @@ public partial class SMWE : Form
         {
             foreach (var cb in cb_l)
             {
-                cb.Items.AddRange(speciesList);
-                cb.SelectedIndex = 0;
+                SetSpecies(cb, 0);
+                cb.Enter += FillSpeciesList;
                 cb.SelectedIndexChanged += UpdateSpeciesForm;
             }
         }
 
         return list;
+    }
+
+    // 86 combos x ~1000 species took ~30 s at handle creation, so a combo holds only its own species
+    // (kept in Tag) until the user focuses it, then it gets the full list.
+    private bool HasFullList(ComboBox cb) => cb.Items.Count == speciesList.Length;
+
+    private int GetSpecies(ComboBox cb) => HasFullList(cb) ? cb.SelectedIndex : cb.Tag is int s ? s : 0;
+
+    private void SetSpecies(ComboBox cb, int species)
+    {
+        cb.Tag = species;
+        if (HasFullList(cb))
+        {
+            cb.SelectedIndex = species;
+            return;
+        }
+        cb.Items.Clear();
+        if ((uint)species < speciesList.Length) // -1 = emptied field, as before
+        {
+            cb.Items.Add(speciesList[species]);
+            cb.SelectedIndex = 0;
+        }
+    }
+
+    private void FillSpeciesList(object sender, EventArgs e)
+    {
+        var cb = (ComboBox)sender;
+        if (HasFullList(cb))
+            return;
+        int species = GetSpecies(cb);
+        cb.SelectedIndexChanged -= UpdateSpeciesForm; // refilling is not an edit
+        cb.BeginUpdate();
+        cb.Items.Clear();
+        cb.Items.AddRange(speciesList);
+        cb.SelectedIndex = species;
+        cb.EndUpdate();
+        cb.SelectedIndexChanged += UpdateSpeciesForm;
     }
 
     private NumericUpDown[][] LoadFormeNUD()
@@ -612,7 +649,7 @@ private void UpdatePanel(object sender, EventArgs e)
                 if (slot == 8)
                     sl = table.AdditionalSOS;
                 rate_spec[i].Value = table.Rates[i];
-                cb_spec[slot][i].SelectedIndex = (int)sl[i].Species;
+                SetSpecies(cb_spec[slot][i], (int)sl[i].Species);
                 nup_spec[slot][i].Value = (int)sl[i].Forme;
             }
         }
@@ -649,11 +686,11 @@ private void UpdatePanel(object sender, EventArgs e)
         int table = Array.FindIndex(source, t => t.Contains(sender));
         int slot = Array.IndexOf(source[table], sender);
         
-        UpdateMascot(cb_spec[table][slot].SelectedIndex, (int)nup_spec[table][slot].Value);
+        UpdateMascot(GetSpecies(cb_spec[table][slot]), (int)nup_spec[table][slot].Value);
 
         var cb_l = cb_spec[table];
         var nup_l = nup_spec[table];
-        var species = (uint)cb_l[slot].SelectedIndex;
+        var species = (uint)GetSpecies(cb_l[slot]);
         var form = (uint)nup_l[slot].Value;
         if (table == 8)
         {
@@ -884,7 +921,7 @@ private void CopySOS_Click(object sender, EventArgs e)
             for (int s = 0; s < nup_spec[i].Length; s++) 
             {
                 nup_spec[i][s].Value = nup_spec[0][s].Value;
-                cb_spec[i][s].SelectedIndex = cb_spec[0][s].SelectedIndex;
+                SetSpecies(cb_spec[i][s], GetSpecies(cb_spec[0][s]));
             }
         }
         AutoSave();
@@ -1060,7 +1097,7 @@ private void CopySOS_Click(object sender, EventArgs e)
     {
         if (species == -1)
         {
-            species = (int)cb_spec[0][0].SelectedIndex;
+            species = GetSpecies(cb_spec[0][0]);
             form = (int)nup_spec[0][0].Value;
         }
         WinFormsUtil.SetImage(PB_Mascot, WinFormsUtil.GetSprite(species, form, 0, 0, Main.Config));

@@ -8,53 +8,69 @@
 
 # IDE & Environment
 .venv/
-.claude/
-brain/
+
+# Third-party reference documents (not ours to redistribute)
+/docs/reference/
 
 # Research, Reference & Extraction Dumps (Embedded into pk3DS.Core Resources)
-ARM Functions/
-Observation Files/
-scratch_xlsx/
-scratch/
-tools/
-docs/
+# Root-anchored (leading /): core.ignorecase=true makes a bare "tools/" also match
+# pk3DS.WinForms/Tools/, and a bare "code_map.csv" match the embedded resource copies.
+/ARM Functions/
+/Observation Files/
+/scratch_xlsx/
+/scratch/
+/tools/
 
 # External Tools & Mod Workspaces
-US/
-UM/
-patches/
-CRO-Expander-4.0/
-CRO-Expander-main/
-Pokemon-Forme-Insertion-main/
-Python source files/
-PokeRandoZX_USUM_Expansion_rev1/
-upr-zx/
-upr-zx-sora/
-ItemSprites/
+/US/
+/UM/
+/patches/
+/CRO-Expander-4.0/
+/CRO-Expander-main/
+/Pokemon-Forme-Insertion-main/
+/Python source files/
+/PokeRandoZX_USUM_Expansion_rev1/
+/upr-zx/
+/upr-zx-sora/
+/ItemSprites/
+/PawnGarcEditor_release_0.4.0/
+/french dude/
+/patch-packages-backup-*/
 
 # Large Binaries, Local Workspace Dumps & Zip Packages
 *.zip
-4.xdelta
-7
-Pokemon+/
-encdata/
-ultramoon/
-tempRomFS.bin
+/4.xdelta
+/7
+/Pokemon+/
+/encdata/
+/ultramoon/
+/tempRomFS.bin
 
 # User Settings, Manifests & Temp Scripts
-randsettings.txt
-showdown_sets.json
-showdown_sets_storage.json
-showdown_sets.txt
-showdown_set_storage.txt
-scratch_bag_use.txt
-test_api.py
-competitive_manifesto.md
-code_map.csv
-Planned Features.txt
+/randsettings.txt
+/showdown_sets.json
+/showdown_sets_storage.json
+/showdown_sets.txt
+/showdown_set_storage.txt
+/scratch_bag_use.txt
+/test_api.py
+/competitive_manifesto.md
+/code_map.csv
+/out4.txt
+/Program.cs
+/Planned Features.txt
 *.bak
 *.tmp
 
 # Python temp files
 __pycache__/
 *.pyc
+
+# Development-only files (not part of the published program)
+/AGENTS.md
+/docs
+/scripts
+/tests
+/walkthrough.md
+/Ripen.xlsx
+/ZoneDataPattern.hexpat

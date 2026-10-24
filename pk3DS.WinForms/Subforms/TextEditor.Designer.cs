@@ -32,6 +32,14 @@ partial class TextEditor
         this.RTB_Visualizer = new System.Windows.Forms.RichTextBox();
         this.CB_Entry = new System.Windows.Forms.ComboBox();
         this.dgv = new System.Windows.Forms.DataGridView();
+        this.CB_InsertVariable = new System.Windows.Forms.ComboBox();
+        this.B_InsertVariable = new System.Windows.Forms.Button();
+        this.L_InsertColor = new System.Windows.Forms.Label();
+        this.CB_ColorChoice = new System.Windows.Forms.ComboBox();
+        this.B_InsertColor = new System.Windows.Forms.Button();
+        this.B_InsertPause = new System.Windows.Forms.Button();
+        this.L_Preview = new System.Windows.Forms.Label();
+        this.RTB_Preview = new System.Windows.Forms.RichTextBox();
 
         ((System.ComponentModel.ISupportInitialize)(this.dgv)).BeginInit();
         this.SuspendLayout();
@@ -98,26 +106,26 @@ partial class TextEditor
         this.B_RemoveLine.Text = "Remove Line";
         this.B_RemoveLine.UseVisualStyleBackColor = true;
         this.B_RemoveLine.Click += new System.EventHandler(this.B_RemoveLine_Click);
-        // 
+        //
         // L_Search
-        // 
+        //
         this.L_Search.AutoSize = true;
-        this.L_Search.Location = new System.Drawing.Point(12, 410);
+        this.L_Search.Location = new System.Drawing.Point(12, 475);
         this.L_Search.Name = "L_Search";
         this.L_Search.Size = new System.Drawing.Size(44, 13);
         this.L_Search.Text = "Search:";
         this.L_Search.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-        // 
+        //
         // TB_Search
-        // 
-        this.TB_Search.Location = new System.Drawing.Point(62, 407);
+        //
+        this.TB_Search.Location = new System.Drawing.Point(62, 472);
         this.TB_Search.Name = "TB_Search";
         this.TB_Search.Size = new System.Drawing.Size(150, 20);
         this.TB_Search.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-        // 
+        //
         // B_Search
-        // 
-        this.B_Search.Location = new System.Drawing.Point(300, 405);
+        //
+        this.B_Search.Location = new System.Drawing.Point(300, 470);
         this.B_Search.Name = "B_Search";
         this.B_Search.Size = new System.Drawing.Size(75, 23);
         this.B_Search.TabIndex = 6;
@@ -125,10 +133,10 @@ partial class TextEditor
         this.B_Search.UseVisualStyleBackColor = true;
         this.B_Search.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
         this.B_Search.Click += new System.EventHandler(this.B_Search_Click);
-        // 
+        //
         // B_SearchPrev
-        // 
-        this.B_SearchPrev.Location = new System.Drawing.Point(220, 405);
+        //
+        this.B_SearchPrev.Location = new System.Drawing.Point(220, 470);
         this.B_SearchPrev.Name = "B_SearchPrev";
         this.B_SearchPrev.Size = new System.Drawing.Size(75, 23);
         this.B_SearchPrev.TabIndex = 7;
@@ -136,17 +144,17 @@ partial class TextEditor
         this.B_SearchPrev.UseVisualStyleBackColor = true;
         this.B_SearchPrev.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
         this.B_SearchPrev.Click += new System.EventHandler(this.B_SearchPrev_Click);
-        // 
+        //
         // B_BatchReplace
-        // 
+        //
         // B_Randomize_Click was fully implemented but had no control to invoke it.
-        this.B_Randomize.Location = new System.Drawing.Point(485, 405);
+        this.B_Randomize.Location = new System.Drawing.Point(485, 470);
         this.B_Randomize.Name = "B_Randomize";
         this.B_Randomize.Size = new System.Drawing.Size(95, 23);
         this.B_Randomize.Text = "Randomize";
         this.B_Randomize.UseVisualStyleBackColor = true;
         this.B_Randomize.Click += new System.EventHandler(this.B_Randomize_Click);
-        this.B_BatchReplace.Location = new System.Drawing.Point(380, 405);
+        this.B_BatchReplace.Location = new System.Drawing.Point(380, 470);
         this.B_BatchReplace.Name = "B_BatchReplace";
         this.B_BatchReplace.Size = new System.Drawing.Size(95, 23);
         this.B_BatchReplace.TabIndex = 8;
@@ -197,12 +205,99 @@ partial class TextEditor
         this.RTB_Visualizer.Size = new System.Drawing.Size(876, 50);
         this.RTB_Visualizer.TabIndex = 15;
         this.RTB_Visualizer.Text = "";
-        // 
+        //
+        // CB_InsertVariable
+        //
+        this.CB_InsertVariable.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+        this.CB_InsertVariable.FormattingEnabled = true;
+        this.CB_InsertVariable.Location = new System.Drawing.Point(130, 327);
+        this.CB_InsertVariable.Name = "CB_InsertVariable";
+        this.CB_InsertVariable.Size = new System.Drawing.Size(160, 21);
+        this.CB_InsertVariable.TabIndex = 16;
+        this.CB_InsertVariable.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        //
+        // B_InsertVariable
+        //
+        this.B_InsertVariable.Location = new System.Drawing.Point(296, 326);
+        this.B_InsertVariable.Name = "B_InsertVariable";
+        this.B_InsertVariable.Size = new System.Drawing.Size(70, 23);
+        this.B_InsertVariable.TabIndex = 17;
+        this.B_InsertVariable.Text = "Insert";
+        this.B_InsertVariable.UseVisualStyleBackColor = true;
+        this.B_InsertVariable.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_InsertVariable.Click += new System.EventHandler(this.B_InsertVariable_Click);
+        //
+        // L_InsertColor
+        //
+        this.L_InsertColor.AutoSize = true;
+        this.L_InsertColor.Location = new System.Drawing.Point(390, 330);
+        this.L_InsertColor.Name = "L_InsertColor";
+        this.L_InsertColor.Size = new System.Drawing.Size(60, 13);
+        this.L_InsertColor.TabIndex = 20;
+        this.L_InsertColor.Text = "Color:";
+        this.L_InsertColor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        //
+        // CB_ColorChoice
+        //
+        this.CB_ColorChoice.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+        this.CB_ColorChoice.FormattingEnabled = true;
+        this.CB_ColorChoice.Location = new System.Drawing.Point(432, 327);
+        this.CB_ColorChoice.Name = "CB_ColorChoice";
+        this.CB_ColorChoice.Size = new System.Drawing.Size(210, 21);
+        this.CB_ColorChoice.TabIndex = 21;
+        this.CB_ColorChoice.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        //
+        // B_InsertColor
+        //
+        this.B_InsertColor.Location = new System.Drawing.Point(648, 326);
+        this.B_InsertColor.Name = "B_InsertColor";
+        this.B_InsertColor.Size = new System.Drawing.Size(70, 23);
+        this.B_InsertColor.TabIndex = 22;
+        this.B_InsertColor.Text = "Insert";
+        this.B_InsertColor.UseVisualStyleBackColor = true;
+        this.B_InsertColor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_InsertColor.Click += new System.EventHandler(this.B_InsertColor_Click);
+        //
+        // B_InsertPause
+        //
+        this.B_InsertPause.Location = new System.Drawing.Point(728, 326);
+        this.B_InsertPause.Name = "B_InsertPause";
+        this.B_InsertPause.Size = new System.Drawing.Size(90, 23);
+        this.B_InsertPause.TabIndex = 23;
+        this.B_InsertPause.Text = "Insert Pause";
+        this.B_InsertPause.UseVisualStyleBackColor = true;
+        this.B_InsertPause.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_InsertPause.Click += new System.EventHandler(this.B_InsertPause_Click);
+        //
+        // L_Preview
+        //
+        this.L_Preview.AutoSize = true;
+        this.L_Preview.Location = new System.Drawing.Point(12, 397);
+        this.L_Preview.Name = "L_Preview";
+        this.L_Preview.Size = new System.Drawing.Size(160, 13);
+        this.L_Preview.TabIndex = 18;
+        this.L_Preview.Text = "Preview (variables resolved):";
+        this.L_Preview.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        //
+        // RTB_Preview
+        //
+        this.RTB_Preview.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+        this.RTB_Preview.BackColor = System.Drawing.Color.Black;
+        this.RTB_Preview.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+        this.RTB_Preview.Font = new System.Drawing.Font("Consolas", 9.75F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+        this.RTB_Preview.ForeColor = System.Drawing.Color.LightGray;
+        this.RTB_Preview.Location = new System.Drawing.Point(12, 412);
+        this.RTB_Preview.Name = "RTB_Preview";
+        this.RTB_Preview.ReadOnly = true;
+        this.RTB_Preview.Size = new System.Drawing.Size(876, 50);
+        this.RTB_Preview.TabIndex = 19;
+        this.RTB_Preview.Text = "";
+        //
         // TextEditor
-        // 
+        //
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(1000, 480);
+        this.ClientSize = new System.Drawing.Size(1000, 545);
         this.Controls.Add(this.L_Search);
         this.Controls.Add(this.B_BatchReplace);
         this.Controls.Add(this.B_Randomize);
@@ -219,7 +314,15 @@ partial class TextEditor
         this.Controls.Add(this.CB_Entry);
         this.Controls.Add(this.L_Visualizer);
         this.Controls.Add(this.RTB_Visualizer);
-        this.MinimumSize = new System.Drawing.Size(500, 450);
+        this.Controls.Add(this.CB_InsertVariable);
+        this.Controls.Add(this.B_InsertVariable);
+        this.Controls.Add(this.L_InsertColor);
+        this.Controls.Add(this.CB_ColorChoice);
+        this.Controls.Add(this.B_InsertColor);
+        this.Controls.Add(this.B_InsertPause);
+        this.Controls.Add(this.L_Preview);
+        this.Controls.Add(this.RTB_Preview);
+        this.MinimumSize = new System.Drawing.Size(500, 515);
         this.Name = "TextEditor";
         this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
         this.Text = "Text Editor";
@@ -248,4 +351,12 @@ partial class TextEditor
     private System.Windows.Forms.Button B_Search;
     private System.Windows.Forms.RichTextBox RTB_Visualizer;
     private System.Windows.Forms.Label L_Visualizer;
+    private System.Windows.Forms.ComboBox CB_InsertVariable;
+    private System.Windows.Forms.Button B_InsertVariable;
+    private System.Windows.Forms.Label L_InsertColor;
+    private System.Windows.Forms.ComboBox CB_ColorChoice;
+    private System.Windows.Forms.Button B_InsertColor;
+    private System.Windows.Forms.Button B_InsertPause;
+    private System.Windows.Forms.Label L_Preview;
+    private System.Windows.Forms.RichTextBox RTB_Preview;
 }

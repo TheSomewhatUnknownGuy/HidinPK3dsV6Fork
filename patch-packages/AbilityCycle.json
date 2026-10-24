@@ -1,0 +1,173 @@
+{
+  "Name": "Ability Cycle",
+  "Description": "Turns the vanilla Ability Capsule into a THREE-way ability cycle (slot 0 -> 1 -> 2 -> 0, covering both regular abilities and the hidden one) instead of the stock two-way flip. Built 2026-09-02 from ABZB's 'Ability Capsule.xlsx', every vanilla byte of which was re-verified against the real US Bag.cro and code.bin before use. This does NOT add an item: it rewrites what Ability Capsule itself does, which is why it needs no new id and no bag dispatch of its own. Bag.cro side: the stock usability and description checks call a helper at 0x910 returning 2 when abilities 1 and 2 differ and 1 when all three differ, and vanilla only accepts 2 - the patch accepts anything non-zero so a Pokemon whose hidden ability differs also qualifies, and the slot-selection block at 0x9A98 is replaced by a three-way pick. code.bin side: FlipTokuseiIndex is rewritten in place. Two of the helpers ABZB calls are NOT exported in static.crs and sit at different addresses on Ultra Moon (+8), so instead of baking either build's address in, the six calls are declared as Retargets: the installer reads each one's destination out of a vanilla site in whichever binary is being patched and re-encodes it. The 'which slot am I' preamble is replaced by a single call to GetTokuseiIndex, which is exported at the same address on both builds and returns exactly the 0/1/2 that ABZB's fourteen instructions computed by hand. The rewritten routine keeps vanilla's exact push/pop {r4,r5,r6,lr}, using only r4-r6 and recomputing the current slot with a second GetTokuseiIndex call rather than parking it in r7/r8. That is deliberate: the Nature Mints package chains into this same function by replaying vanilla's prologue, so a wider push here would leave its pop unbalanced and corrupt the stack - exactly the failure mode that made the earlier ability items crash. NOTE 2026-09-02: Ultra Sun and Ultra Moon ship a BYTE-IDENTICAL static.crs (same MD5), so the symbol table is only correct for Ultra Sun - every function above roughly 0x4A0000 sits 8 bytes later on Ultra Moon while the table still reports the Sun address. Calls into that region are therefore declared as symbol Retargets with the expected prologue word, and the installer re-finds the real entry by that signature instead of trusting the table.",
+  "Category": "Mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {
+    "Bag.cro": {
+      "Blocks": [],
+      "SitePatches": [
+        {
+          "Offset": "0x09914",
+          "Original": "6D0000EA",
+          "Patched": "6B0000EA",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 39188,
+          "OriginalBytes": "bQAA6g==",
+          "PatchedBytes": "awAA6g=="
+        },
+        {
+          "Offset": "0x09A40",
+          "Original": "020050E3",
+          "Patched": "000050E3",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 39488,
+          "OriginalBytes": "AgBQ4w==",
+          "PatchedBytes": "AABQ4w=="
+        },
+        {
+          "Offset": "0x09A48",
+          "Original": "2300001A",
+          "Patched": "2300000A",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 39496,
+          "OriginalBytes": "IwAAGg==",
+          "PatchedBytes": "IwAACg=="
+        },
+        {
+          "Offset": "0x09A98",
+          "Original": "020050E300F020E30D00000A000050E31400000A1A00A0E39ADBFFEB0601C4E5FF3000E2700094E50720A0E11410A0E344EDFFEB0B00A0E3040084E53CD08DE2F08FBDE8",
+          "Patched": "010050E31B00A0331C00A0031A00A0839CDBFFEB0601C4E5FF3000E2700094E50720A0E11410A0E346EDFFEB0B00A0E3040084E53CD08DE2F08FBDE8CCCCCCCCCCCCCCCC",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 39576,
+          "OriginalBytes": "AgBQ4wDwIOMNAAAKAABQ4xQAAAoaAKDjmtv/6wYBxOX/MADicACU5QcgoOEUEKDjRO3/6wsAoOMEAITlPNCN4vCPveg=",
+          "PatchedBytes": "AQBQ4xsAoDMcAKADGgCgg5zb/+sGAcTl/zAA4nAAlOUHIKDhFBCg40bt/+sLAKDjBACE5TzQjeLwj73ozMzMzMzMzMw="
+        },
+        {
+          "Offset": "0x09B00",
+          "Original": "1B00A0E385DBFFEB0601C4E500F020E3E8FFFFEA",
+          "Patched": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 39680,
+          "OriginalBytes": "GwCg44Xb/+sGAcTlAPAg4+j//+o=",
+          "PatchedBytes": "zMzMzMzMzMzMzMzMzMzMzMzMzMw="
+        },
+        {
+          "Offset": "0x0DCEC",
+          "Original": "020050E3",
+          "Patched": "000050E3",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 56556,
+          "OriginalBytes": "AgBQ4w==",
+          "PatchedBytes": "AABQ4w=="
+        },
+        {
+          "Offset": "0x0DCF4",
+          "Original": "0C00001A",
+          "Patched": "0C00000A",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 56564,
+          "OriginalBytes": "DAAAGg==",
+          "PatchedBytes": "DAAACg=="
+        },
+        {
+          "Offset": "0x0DCF8",
+          "Original": "060000EA",
+          "Patched": "150000EA",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 56568,
+          "OriginalBytes": "BgAA6g==",
+          "PatchedBytes": "FQAA6g=="
+        },
+        {
+          "Offset": "0x0DD18",
+          "Original": "0600A0E1FDCAFFEB020050E300F020E30900001A",
+          "Patched": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+          "IsHook": false,
+          "HookTarget": "",
+          "OffsetValue": 56600,
+          "OriginalBytes": "BgCg4f3K/+sCAFDjAPAg4wkAABo=",
+          "PatchedBytes": "zMzMzMzMzMzMzMzMzMzMzMzMzMw="
+        }
+      ]
+    }
+  },
+  "CodeBin": {
+    "LoadBase": 1048576,
+    "Blocks": [],
+    "Patches": [
+      {
+        "Name": "three-way-ability-cycle",
+        "Symbol": "_ZN3pml8pokepara9CoreParam16FlipTokuseiIndexEv",
+        "Offset": 0,
+        "Original": "70402DE9",
+        "Patched": "70402DE90040A0E1633406EB016080E2030056E30060A0030C0094E5000000000050A0E10C0094E5000000000010A0E10620A0E10500A0E1000000000050A0E10400A0E1543406EB0010A0E10C0094E500000000020056E30610A0110010A0030C0094E5000000000C0094E5020056E30010A0130110A003000000000C0094E50510A0E17040BDE8160000EA",
+        "OriginalBytes": "cEAt6Q==",
+        "Retargets": [
+          {
+            "At": "0x1C",
+            "From": "0x3216BC",
+            "Link": true
+          },
+          {
+            "At": "0x28",
+            "From": "0x3216C8",
+            "Link": true
+          },
+          {
+            "At": "0x38",
+            "From": "0x3216D8",
+            "Link": true
+          },
+          {
+            "At": "0x50",
+            "From": "0x3216E8",
+            "Link": true
+          },
+          {
+            "At": "0x64",
+            "From": "0x321738",
+            "Link": true
+          },
+          {
+            "At": "0x78",
+            "From": "0x321744",
+            "Link": true
+          },
+          {
+            "At": "0x8",
+            "Symbol": "_ZNK3pml8pokepara9CoreParam15GetTokuseiIndexEv",
+            "Verify": "E92D4070",
+            "Link": true,
+            "SearchWindow": 64
+          },
+          {
+            "At": "0x44",
+            "Symbol": "_ZNK3pml8pokepara9CoreParam15GetTokuseiIndexEv",
+            "Verify": "E92D4070",
+            "Link": true,
+            "SearchWindow": 64
+          }
+        ]
+      }
+    ]
+  },
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

@@ -1,0 +1,42 @@
+{
+  "Name": "Aura Wheel",
+  "Description": "Aura Wheel (Move 783). Morpeko signature move. Fails if user is not Morpeko (timing 0x25). Raises user\u0027s Speed by 1 stage on hit (timing 0x9E).",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 783,
+      "Name": "Aura Wheel",
+      "Slots": [
+        {
+          "Timing": "0x25",
+          "Code": "30402DE90240A0E10150A0E10200A0E3D01EFAEB040050E10A00001A0500A0E10410A0E19B48FAEB0C0090E5030C40E26D0050E20300000A2310A0E32600A0E33040BDE83E0BFAEA3080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 37,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "MEAt6QJAoOEBUKDhAgCg49Ae+usEAFDhCgAAGgUAoOEEEKDhm0j66wwAkOUDDEDibQBQ4gMAAAojEKDjJgCg4zBAveg+C/rqMIC96A=="
+        },
+        {
+          "Timing": "0x9E",
+          "Code": "70402DE90240A0E10150A0E10300A0E3D01EFAEB040050E10F00001A0500A0E10410A0E1B31DFAEB0060A0E10500A0E30400C6E50C40C6E50100A0E31000C6E51100C6E50600A0E31200C6E50500A0E10610A0E17040BDE825F3F9EA7080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 158,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QJAoOEBUKDhAwCg49Ae+usEAFDhDwAAGgUAoOEEEKDhsx366wBgoOEFAKDjBADG5QxAxuUBAKDjEADG5REAxuUGAKDjEgDG5QUAoOEGEKDhcEC96CXz+epwgL3o"
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

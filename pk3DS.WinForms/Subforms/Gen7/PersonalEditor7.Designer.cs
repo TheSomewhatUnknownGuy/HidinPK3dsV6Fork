@@ -75,6 +75,8 @@ partial class PersonalEditor7
         this.TB_CatchRate = new System.Windows.Forms.MaskedTextBox();
         this.TB_Stage = new System.Windows.Forms.TextBox();
         this.L_Stage = new System.Windows.Forms.Label();
+        this.TB_LowestEvo = new System.Windows.Forms.TextBox();
+        this.L_LowestEvo = new System.Windows.Forms.Label();
         this.TB_FormeCount = new System.Windows.Forms.TextBox();
         this.L_FormesCount = new System.Windows.Forms.Label();
         this.TB_FormeSprite = new System.Windows.Forms.TextBox();
@@ -218,13 +220,6 @@ partial class PersonalEditor7
         this.TP_Changelog.SuspendLayout();
         this.SuspendLayout();
 
-        this.StatBar_HP = new pk3DS.WinForms.Controls.StatBar();
-        this.StatBar_ATK = new pk3DS.WinForms.Controls.StatBar();
-        this.StatBar_DEF = new pk3DS.WinForms.Controls.StatBar();
-        this.StatBar_SPA = new pk3DS.WinForms.Controls.StatBar();
-        this.StatBar_SPD = new pk3DS.WinForms.Controls.StatBar();
-        this.StatBar_SPE = new pk3DS.WinForms.Controls.StatBar();
-        this.L_SpeciesName = new System.Windows.Forms.Label();
         // 
         // CB_Species
         // 
@@ -253,14 +248,6 @@ partial class PersonalEditor7
         this.TC_Pokemon.Controls.Add(this.TP_General);
         this.TC_Pokemon.Controls.Add(this.TP_MoveTutors);
         this.TC_Pokemon.Controls.Add(this.TP_Changelog);
-        this.TP_General.Controls.Add(this.StatBar_HP);
-        this.TP_General.Controls.Add(this.StatBar_ATK);
-        this.TP_General.Controls.Add(this.StatBar_DEF);
-        this.TP_General.Controls.Add(this.StatBar_SPA);
-        this.TP_General.Controls.Add(this.StatBar_SPD);
-        this.TP_General.Controls.Add(this.StatBar_SPE);
-        this.TP_General.Controls.Add(this.L_SpeciesName);
-        this.Location = new System.Drawing.Point(12, 40);
         this.TC_Pokemon.Location = new System.Drawing.Point(12, 40);
         this.TC_Pokemon.Name = "TC_Pokemon";
         this.TC_Pokemon.SelectedIndex = 0;
@@ -301,6 +288,8 @@ partial class PersonalEditor7
         this.TP_General.Controls.Add(this.TB_CatchRate);
         this.TP_General.Controls.Add(this.TB_Stage);
         this.TP_General.Controls.Add(this.L_Stage);
+        this.TP_General.Controls.Add(this.TB_LowestEvo);
+        this.TP_General.Controls.Add(this.L_LowestEvo);
         this.TP_General.Controls.Add(this.TB_FormeCount);
         this.TP_General.Controls.Add(this.L_FormesCount);
         this.TP_General.Controls.Add(this.TB_FormeSprite);
@@ -430,24 +419,24 @@ partial class PersonalEditor7
         this.L_StatDiff.Text = "Vanilla BST Difference:";
 
         // Diff L_Labels (HP, ATK, etc)
-        this.L_DiffHP.Location = new System.Drawing.Point(270, 215);
-        this.L_DiffHP.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffHP.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        this.L_DiffATK.Location = new System.Drawing.Point(270, 240);
-        this.L_DiffATK.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffATK.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        this.L_DiffDEF.Location = new System.Drawing.Point(270, 265);
-        this.L_DiffDEF.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffDEF.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        this.L_DiffSPA.Location = new System.Drawing.Point(270, 290);
-        this.L_DiffSPA.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffSPA.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        this.L_DiffSPD.Location = new System.Drawing.Point(270, 315);
-        this.L_DiffSPD.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffSPD.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        this.L_DiffSPE.Location = new System.Drawing.Point(270, 340);
-        this.L_DiffSPE.Size = new System.Drawing.Size(31, 13);
-        this.L_DiffSPE.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+        this.L_DiffHP.AutoSize = true;
+        this.L_DiffHP.Location = new System.Drawing.Point(255, 215);
+        this.L_DiffHP.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.L_DiffATK.AutoSize = true;
+        this.L_DiffATK.Location = new System.Drawing.Point(255, 240);
+        this.L_DiffATK.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.L_DiffDEF.AutoSize = true;
+        this.L_DiffDEF.Location = new System.Drawing.Point(255, 265);
+        this.L_DiffDEF.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.L_DiffSPA.AutoSize = true;
+        this.L_DiffSPA.Location = new System.Drawing.Point(255, 290);
+        this.L_DiffSPA.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.L_DiffSPD.AutoSize = true;
+        this.L_DiffSPD.Location = new System.Drawing.Point(255, 315);
+        this.L_DiffSPD.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.L_DiffSPE.AutoSize = true;
+        this.L_DiffSPE.Location = new System.Drawing.Point(255, 340);
+        this.L_DiffSPE.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
         // Controls
         this.TB_RawColor.Location = new System.Drawing.Point(229, 209);
@@ -540,6 +529,17 @@ partial class PersonalEditor7
 
         this.L_Stage.Location = new System.Drawing.Point(10, 390);
         this.L_Stage.Text = "Evo Stage:";
+
+        // Grouped with the other evolution/form fields (Evo Stage/Formes at y=390, Forme
+        // Sprite/Regional Variant at y=413) instead of sitting alone at the bottom of the tab.
+        this.TB_LowestEvo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+        this.TB_LowestEvo.Location = new System.Drawing.Point(90, 517);
+        this.TB_LowestEvo.Size = new System.Drawing.Size(40, 20);
+        this.TB_LowestEvo.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+
+        this.L_LowestEvo.AutoSize = true;
+        this.L_LowestEvo.Location = new System.Drawing.Point(10, 520);
+        this.L_LowestEvo.Text = "Lowest Evo:";
 
         this.TB_FormeCount.Location = new System.Drawing.Point(230, 387);
         this.TB_FormeCount.Size = new System.Drawing.Size(32, 20);
@@ -1363,6 +1363,8 @@ partial class PersonalEditor7
     private System.Windows.Forms.Label L_FormeSprite;
     private System.Windows.Forms.TextBox TB_Stage;
     private System.Windows.Forms.Label L_Stage;
+    private System.Windows.Forms.TextBox TB_LowestEvo;
+    private System.Windows.Forms.Label L_LowestEvo;
     private System.Windows.Forms.MaskedTextBox TB_CatchRate;
     private System.Windows.Forms.Label L_BST;
     private System.Windows.Forms.TextBox TB_BST;

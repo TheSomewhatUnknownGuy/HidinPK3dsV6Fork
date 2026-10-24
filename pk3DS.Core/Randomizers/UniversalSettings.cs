@@ -210,8 +210,19 @@ public class UniversalSettings
     public int MasterAIMode { get; set; } = 0; // 0: Normal, 1: Important Trainers Only, 2: All Trainers (Master AI)
     public bool DoubleBattleMode { get; set; } = false;
     public bool BetterTrainerMovesets { get; set; } = true;
+    /// <summary>
+    /// Give trainer Pokemon that were NOT randomized competitively better builds (moves, items,
+    /// EVs via the competitive sanitizer). Off: vanilla slots stay exactly as the game shipped them.
+    /// </summary>
+    public bool UpgradeVanillaTrainers { get; set; } = false;
     public bool RivalCarriesStarter { get; set; } = true;
     public bool TrainerTrySimilarStrength { get; set; } = true;
+    /// <summary>Uhuru only: randomize block 0 once and copy its species into every other difficulty block.</summary>
+    public bool UhuruOneTeam { get; set; } = true;
+    /// <summary>Uhuru only: skip the PWT trainers (TrainerBlocks.UhuruPwtTrainers) in every block.</summary>
+    public bool UhuruKeepPwtCast { get; set; }
+    /// <summary>Uhuru only: shuffle which slot each PWT trainer sits in (script 217). The same 146 trainers stay in the pool. Off by default; a settings file without it loads as off.</summary>
+    public bool UhuruShufflePwtPool { get; set; }
     public bool WeightTypesByNumPokemon { get; set; } = false;
     public bool TrainerDontUseLegendaries { get; set; } = true;
     public bool NoEarlyWonderGuard { get; set; } = true;
@@ -412,6 +423,12 @@ public class UniversalSettings
     /// Research Center recipes to install as part of a randomize, by name.
     /// </summary>
     public List<string> InstallPatches { get; set; } = [];
+
+    /// <summary>
+    /// The competitive weights this preset carries. Null in older presets and in a fresh form, which
+    /// leaves competitive_weights.json alone.
+    /// </summary>
+    public Competitive.CompetitiveWeights Weights { get; set; }
 
     // Preset Encoding & Decoding
     public string ExportSettingsString()

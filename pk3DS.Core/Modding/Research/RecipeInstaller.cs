@@ -12,14 +12,19 @@ public sealed class RecipeResult
 {
     public List<string> Steps { get; } = [];
     public List<string> Errors { get; } = [];
+    /// <summary>Things the user must know that did not stop the operation (e.g. a part left as is).</summary>
+    public List<string> Warnings { get; } = [];
     public bool Ok => Errors.Count == 0;
 
     internal void Say(string s) => Steps.Add(s);
     internal void Fail(string s) => Errors.Add(s);
+    internal void Warn(string s) => Warnings.Add(s);
 
     public string Describe() =>
         string.Join(Environment.NewLine,
-            Steps.Select(s => "  " + s).Concat(Errors.Select(e => "  ERROR: " + e)));
+            Steps.Select(s => "  " + s)
+                .Concat(Warnings.Select(w => "  WARNING: " + w))
+                .Concat(Errors.Select(e => "  ERROR: " + e)));
 }
 
 /// <summary>
@@ -49,45 +54,113 @@ public static class RecipeInstaller
     /// </summary>
     private static int WriteTextAllLanguages(GameConfig config, Recipe recipe,
                                              TextName nameTable, TextName? flavourTable,
+                                             TextName? pluralTable, TextName? pluralAltTable,
                                              RecipeResult r)
     {
         int written = 0;
         var missed = new List<string>();
 
-        for (int lang = 0; lang <= 9; lang++)
+        int maxId = 0;
+        foreach (var e in recipe.Entries)
+            if (e.Id > maxId) maxId = e.Id;
+
+        int originalLanguage = config.Language;
+        try
+        {
+            for (int lang = 0; lang <= 9; lang++)
+            {
+                try
+                {
+                    config.Language = lang;
+                    config.InitializeGameText();
+
+                    var n = config.GetText(nameTable);
+                    if (n == null || n.Length == 0) continue;
+                    var f = flavourTable.HasValue ? config.GetText(flavourTable.Value) : null;
+                    var p = pluralTable.HasValue ? config.GetText(pluralTable.Value) : null;
+                    var pa = pluralAltTable.HasValue ? config.GetText(pluralAltTable.Value) : null;
+
+                    if (maxId >= n.Length)
+                    {
+                        var grown = new string[maxId + 1];
+                        Array.Copy(n, grown, n.Length);
+                        for (int i = n.Length; i < grown.Length; i++) grown[i] = "???";
+                        n = grown;
+                    }
+                    if (f != null && f.Length > 0 && maxId >= f.Length)
+                    {
+                        var grown = new string[maxId + 1];
+                        Array.Copy(f, grown, f.Length);
+                        for (int i = f.Length; i < grown.Length; i++) grown[i] = "";
+                        f = grown;
+                    }
+                    if (p != null && p.Length > 0 && maxId >= p.Length)
+                    {
+                        var grown = new string[maxId + 1];
+                        Array.Copy(p, grown, p.Length);
+                        for (int i = p.Length; i < grown.Length; i++) grown[i] = "???";
+                        p = grown;
+                    }
+                    if (pa != null && pa.Length > 0 && maxId >= pa.Length)
+                    {
+                        var grown = new string[maxId + 1];
+                        Array.Copy(pa, grown, pa.Length);
+                        for (int i = pa.Length; i < grown.Length; i++) grown[i] = "???";
+                        pa = grown;
+                    }
+
+                    bool touchedName = false, touchedFlavour = false, touchedPlural = false, touchedPluralAlt = false;
+                    foreach (var e in recipe.Entries)
+                    {
+                        if (e.Id >= 0 && e.Id < n.Length && !string.IsNullOrEmpty(e.Name))
+                        { n[e.Id] = e.Name; touchedName = true; }
+
+                        if (f != null && e.Id >= 0 && e.Id < f.Length && !string.IsNullOrEmpty(e.Description))
+                        { f[e.Id] = ItemTextUtil.FormatDescription(e.Description); touchedFlavour = true; }
+
+                        string plural = !string.IsNullOrWhiteSpace(e.Plural) ? e.Plural : ItemTextUtil.Pluralize(e.Name);
+                        string pluralAlt = !string.IsNullOrWhiteSpace(e.PluralAlt) ? e.PluralAlt : ItemTextUtil.PluralAlt(e.Name);
+
+                        if (p != null && e.Id >= 0 && e.Id < p.Length && !string.IsNullOrEmpty(plural))
+                        { p[e.Id] = plural; touchedPlural = true; }
+
+                        if (pa != null && e.Id >= 0 && e.Id < pa.Length && !string.IsNullOrEmpty(pluralAlt))
+                        { pa[e.Id] = pluralAlt; touchedPluralAlt = true; }
+                    }
+
+                    if (touchedName)
+                    {
+                        config.SetText(nameTable, n);
+                        config.SaveText(nameTable);
+                    }
+                    if (touchedFlavour && flavourTable.HasValue && f != null)
+                    {
+                        config.SetText(flavourTable.Value, f);
+                        config.SaveText(flavourTable.Value);
+                    }
+                    if (touchedPlural && pluralTable.HasValue && p != null)
+                    {
+                        config.SetText(pluralTable.Value, p);
+                        config.SaveText(pluralTable.Value);
+                    }
+                    if (touchedPluralAlt && pluralAltTable.HasValue && pa != null)
+                    {
+                        config.SetText(pluralAltTable.Value, pa);
+                        config.SaveText(pluralAltTable.Value);
+                    }
+                    if (touchedName || touchedFlavour || touchedPlural || touchedPluralAlt) written++;
+                }
+                catch (Exception ex) { missed.Add($"{lang} ({ex.GetType().Name})"); }
+            }
+        }
+        finally
         {
             try
             {
-                var c = new GameConfig(config.Version);
-                c.Initialize(config.RomFS, config.ExeFS, lang);
-
-                var n = c.GetText(nameTable);
-                if (n == null) continue;
-                var f = flavourTable.HasValue ? c.GetText(flavourTable.Value) : null;
-
-                bool touchedName = false, touchedFlavour = false;
-                foreach (var e in recipe.Entries)
-                {
-                    if (e.Id >= 0 && e.Id < n.Length && !string.IsNullOrEmpty(e.Name))
-                    { n[e.Id] = e.Name; touchedName = true; }
-
-                    if (f != null && e.Id >= 0 && e.Id < f.Length && !string.IsNullOrEmpty(e.Description))
-                    { f[e.Id] = e.Description; touchedFlavour = true; }
-                }
-
-                if (touchedName)
-                {
-                    c.SetText(nameTable, n);
-                    c.SaveText(nameTable);
-                }
-                if (touchedFlavour && flavourTable.HasValue)
-                {
-                    c.SetText(flavourTable.Value, f!);
-                    c.SaveText(flavourTable.Value);
-                }
-                if (touchedName || touchedFlavour) written++;
+                config.Language = originalLanguage;
+                config.InitializeGameText();
             }
-            catch (Exception ex) { missed.Add($"{lang} ({ex.GetType().Name})"); }
+            catch { }
         }
 
         if (missed.Count > 0 && written == 0)
@@ -125,6 +198,22 @@ public static class RecipeInstaller
             _ => "Battle.cro",
         };
         return Path.Combine(romfs, name);
+    }
+
+    /// <summary>
+    /// On Uhuru, why this recipe may not run, or null. Only patch packages (whose anchors check the original
+    /// bytes), IPS patches (their records are checked in Run) and data-only recipes are allowed; the other kinds write unchecked.
+    /// </summary>
+    private static string? UhuruRecipeRefusal(Recipe recipe)
+    {
+        if (recipe.EffectKind == RecipeEffectKind.DataOnly) return null;
+        if (recipe.EffectKind == RecipeEffectKind.IpsPatch) return null; // checked against the diff tables where the records are known
+        if (recipe.EffectKind != RecipeEffectKind.Package)
+            return UhuruGuard.RefusalFor("Battle.cro");
+
+        string stem = Path.GetFileNameWithoutExtension(recipe.PackagePath ?? "");
+        string name = (recipe.Package?.Name ?? "").Replace(" ", "");
+        return UhuruGuard.PackageRefusal(stem) ?? UhuruGuard.PackageRefusal(name);
     }
 
     private static RecipeResult Run(Recipe recipe, GameConfig config, string? battleCroPath,
@@ -172,12 +261,20 @@ public static class RecipeInstaller
 
         if (!r.Ok) return r;
 
+        if (UhuruGuard.Active)
+        {
+            string? blocked = UhuruRecipeRefusal(recipe);
+            if (blocked != null) { r.Fail(blocked); return r; }
+        }
+
         // --- text ---
-        string[]? names = null, flavour = null;
+        string[]? names = null, flavour = null, plurals = null, pluralAlts = null;
         if (recipe.Kind == CustomMechanicKind.Item)
         {
             names = config.GetText(TextName.ItemNames);
             flavour = config.GetText(TextName.ItemFlavor);
+            plurals = config.GetText(TextName.ItemNamesPlural);
+            pluralAlts = config.GetText(TextName.ItemNamesPluralAlt);
         }
         else if (recipe.Kind == CustomMechanicKind.Ability)
         {
@@ -201,47 +298,60 @@ public static class RecipeInstaller
             if (textOwnedByEffect) break;
             if (e.Id >= names.Length)
             {
-                r.Fail($"id {e.Id} is past the end of the name table ({names.Length} entries) - " +
-                       "grow it in the editor first, since the game derives its ceiling from that length");
-                continue;
+                var grown = new string[e.Id + 1];
+                Array.Copy(names, grown, names.Length);
+                for (int i = names.Length; i < grown.Length; i++) grown[i] = "???";
+                names = grown;
             }
 
             string was = names[e.Id] ?? "";
             r.Say($"  id {e.Id}: \"{was}\" -> \"{e.Name}\"");
             if (commit) names[e.Id] = e.Name;
 
-            if (flavour != null && e.Id < flavour.Length && !string.IsNullOrEmpty(e.Description))
+            if (flavour != null && flavour.Length > 0)
             {
-                if (commit) flavour[e.Id] = e.Description;
+                if (e.Id >= flavour.Length)
+                {
+                    var grown = new string[e.Id + 1];
+                    Array.Copy(flavour, grown, flavour.Length);
+                    for (int i = flavour.Length; i < grown.Length; i++) grown[i] = "";
+                    flavour = grown;
+                }
+                if (commit && !string.IsNullOrEmpty(e.Description))
+                    flavour[e.Id] = ItemTextUtil.FormatDescription(e.Description);
             }
-            else if (flavour != null && e.Id >= flavour.Length)
+
+            if (plurals != null && plurals.Length > 0)
             {
-                r.Say($"  id {e.Id}: no description slot (table has {flavour.Length}); name only");
+                if (e.Id >= plurals.Length)
+                {
+                    var grown = new string[e.Id + 1];
+                    Array.Copy(plurals, grown, plurals.Length);
+                    for (int i = plurals.Length; i < grown.Length; i++) grown[i] = "???";
+                    plurals = grown;
+                }
+                string plural = !string.IsNullOrWhiteSpace(e.Plural) ? e.Plural : ItemTextUtil.Pluralize(e.Name);
+                if (commit) plurals[e.Id] = plural;
+            }
+
+            if (pluralAlts != null && pluralAlts.Length > 0)
+            {
+                if (e.Id >= pluralAlts.Length)
+                {
+                    var grown = new string[e.Id + 1];
+                    Array.Copy(pluralAlts, grown, pluralAlts.Length);
+                    for (int i = pluralAlts.Length; i < grown.Length; i++) grown[i] = "???";
+                    pluralAlts = grown;
+                }
+                string plural = !string.IsNullOrWhiteSpace(e.Plural) ? e.Plural : ItemTextUtil.Pluralize(e.Name);
+                string pluralAlt = !string.IsNullOrWhiteSpace(e.PluralAlt) ? e.PluralAlt : ItemTextUtil.PluralAlt(e.Name);
+                if (commit) pluralAlts[e.Id] = pluralAlt;
             }
         }
         if (!r.Ok) return r;
 
-        if (commit && !textOwnedByEffect)
-        {
-            var nameTable = recipe.Kind switch
-            {
-                CustomMechanicKind.Item => TextName.ItemNames,
-                CustomMechanicKind.Ability => TextName.AbilityNames,
-                _ => TextName.MoveNames,
-            };
-            TextName? flavourTable = recipe.Kind switch
-            {
-                CustomMechanicKind.Item => TextName.ItemFlavor,
-                CustomMechanicKind.Ability => null,   // no flavour table for abilities in these games
-                _ => TextName.MoveFlavor,
-            };
-
-            int langs = WriteTextAllLanguages(config, recipe, nameTable, flavourTable, r);
-            r.Say(langs > 1
-                ? $"text written and saved to {langs} language(s)"
-                : "text written and saved");
-        }
-
+        // Preconditions first: names used to be saved to every language before this check, so a
+        // recipe refused as "built for a different binary" still left named, effect-less items behind.
         foreach (var a in recipe.Anchors)
         {
             string? apath = a.Target == ResearchTarget.CodeBin
@@ -269,6 +379,29 @@ public static class RecipeInstaller
                    $"for {a.Describes}, found {found}]");
         }
         if (!r.Ok) return r;
+
+        if (commit && !textOwnedByEffect)
+        {
+            var nameTable = recipe.Kind switch
+            {
+                CustomMechanicKind.Item => TextName.ItemNames,
+                CustomMechanicKind.Ability => TextName.AbilityNames,
+                _ => TextName.MoveNames,
+            };
+            TextName? flavourTable = recipe.Kind switch
+            {
+                CustomMechanicKind.Item => TextName.ItemFlavor,
+                CustomMechanicKind.Ability => null,   // no flavour table for abilities in these games
+                _ => TextName.MoveFlavor,
+            };
+            TextName? pluralTable = recipe.Kind == CustomMechanicKind.Item ? TextName.ItemNamesPlural : null;
+            TextName? pluralAltTable = recipe.Kind == CustomMechanicKind.Item ? TextName.ItemNamesPluralAlt : null;
+
+            int langs = WriteTextAllLanguages(config, recipe, nameTable, flavourTable, pluralTable, pluralAltTable, r);
+            r.Say(langs > 1
+                ? $"text written and saved to {langs} language(s)"
+                : "text written and saved");
+        }
 
         // --- effect ---
         switch (recipe.EffectKind)
@@ -440,11 +573,17 @@ public static class RecipeInstaller
                 byte[] code = File.ReadAllBytes(codePath);
                 r.Say($"{Path.GetFileName(recipe.IpsPath)}: {IpsPatch.Describe(records)}");
 
+                // Translate record offsets through CodeBinExpansionJournal in case code.bin segments expanded
+                records = CodeBinExpansionJournal.TranslateIpsRecords(records, codePath);
+
                 var past = records.Where(x => x.End > code.Length).ToList();
                 foreach (var x in past)
                     r.Fail($"writes 0x{x.Offset:X6}..0x{x.End:X6}, past the end of a " +
-                           $"{code.Length:N0}-byte code.bin - built for a different build");
+                           $"{code.Length:N0}-byte code.bin - this patch's offsets don't line up with the current code.bin layout");
                 if (past.Count > 0) break;
+
+                if (UhuruGuard.Active && UhuruGuard.IpsRefusal(records.Select(x => (x.Offset, x.Bytes.Length))) is { } ipsWhy)
+                { r.Fail("Refused on Uhuru: " + ipsWhy); break; }
 
                 int already = records.Count(x => Enumerable.Range(0, x.Bytes.Length)
                                                            .All(k => code[x.Offset + k] == x.Bytes[k]));
@@ -458,8 +597,19 @@ public static class RecipeInstaller
 
                 try
                 {
-                    int wrote = IpsPatch.Apply(code, records);
-                    File.WriteAllBytes(codePath, code);
+                    // Keep exactly the bytes this patch replaces, so revert can undo it alone. Restoring
+                    // the first-ever code.bin.bak instead rolled back every later code.bin change too.
+                    string undoPath = IpsUndoPath(config, recipe.IpsPath);
+                    if (!File.Exists(undoPath) && already < records.Count)
+                    {
+                        var undo = records.Select(x => new IpsRecord(x.Offset, code.AsSpan(x.Offset, x.Bytes.Length).ToArray(), false)).ToList();
+                        File.WriteAllText(undoPath, System.Text.Json.JsonSerializer.Serialize(undo));
+                    }
+                    byte[] patched = (byte[])code.Clone();
+                    int wrote = IpsPatch.Apply(patched, records);
+                    if (UhuruGuard.Active && UhuruGuard.FirstOverlap("code.bin", code, patched) is { } overlap)
+                    { r.Fail("Refused on Uhuru: " + overlap); break; }
+                    File.WriteAllBytes(codePath, patched);
                     r.Say($"{wrote} byte(s) written to code.bin");
                 }
                 catch (Exception ex) { r.Fail($"applying failed: {ex.Message}"); }
@@ -478,7 +628,7 @@ public static class RecipeInstaller
                         if (!string.IsNullOrWhiteSpace(kv.Value)) supplied[kv.Key] = kv.Value.Trim();
 
                 var firstParam = pkg.Parameters?.Keys.FirstOrDefault();
-                if (firstParam != null && ids.Count > 0 && !supplied.ContainsKey(firstParam))
+                if (firstParam != null && ids.Count > 0 && ids[0] >= 0 && !supplied.ContainsKey(firstParam))
                     supplied[firstParam] = ids[0].ToString();
 
                 // Two parameters pointed at the same id is the collision that used to surface as an
@@ -541,15 +691,14 @@ public static class RecipeInstaller
                     break;
                 }
 
-                // The same range check ApplyData makes, made here so it is part of the plan rather
-                // than a surprise four stages into the install.
+                // Check that cloneFrom templates exist within the current table
                 if (bound.ItemData.Count > 0)
                 {
                     int itemCount = config.GetGARCData("item").Files.Length;
                     foreach (var (idText, idata) in bound.ItemData)
                     {
-                        if (!uint.TryParse(idText, out uint iid) || iid >= itemCount)
-                        { r.Fail($"item id '{idText}' is out of range"); continue; }
+                        if (!uint.TryParse(idText, out _))
+                        { r.Fail($"invalid item id '{idText}'"); continue; }
                         if (!string.IsNullOrWhiteSpace(idata.CloneFrom) &&
                             (!uint.TryParse(idata.CloneFrom, out uint from) || from >= itemCount))
                             r.Fail($"cloneFrom '{idata.CloneFrom}' is out of range");
@@ -564,6 +713,14 @@ public static class RecipeInstaller
                           $"{pkg.SitePatches?.Count ?? 0} site hook(s), {pkg.OtherCros?.Count ?? 0} other CRO(s)");
                     break;
                 }
+
+                var allPlaced = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
+                // Each binary is staged and written only once the whole package has succeeded: writing
+                // as soon as each was done left Battle.cro patched without its code.bin half after a
+                // later failure, and wrote files whose data tables had failed.
+                var pending = new List<(string Name, string Path, byte[] Output, Action Write)>();
+                var record = InstallRecord.Load(config.RomFS);
+                var placements = new List<InstallRecord.Placement>();
 
                 // 1. Battle.cro (if package touches Battle.cro mechanics or blocks)
                 if (bound.Mechanics.Count > 0 || bound.Blocks.Count > 0 || bound.SitePatches.Count > 0)
@@ -584,12 +741,161 @@ public static class RecipeInstaller
 
                     if (!applied.Success || output == null) { r.Fail("the package was not applied to Battle.cro"); break; }
 
-                    BackupFileBeforeWrite(bCro);
-                    pk3DS.Core.CTR.CROUtil.SaveCro(bCro, output);
-                    r.Say($"{recipe.Name} applied to Battle.cro");
+                    // Uhuru may reference master tables by literal address, so moving one is not safe there.
+                    if (UhuruGuard.Active && applied.TableRelocated)
+                    { r.Fail("Refused on Uhuru: this package would move a Battle.cro table, .data or segment"); break; }
+
+                    pending.Add(("Battle.cro", bCro, output, () =>
+                    {
+                        BackupFileBeforeWrite(bCro);
+                        pk3DS.Core.CTR.CROUtil.SaveCro(bCro, output);
+                    }));
+                    r.Say($"{recipe.Name} prepared for Battle.cro");
                 }
 
-                // 2. Other CROs (e.g. Bag.cro, FieldRo.cro)
+                // 2. CodeBin (applied before OtherCros so CRO dispatch stubs can resolve cross-binary code targets)
+                if (bound.CodeBin != null && (bound.CodeBin.Patches.Count > 0 || bound.CodeBin.Blocks.Count > 0))
+                {
+                    string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS);
+                    if (!File.Exists(codePath))
+                    {
+                        r.Fail("code.bin not found in ExeFS");
+                    }
+                    else
+                    {
+                        byte[] codeBytes = File.ReadAllBytes(codePath);
+                        string exeFsPath = config.ExeFS;
+                        string? romRoot = Directory.GetParent(Path.GetFullPath(exeFsPath))?.FullName;
+                        string? exHeaderPath = romRoot == null ? null : Path.Combine(romRoot, "ExHeader.bin");
+                        string? ncch0Path = romRoot == null ? null : Path.Combine(romRoot, "HeaderNCCH0.bin");
+                        byte[]? exHeader = exHeaderPath != null && File.Exists(exHeaderPath)
+                            ? File.ReadAllBytes(exHeaderPath) : null;
+                        int textEnd = CodeGrowth.TextEndFor(exHeader, codeBytes.LongLength);
+                        // Blocks earlier packages placed are off limits: a zero-filled table inside one
+                        // (CenterMoveTutor's) otherwise looks like free padding to the allocator.
+                        var keepOut = record.PlacedIn("code.bin")
+                            .Concat(UhuruGuard.Active ? UhuruGuard.KeepOut("code.bin") : new List<(uint, int)>());
+                        PortResult codeResult = PortCodeBinInstaller.Apply(codeBytes, bound.CodeBin, config.RomFS, r.Say,
+                            keepOut: keepOut, textEnd: textEnd);
+                        GrowResult? codeGrowth = null;
+                        byte[]? stagedGrowthJournal = null;
+                        string? growthJournalPath = null;
+
+                        bool noExecutableRoom = codeResult.Errors.Any(e =>
+                            e.Contains("has no executable room", StringComparison.OrdinalIgnoreCase));
+                        if (noExecutableRoom && GameConfig.AllowGrowth && !UhuruGuard.Active)
+                        {
+                            long needed = bound.CodeBin.Blocks.Sum(b => (b.CodeBytes.LongLength + 3L) & ~3L);
+                            if (exHeader == null || exHeaderPath == null || !File.Exists(exHeaderPath))
+                            {
+                                r.Say("  ! code.bin growth refused: ExHeader.bin was not found next to ExeFS");
+                            }
+                            else if (needed <= 0 || needed > int.MaxValue)
+                            {
+                                r.Say($"  ! code.bin growth refused: required code size {needed} is outside the supported range");
+                            }
+                            else
+                            {
+                                // Grow records an offset journal. Stage that journal too, so a later
+                                // package failure leaves no code, header, or journal changes behind.
+                                string stageName = "pk3ds-code-growth-" + Guid.NewGuid().ToString("N");
+                                string journalStageRoot = Path.Combine(Path.GetTempPath(), stageName);
+                                try
+                                {
+                                    Directory.CreateDirectory(journalStageRoot);
+                                    File.WriteAllText(Path.Combine(journalStageRoot, ".romlab-scratch"), "staged code growth journal");
+                                    string stagedExeFsPath = Path.Combine(journalStageRoot, "ExeFS");
+                                    Directory.CreateDirectory(stagedExeFsPath);
+                                    growthJournalPath = CodeBinExpansionJournal.GetJournalPath(exeFsPath);
+                                    string stagedJournalPath = Path.Combine(stagedExeFsPath, CodeBinExpansionJournal.JournalFileName);
+                                    if (File.Exists(growthJournalPath))
+                                        File.Copy(growthJournalPath, stagedJournalPath, true);
+
+                                    byte[]? ncch0 = ncch0Path != null && File.Exists(ncch0Path)
+                                        ? File.ReadAllBytes(ncch0Path) : null;
+                                    codeGrowth = CodeGrowth.Grow(codeBytes, exHeader, ncch0, (int)needed, stagedExeFsPath);
+                                    if (codeGrowth.Ok)
+                                    {
+                                        var retry = PortCodeBinInstaller.Apply(codeGrowth.Code, bound.CodeBin, config.RomFS, r.Say,
+                                            keepOut: keepOut, textEnd: CodeGrowth.TextEndFor(codeGrowth.ExHeader));
+                                        if (retry.Success && retry.Output != null)
+                                        {
+                                            codeResult = retry;
+                                            if (File.Exists(stagedJournalPath))
+                                                stagedGrowthJournal = File.ReadAllBytes(stagedJournalPath);
+                                            r.Say($"  code.bin grew by {codeGrowth.Pages} page(s)");
+                                        }
+                                        else
+                                        {
+                                            codeResult = retry;
+                                            r.Say("  ! code.bin growth retry did not find executable room");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        r.Say("  ! code.bin growth refused: " + codeGrowth.Error);
+                                        codeGrowth = null;
+                                    }
+                                }
+                                finally
+                                {
+                                    string marker = Path.Combine(journalStageRoot, ".romlab-scratch");
+                                    if (Directory.Exists(journalStageRoot) && File.Exists(marker))
+                                        Directory.Delete(journalStageRoot, true);
+                                }
+                            }
+                        }
+
+                        foreach (string s in codeResult.Log) r.Say("  " + s);
+                        foreach (string e in codeResult.Errors) r.Fail("code.bin: " + e);
+                        if (codeResult.Success && codeResult.Output != null)
+                        {
+                            foreach (var kv in codeResult.Placed) allPlaced[kv.Key] = kv.Value;
+                            foreach (var b in bound.CodeBin.Blocks)
+                                if (codeResult.Placed.TryGetValue(b.Name, out uint loadAt))
+                                    placements.Add(new() { File = "code.bin", Block = b.Name, Offset = loadAt - bound.CodeBin.LoadBase, Size = b.CodeBytes.Length });
+
+                            var dtResult = PatchPackageInstaller.ApplyDataTables(bound, "code.bin", codeResult.Output, codeResult.Placed, allPlaced);
+                            foreach (string s in dtResult.Log) r.Say("  " + s);
+                            foreach (string e in dtResult.Errors) r.Fail("  " + e);
+
+                            pending.Add(("code.bin", codePath, codeResult.Output, () =>
+                            {
+                                BackupFileBeforeWrite(codePath);
+                                File.WriteAllBytes(codePath, codeResult.Output);
+                            }));
+
+                            GrowResult? acceptedGrowth = codeGrowth;
+                            if (acceptedGrowth != null && acceptedGrowth.Ok && exHeaderPath != null)
+                            {
+                                pending.Add(("ExHeader.bin", exHeaderPath, acceptedGrowth.ExHeader, () =>
+                                {
+                                    BackupFileBeforeWrite(exHeaderPath);
+                                    File.WriteAllBytes(exHeaderPath, acceptedGrowth.ExHeader);
+                                }));
+                                if (ncch0Path != null && File.Exists(ncch0Path) && acceptedGrowth.Ncch0.Length > 0)
+                                {
+                                    pending.Add(("HeaderNCCH0.bin", ncch0Path, acceptedGrowth.Ncch0, () =>
+                                    {
+                                        BackupFileBeforeWrite(ncch0Path);
+                                        File.WriteAllBytes(ncch0Path, acceptedGrowth.Ncch0);
+                                    }));
+                                }
+                                if (stagedGrowthJournal != null && growthJournalPath != null)
+                                {
+                                    pending.Add((CodeBinExpansionJournal.JournalFileName, growthJournalPath,
+                                        stagedGrowthJournal, () =>
+                                        {
+                                            BackupFileBeforeWrite(growthJournalPath);
+                                            File.WriteAllBytes(growthJournalPath, stagedGrowthJournal);
+                                        }));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Other CROs (e.g. Bag.cro, FieldRo.cro)
                 foreach (var (croName, croPort) in bound.OtherCros)
                 {
                     string croPath = Path.Combine(config.RomFS, croName);
@@ -606,41 +912,94 @@ public static class RecipeInstaller
                     foreach (string e in croResult.Errors) r.Fail("  " + e);
                     if (!croResult.Success || croResult.Output == null) continue;
 
-                    // Data tables targeting this CRO
-                    var dtResult = PatchPackageInstaller.ApplyDataTables(bound, croName, croResult.Output, croResult.Placed);
+                    foreach (var kv in croResult.Placed) allPlaced[kv.Key] = kv.Value;
+                    foreach (var b in croPort.Blocks ?? [])
+                        if (croResult.Placed.TryGetValue(b.Name, out uint blockAt))
+                            placements.Add(new() { File = croName, Block = b.Name, Offset = blockAt, Size = b.CodeBytes.Length });
+                    foreach (var site in croPort.SitePatches ?? [])
+                        placements.Add(new() { File = croName, Block = site.IsHook ? site.HookTarget ?? "" : "", Offset = site.OffsetValue });
+
+                    // Data tables targeting this CRO (with cross-binary placed resolution)
+                    var dtResult = PatchPackageInstaller.ApplyDataTables(bound, croName, croResult.Output, croResult.Placed, allPlaced);
                     foreach (string s in dtResult.Log) r.Say("  " + s);
                     foreach (string e in dtResult.Errors) r.Fail("  " + e);
 
                     pk3DS.Core.CTR.CROUtil.UpdateHashes(croResult.Output);
-                    BackupFileBeforeWrite(croPath);
-                    File.WriteAllBytes(croPath, croResult.Output);
-                    r.Say($"{croName} written and hashes refreshed.");
+                    pending.Add((croName, croPath, croResult.Output, () =>
+                    {
+                        BackupFileBeforeWrite(croPath);
+                        File.WriteAllBytes(croPath, croResult.Output);
+                    }));
                 }
 
-                // 3. CodeBin (e.g. for Ability Patch & Nature Mints)
-                if (bound.CodeBin != null && (bound.CodeBin.Patches.Count > 0 || bound.CodeBin.Blocks.Count > 0))
+                if (!r.Ok)
                 {
-                    string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS);
-                    if (!File.Exists(codePath))
+                    r.Fail("nothing was written: every file is left as it was");
+                    break;
+                }
+                // Uhuru: the anchors verify what they touch, but the Mechanics path does not, so check the
+                // finished output against Uhuru's changed regions before a single file is written.
+                if (UhuruGuard.Active)
+                {
+                    foreach (var (name, path, output, _) in pending)
                     {
-                        r.Fail("code.bin not found in ExeFS");
+                        string? hit = UhuruGuard.FirstOverlap(path, File.ReadAllBytes(path), output);
+                        if (hit != null) r.Fail($"Refused on Uhuru: {hit}");
                     }
-                    else
+                    string cb = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS);
+                    byte[]? finalCode = pending.FirstOrDefault(p => p.Name == "code.bin").Output
+                                        ?? (File.Exists(cb) ? File.ReadAllBytes(cb) : null);
+                    if (PatchPackageInstaller.UhuruCeilingRefusal(pkg, supplied, finalCode) is { } ceiling) r.Fail(ceiling);
+                    if (!r.Ok)
                     {
-                        byte[] codeBytes = File.ReadAllBytes(codePath);
-                        var codeResult = PortCodeBinInstaller.Apply(codeBytes, bound.CodeBin, config.RomFS, r.Say);
-                        foreach (string s in codeResult.Log) r.Say("  " + s);
-                        foreach (string e in codeResult.Errors) r.Fail("code.bin: " + e);
-                        if (codeResult.Success && codeResult.Output != null)
-                        {
-                            BackupFileBeforeWrite(codePath);
-                            File.WriteAllBytes(codePath, codeResult.Output);
-                            r.Say("code.bin patched.");
-                        }
+                        r.Fail("nothing was written: every file is left as it was");
+                        break;
                     }
                 }
+                // code.bin and a grown exheader must land together: remember every file, and put them all back if any write fails.
+                var originals = new Dictionary<string, byte[]?>();
+                foreach (var (_, pendingPath, _, _) in pending)
+                    originals[pendingPath] = File.Exists(pendingPath) ? File.ReadAllBytes(pendingPath) : null;
+                try
+                {
+                    foreach (var (name, _, _, write) in pending)
+                    {
+                        write();
+                        r.Say($"{name} written.");
+                    }
+                }
+                catch (Exception writeEx)
+                {
+                    foreach (var (restorePath, restoreBytes) in originals)
+                    {
+                        try
+                        {
+                            if (restoreBytes != null) File.WriteAllBytes(restorePath, restoreBytes);
+                            else if (File.Exists(restorePath)) File.Delete(restorePath);
+                        }
+                        catch { }
+                    }
+                    r.Fail($"write failed ({writeEx.Message}); every file was put back as it was");
+                    break;
+                }
+                try
+                {
+                    // Merge, don't replace: a reinstall that found everything already in place places
+                    // nothing, and replacing would erase the ranges the allocator must keep out of.
+                    var entry = record.Packages.TryGetValue(pkg.Name, out var prior) ? prior : [];
+                    foreach (var pl in placements)
+                        if (!entry.Any(x => x.File.Equals(pl.File, StringComparison.OrdinalIgnoreCase) &&
+                                            x.Block == pl.Block && x.Offset == pl.Offset))
+                            entry.Add(pl);
+                    record.Packages[pkg.Name] = entry;
+                    record.Save(config.RomFS);
+                }
+                catch (Exception ex)
+                {
+                    r.Say($"! install record not saved ({ex.Message}); later installs cannot see these blocks");
+                }
 
-                // 4. Data and Text
+                // 4. Data and Text (after the binaries: it reads code.bin back to raise the item ceiling)
                 var data = PatchPackageInstaller.ApplyData(pkg, supplied, config);
                 foreach (string s in data.Log) r.Say("  " + s);
                 foreach (string e in data.Errors) r.Fail("  " + e);
@@ -937,6 +1296,11 @@ public static class RecipeInstaller
         return r;
     }
 
+    /// <summary>Where an IPS recipe's undo bytes live: beside the install record, outside exefs.</summary>
+    private static string IpsUndoPath(GameConfig config, string ipsPath) =>
+        Path.Combine(Path.GetDirectoryName(InstallRecord.PathFor(config.RomFS)) ?? "",
+                     $"pk3ds-undo-{Path.GetFileName(ipsPath)}.json");
+
     public static void BackupFileBeforeWrite(string filePath)
     {
         try
@@ -960,6 +1324,13 @@ public static class RecipeInstaller
         var r = new RecipeResult();
         r.Say($"Reverting recipe: {recipe.Name}");
 
+        if (UhuruGuard.Active && recipe.EffectKind != RecipeEffectKind.DataOnly)
+        {
+            // A revert writes recorded bytes back into code.bin / CRO files (Bag.cro 0x15F40 is Uhuru's own code).
+            r.Fail(UhuruGuard.RefusalFor("Battle.cro") + " Restore the .bak copy instead.");
+            return r;
+        }
+
         try
         {
             switch (recipe.EffectKind)
@@ -972,33 +1343,38 @@ public static class RecipeInstaller
                         break;
                     }
 
-                    string? targetPath = recipe.Target == ResearchTarget.CodeBin
-                        ? pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS)
-                        : ResolveTargetFile(recipe.Target, config);
-
-                    if (string.IsNullOrEmpty(targetPath) || !File.Exists(targetPath))
-                    {
-                        r.Fail($"Target file for {recipe.Target} was not found");
-                        break;
-                    }
-
-                    byte[] bin = File.ReadAllBytes(targetPath);
-                    int revertedCount = 0;
-
+                    // Each edit goes back to its own file (as install does), and only where it still
+                    // holds the installed value; otherwise nothing is written.
+                    var files = new Dictionary<ResearchTarget, (string Path, byte[] Data)>();
                     foreach (var edit in recipe.ByteEdits)
                     {
-                        if (edit.Offset < bin.Length)
+                        var target = edit.Target ?? recipe.Target;
+                        if (!files.ContainsKey(target))
                         {
-                            bin[edit.Offset] = edit.From;
-                            revertedCount++;
+                            string? tp = target == ResearchTarget.CodeBin
+                                ? pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS)
+                                : ResolveTargetFile(target, config);
+                            if (string.IsNullOrEmpty(tp) || !File.Exists(tp))
+                            { r.Fail($"{Recipe.FileNameOf(target)} was not found"); continue; }
+                            files[target] = (tp, File.ReadAllBytes(tp));
                         }
+                        var data = files[target].Data;
+                        if (edit.Offset >= data.Length)
+                        { r.Fail($"{Recipe.FileNameOf(target)} 0x{edit.Offset:X6} is past the end of the file"); continue; }
+                        if (data[edit.Offset] == edit.From) continue; // already original
+                        if (data[edit.Offset] != edit.To)
+                        { r.Fail($"{Recipe.FileNameOf(target)} 0x{edit.Offset:X6} holds 0x{data[edit.Offset]:X2}, not this recipe's 0x{edit.To:X2}"); continue; }
+                        data[edit.Offset] = edit.From;
                     }
+                    if (!r.Ok) { r.Fail("nothing was reverted"); break; }
 
-                    bool isCro = recipe.Target != ResearchTarget.CodeBin;
-                    if (isCro) pk3DS.Core.CTR.CROUtil.UpdateHashes(bin);
-                    File.WriteAllBytes(targetPath, bin);
-
-                    r.Say($"Reverted {revertedCount} byte edit(s) in {Path.GetFileName(targetPath)}" + (isCro ? "; hashes refreshed" : ""));
+                    foreach (var (target, (path, data)) in files)
+                    {
+                        bool isCro = target != ResearchTarget.CodeBin;
+                        if (isCro) pk3DS.Core.CTR.CROUtil.UpdateHashes(data);
+                        File.WriteAllBytes(path, data);
+                        r.Say($"Reverted byte edits in {Path.GetFileName(path)}" + (isCro ? "; hashes refreshed" : ""));
+                    }
                     break;
                 }
 
@@ -1109,16 +1485,32 @@ public static class RecipeInstaller
                 case RecipeEffectKind.IpsPatch:
                 {
                     string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS);
-                    string bak = codePath + ".bak";
-                    if (File.Exists(bak))
+                    string undoPath = string.IsNullOrWhiteSpace(recipe.IpsPath) ? "" : IpsUndoPath(config, recipe.IpsPath);
+                    if (!File.Exists(codePath)) { r.Fail("code.bin was not found"); break; }
+                    if (!File.Exists(undoPath))
                     {
-                        File.Copy(bak, codePath, true);
-                        r.Say($"Restored code.bin from automatic backup ({Path.GetFileName(bak)}).");
+                        r.Fail("no undo was recorded for this patch (installed before per-patch undo existed). " +
+                               $"Restoring code.bin.bak would also undo every later code.bin change, so it is not done automatically.");
+                        break;
                     }
-                    else
+                    if (string.IsNullOrWhiteSpace(recipe.IpsPath) || !File.Exists(recipe.IpsPath))
+                    { r.Fail("the .ips file is needed to check this patch is still in place, and was not found"); break; }
+
+                    byte[] code = File.ReadAllBytes(codePath);
+                    var applied = CodeBinExpansionJournal.TranslateIpsRecords(IpsPatch.Read(File.ReadAllBytes(recipe.IpsPath)), codePath);
+                    var changed = applied.Where(x => x.End > code.Length ||
+                                                     !code.AsSpan(x.Offset, x.Bytes.Length).SequenceEqual(x.Bytes)).ToList();
+                    if (changed.Count > 0)
                     {
-                        r.Say("No automatic backup of code.bin was found.");
+                        r.Fail($"{changed.Count} of this patch's record(s) were changed since (first at 0x{changed[0].Offset:X6}); " +
+                               "reverting would overwrite the later change, so nothing was written");
+                        break;
                     }
+                    var undo = System.Text.Json.JsonSerializer.Deserialize<List<IpsRecord>>(File.ReadAllText(undoPath)) ?? [];
+                    int restored = IpsPatch.Apply(code, undo);
+                    File.WriteAllBytes(codePath, code);
+                    File.Delete(undoPath);
+                    r.Say($"Restored {restored} byte(s) this patch had changed in code.bin.");
                     break;
                 }
 
@@ -1126,6 +1518,16 @@ public static class RecipeInstaller
                 {
                     var pkg = recipe.Package;
                     if (pkg == null) { r.Fail("no package found on recipe"); break; }
+
+                    var record = InstallRecord.Load(config.RomFS);
+                    bool recorded = record.Knows(pkg.Name);
+
+                    // Battle.cro: master-table mechanics and placed blocks cannot be taken back out, and
+                    // restoring only the hooks would leave the mechanics live. Say so rather than report
+                    // success (revert used to skip Battle.cro silently).
+                    if ((pkg.Mechanics?.Count ?? 0) > 0 || (pkg.Blocks?.Count ?? 0) > 0 || (pkg.SitePatches?.Count ?? 0) > 0)
+                        r.Warn($"Battle.cro was not reverted ({pkg.Mechanics?.Count ?? 0} mechanic(s), {pkg.Blocks?.Count ?? 0} block(s), " +
+                               $"{pkg.SitePatches?.Count ?? 0} hook(s)); restore it from Battle.cro.bak if this package must be fully removed.");
 
                     // Revert OtherCros (e.g. Bag.cro)
                     foreach (var (croName, croPort) in pkg.OtherCros ?? [])
@@ -1138,12 +1540,27 @@ public static class RecipeInstaller
                         int reverted = 0;
                         foreach (var site in croPort.SitePatches ?? [])
                         {
-                            if (site.OriginalBytes != null && site.OriginalBytes.Length > 0 &&
-                                site.OffsetValue + site.OriginalBytes.Length <= bin.Length)
-                            {
-                                Array.Copy(site.OriginalBytes, 0, bin, site.OffsetValue, site.OriginalBytes.Length);
-                                reverted++;
-                            }
+                            byte[] orig = site.OriginalBytes;
+                            uint at = site.OffsetValue;
+                            if (orig == null || orig.Length == 0 || at + orig.Length > bin.Length) continue;
+
+                            // A hook shared with other installed packages (bag-item-effects is shared by
+                            // six) must stay, or reverting one package disables the rest. Without an
+                            // install record nobody can tell, so hooks are left alone then.
+                            if (site.IsHook && !recorded)
+                            { r.Say($"  {croName} 0x{at:X6}: hook left in place (no install record says whether other packages use it)"); continue; }
+                            if (record.OthersUse(pkg.Name, croName, site.IsHook ? site.HookTarget ?? "" : "", at))
+                            { r.Say($"  {croName} 0x{at:X6}: still used by another installed package, left in place"); continue; }
+
+                            // Only undo what this package wrote: a literal site must still hold its bytes,
+                            // a hook must still be a branch.
+                            bool ours = site.IsHook
+                                ? pk3DS.Core.CTR.ARMCodec.IsBranch(BitConverter.ToUInt32(bin, (int)at))
+                                : bin.AsSpan((int)at, orig.Length).SequenceEqual(site.PatchedBytes);
+                            if (!ours) { r.Say($"  {croName} 0x{at:X6}: no longer holds this package's bytes, left alone"); continue; }
+
+                            Array.Copy(orig, 0, bin, at, orig.Length);
+                            reverted++;
                         }
 
                         if (reverted > 0)
@@ -1155,28 +1572,37 @@ public static class RecipeInstaller
                     }
 
                     // Revert CodeBin
+                    bool codeBinUndone = pkg.CodeBin == null;
                     if (pkg.CodeBin != null)
                     {
                         string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(config.ExeFS);
                         if (File.Exists(codePath))
                         {
-                            byte[] code = File.ReadAllBytes(codePath);
-                            int reverted = 0;
-                            foreach (var p in pkg.CodeBin.Patches ?? [])
+                            // Patch offsets are measured from a symbol, not the start of the file:
+                            // writing them raw put AbilityCycle's original bytes over code.bin's entry.
+                            var undo = PortCodeBinInstaller.Revert(File.ReadAllBytes(codePath), pkg.CodeBin, config.RomFS, out int reverted);
+                            foreach (string s in undo.Log) r.Say(s);
+                            foreach (string e in undo.Errors) r.Fail(e);
+                            if (!undo.Success)
+                                r.Fail("code.bin left unchanged: not every patch could be confirmed in place.");
+                            else
                             {
-                                if (p.OriginalBytes != null && p.OriginalBytes.Length > 0 &&
-                                    p.Offset + p.OriginalBytes.Length <= code.Length)
+                                codeBinUndone = true;
+                                if (reverted > 0)
                                 {
-                                    Array.Copy(p.OriginalBytes, 0, code, p.Offset, p.OriginalBytes.Length);
-                                    reverted++;
+                                    File.WriteAllBytes(codePath, undo.Output);
+                                    r.Say($"Restored {reverted} code patch(es) in code.bin.");
                                 }
                             }
-                            if (reverted > 0)
-                            {
-                                File.WriteAllBytes(codePath, code);
-                                r.Say($"Restored {reverted} code patch(es) in code.bin.");
-                            }
                         }
+                    }
+
+                    // Keep the entry while code.bin still carries the package: dropping it would let the
+                    // allocator hand that live code to the next install.
+                    if (recorded && codeBinUndone && record.Packages.Remove(pkg.Name))
+                    {
+                        try { record.Save(config.RomFS); }
+                        catch (Exception ex) { r.Say($"! install record not updated ({ex.Message})"); }
                     }
                     break;
                 }

@@ -46,4 +46,43 @@ public class Move7 : Move
     public int RefreshAfflictPercent { get => Data[0x23]; set => Data[0x23] = (byte)value; } // 36
 
     public MoveFlag7 Flags { get => (MoveFlag7)BitConverter.ToUInt32(Data, 0x24); set => BitConverter.GetBytes((uint)value).CopyTo(Data, 0x24); }
+
+    /// <summary>
+    /// Calculates standard Gen 7 Z-Move base power from the base move's power.
+    /// </summary>
+    public static int GetZMovePower(int basePower)
+    {
+        if (basePower <= 55) return 100;
+        if (basePower <= 65) return 120;
+        if (basePower <= 75) return 140;
+        if (basePower <= 85) return 160;
+        if (basePower <= 95) return 175;
+        if (basePower == 100) return 180;
+        if (basePower <= 110) return 185;
+        if (basePower <= 125) return 190;
+        if (basePower <= 135) return 195;
+        return 200;
+    }
+
+    /// <summary>
+    /// Standardizes Z-Move attributes (Z-Move ID, Z-Power, and Z-Effect) based on Type, Category, and Power.
+    /// Status moves default to Z-Effect 26 (resets lowered stats of the user).
+    /// </summary>
+    public void FixZMove(int statusZEffect = 26)
+    {
+        if (Category == 0) // Status
+        {
+            ZMove = 0;
+            ZPower = 0;
+            ZEffect = statusZEffect;
+        }
+        else // Physical (1) or Special (2)
+        {
+            int type = Math.Clamp(Type, 0, 17);
+            int isSpecial = (Category == 2) ? 1 : 0;
+            ZMove = 622 + (type * 2) + isSpecial;
+            ZPower = GetZMovePower(Power);
+            ZEffect = 0;
+        }
+    }
 }

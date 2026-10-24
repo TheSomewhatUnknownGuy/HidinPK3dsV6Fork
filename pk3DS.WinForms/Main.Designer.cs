@@ -48,6 +48,7 @@ sealed partial class Main
         this.Menu_BLZ = new System.Windows.Forms.ToolStripMenuItem();
         this.Menu_LZ11 = new System.Windows.Forms.ToolStripMenuItem();
         this.Menu_Shuffler = new System.Windows.Forms.ToolStripMenuItem();
+        this.Menu_ZoneData = new System.Windows.Forms.ToolStripMenuItem();
         this.Menu_Extract = new System.Windows.Forms.ToolStripMenuItem();
         this.Menu_Extract_CXI = new System.Windows.Forms.ToolStripMenuItem();
         this.Menu_Rebuild = new System.Windows.Forms.ToolStripMenuItem();
@@ -86,6 +87,13 @@ sealed partial class Main
         this.B_Move = new System.Windows.Forms.Button();
         this.B_TitleScreen = new System.Windows.Forms.Button();
         this.B_OWSE = new System.Windows.Forms.Button();
+        this.B_SpeciesInsertion = new System.Windows.Forms.Button();
+        this.B_AMXScript = new System.Windows.Forms.Button();
+        this.B_IconEditor = new System.Windows.Forms.Button();
+        this.B_GiftItemEditor = new System.Windows.Forms.Button();
+        this.B_ModelScale = new System.Windows.Forms.Button();
+        this.B_OWModelSwap = new System.Windows.Forms.Button();
+        this.B_FacilityPools = new System.Windows.Forms.Button();
         this.Tab_ExeFS = new System.Windows.Forms.TabPage();
         this.FLP_ExeFS = new System.Windows.Forms.FlowLayoutPanel();
         this.B_TM = new System.Windows.Forms.Button();
@@ -267,7 +275,8 @@ sealed partial class Main
             this.unPackBCLIMToolStripMenuItem,
             this.Menu_BLZ,
             this.Menu_LZ11,
-            this.Menu_Shuffler});
+            this.Menu_Shuffler,
+            this.Menu_ZoneData});
         this.Menu_Misc.Name = "Menu_Misc";
         this.Menu_Misc.Size = new System.Drawing.Size(184, 22);
         this.Menu_Misc.Text = "Misc Tools";
@@ -303,7 +312,14 @@ sealed partial class Main
         this.Menu_Shuffler.Size = new System.Drawing.Size(216, 22);
         this.Menu_Shuffler.Text = "GARC Shuffler";
         this.Menu_Shuffler.Click += new System.EventHandler(this.Menu_Shuffler_Click);
-        // 
+        //
+        // Menu_ZoneData
+        //
+        this.Menu_ZoneData.Name = "Menu_ZoneData";
+        this.Menu_ZoneData.Size = new System.Drawing.Size(216, 22);
+        this.Menu_ZoneData.Text = "Zone Data Editor (Gen 7)";
+        this.Menu_ZoneData.Click += new System.EventHandler(this.Menu_ZoneData_Click);
+        //
         // Menu_Extract
         // 
         this.Menu_Extract.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -518,6 +534,13 @@ sealed partial class Main
         this.FLP_RomFS.Controls.Add(this.B_TitleScreen);
         this.FLP_RomFS.Controls.Add(this.B_OWSE);
         this.FLP_RomFS.Controls.Add(this.B_Static);
+        this.FLP_RomFS.Controls.Add(this.B_SpeciesInsertion);
+        this.FLP_RomFS.Controls.Add(this.B_AMXScript);
+        this.FLP_RomFS.Controls.Add(this.B_IconEditor);
+        this.FLP_RomFS.Controls.Add(this.B_GiftItemEditor);
+        this.FLP_RomFS.Controls.Add(this.B_ModelScale);
+        this.FLP_RomFS.Controls.Add(this.B_OWModelSwap);
+        this.FLP_RomFS.Controls.Add(this.B_FacilityPools);
         this.FLP_RomFS.Dock = System.Windows.Forms.DockStyle.Fill;
         this.FLP_RomFS.Location = new System.Drawing.Point(3, 3);
         this.FLP_RomFS.Name = "FLP_RomFS";
@@ -680,9 +703,79 @@ sealed partial class Main
         this.B_OWSE.Text = "OWSE";
         this.B_OWSE.UseVisualStyleBackColor = true;
         this.B_OWSE.Click += new System.EventHandler(this.B_OWSE_Click);
-        // 
+        //
+        // B_SpeciesInsertion
+        //
+        this.B_SpeciesInsertion.Location = new System.Drawing.Point(215, 161);
+        this.B_SpeciesInsertion.Name = "B_SpeciesInsertion";
+        this.B_SpeciesInsertion.Size = new System.Drawing.Size(150, 42);
+        this.B_SpeciesInsertion.TabIndex = 14;
+        this.B_SpeciesInsertion.Text = "Insert Species";
+        this.B_SpeciesInsertion.UseVisualStyleBackColor = true;
+        this.B_SpeciesInsertion.Click += new System.EventHandler(this.B_SpeciesInsertion_Click);
+        //
+        // B_AMXScript
+        //
+        this.B_AMXScript.Location = new System.Drawing.Point(215, 203);
+        this.B_AMXScript.Name = "B_AMXScript";
+        this.B_AMXScript.Size = new System.Drawing.Size(150, 42);
+        this.B_AMXScript.TabIndex = 15;
+        this.B_AMXScript.Text = "AMX Scripts";
+        this.B_AMXScript.UseVisualStyleBackColor = true;
+        this.B_AMXScript.Click += new System.EventHandler(this.B_AMXScript_Click);
+        //
+        // B_IconEditor
+        //
+        this.B_IconEditor.Location = new System.Drawing.Point(215, 245);
+        this.B_IconEditor.Name = "B_IconEditor";
+        this.B_IconEditor.Size = new System.Drawing.Size(150, 42);
+        this.B_IconEditor.TabIndex = 16;
+        this.B_IconEditor.Text = "Icon Editor";
+        this.B_IconEditor.UseVisualStyleBackColor = true;
+        this.B_IconEditor.Click += new System.EventHandler(this.B_IconEditor_Click);
+        //
+        // B_GiftItemEditor
+        //
+        this.B_GiftItemEditor.Location = new System.Drawing.Point(12, 293);
+        this.B_GiftItemEditor.Name = "B_GiftItemEditor";
+        this.B_GiftItemEditor.Size = new System.Drawing.Size(150, 42);
+        this.B_GiftItemEditor.TabIndex = 17;
+        this.B_GiftItemEditor.Text = "Gift Editor";
+        this.B_GiftItemEditor.UseVisualStyleBackColor = true;
+        this.B_GiftItemEditor.Click += new System.EventHandler(this.B_GiftItemEditor_Click);
+        //
+        // B_ModelScale
+        //
+        this.B_ModelScale.Location = new System.Drawing.Point(163, 293);
+        this.B_ModelScale.Name = "B_ModelScale";
+        this.B_ModelScale.Size = new System.Drawing.Size(150, 42);
+        this.B_ModelScale.TabIndex = 18;
+        this.B_ModelScale.Text = "Model Scale";
+        this.B_ModelScale.UseVisualStyleBackColor = true;
+        this.B_ModelScale.Click += new System.EventHandler(this.B_ModelScale_Click);
+        //
+        // B_OWModelSwap
+        //
+        this.B_OWModelSwap.Location = new System.Drawing.Point(314, 293);
+        this.B_OWModelSwap.Name = "B_OWModelSwap";
+        this.B_OWModelSwap.Size = new System.Drawing.Size(150, 42);
+        this.B_OWModelSwap.TabIndex = 19;
+        this.B_OWModelSwap.Text = "Overworld Model Swap";
+        this.B_OWModelSwap.UseVisualStyleBackColor = true;
+        this.B_OWModelSwap.Click += new System.EventHandler(this.B_OWModelSwap_Click);
+        //
+        // B_FacilityPools
+        //
+        this.B_FacilityPools.Location = new System.Drawing.Point(465, 293);
+        this.B_FacilityPools.Name = "B_FacilityPools";
+        this.B_FacilityPools.Size = new System.Drawing.Size(150, 42);
+        this.B_FacilityPools.TabIndex = 20;
+        this.B_FacilityPools.Text = "Facility Pools (Uhuru)";
+        this.B_FacilityPools.UseVisualStyleBackColor = true;
+        this.B_FacilityPools.Click += new System.EventHandler(this.B_FacilityPools_Click);
+        //
         // Tab_ExeFS
-        // 
+        //
         this.Tab_ExeFS.Controls.Add(this.FLP_ExeFS);
         this.Tab_ExeFS.Location = new System.Drawing.Point(4, 22);
         this.Tab_ExeFS.Name = "Tab_ExeFS";
@@ -906,6 +999,7 @@ sealed partial class Main
     private System.Windows.Forms.ToolStripMenuItem Menu_SMDH;
     private System.Windows.Forms.ToolStripMenuItem Menu_CRO;
     private System.Windows.Forms.ToolStripMenuItem Menu_Shuffler;
+    private System.Windows.Forms.ToolStripMenuItem Menu_ZoneData;
     private System.Windows.Forms.TabControl TC_RomFS;
     private System.Windows.Forms.TabPage Tab_RomFS;
     private System.Windows.Forms.TabPage Tab_ExeFS;
@@ -934,6 +1028,13 @@ sealed partial class Main
     private System.Windows.Forms.FlowLayoutPanel FLP_RomFS;
     private System.Windows.Forms.Label L_Status;
     private System.Windows.Forms.Button B_OWSE;
+    private System.Windows.Forms.Button B_SpeciesInsertion;
+    private System.Windows.Forms.Button B_AMXScript;
+    private System.Windows.Forms.Button B_IconEditor;
+    private System.Windows.Forms.Button B_GiftItemEditor;
+    private System.Windows.Forms.Button B_ModelScale;
+    private System.Windows.Forms.Button B_OWModelSwap;
+    private System.Windows.Forms.Button B_FacilityPools;
     private System.Windows.Forms.Button B_ShinyRate;
     private System.Windows.Forms.Button B_Royal;
     private System.Windows.Forms.Button B_TM;

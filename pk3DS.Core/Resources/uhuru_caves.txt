@@ -1,0 +1,4 @@
+# Uhuru v16.0.3 .text caves: zero runs >= 16 bytes outside the regions that its code reads or points at, generated 2026-10-11 by scripts/uhuru/caves.py
+# sources: Ultra Sun Korean | uhuru_regions.txt
+# caves: 0, bytes: 0; by reason: (a) pointer word 0, (b) pc-relative ldr 0, (c) add/sub pc 0
+# format: file<TAB>startHex<TAB>endHexExclusive (file offsets)

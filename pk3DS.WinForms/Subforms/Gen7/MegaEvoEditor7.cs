@@ -108,7 +108,10 @@ public partial class MegaEvoEditor7 : Form
 
         for (int i = 0; i < 2; i++)
         {
-            checkbox_spec[i].Checked = me.Method[i] == 1;
+            // Method 1 is item-triggered; anything else (Rayquaza's move-triggered 2, whose Argument
+            // is a move id) is shown but locked, since this form can only express an item Mega.
+            checkbox_spec[i].Checked = me.Method[i] != 0;
+            checkbox_spec[i].Enabled = me.Method[i] <= 1;
             
             // Set Item Safely
             SetComboValue(item_spec[i], (int)me.Argument[i]);
@@ -147,6 +150,10 @@ public partial class MegaEvoEditor7 : Form
         
         for (int i = 0; i < 2; i++)
         {
+            // Browsing past a move-triggered Mega used to rewrite it as Method 0 (and its move
+            // Argument as an item), erasing Rayquaza's Mega. Leave such slots exactly as loaded.
+            if (me.Method[i] > 1)
+                continue;
             me.Method[i] = checkbox_spec[i].Checked ? (byte)1 : (byte)0;
             
             if (item_spec[i].SelectedValue != null)
@@ -236,7 +243,8 @@ public partial class MegaEvoEditor7 : Form
     {
         for (int i = 0; i < groupbox_spec.Length; i++)
         {
-            groupbox_spec[i].Enabled = checkbox_spec[i].Checked;
+            // A locked (move-triggered) slot is display-only: SetEntry won't write its fields.
+            groupbox_spec[i].Enabled = checkbox_spec[i].Checked && checkbox_spec[i].Enabled;
         }
         UpdateSprite(null, null);
     }

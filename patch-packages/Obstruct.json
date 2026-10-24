@@ -1,0 +1,119 @@
+{
+  "Name": "Obstruct",
+  "Description": "Obstruct (Move 792). Protects the user from attacks and sharply lowers the Defense (-2 stages) of any attacker that makes direct contact.",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 792,
+      "Name": "Obstruct",
+      "Slots": [
+        {
+          "Timing": "0x03",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x03",
+            "Name": "Protect"
+          },
+          "TimingByte": 3,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x25",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x25",
+            "Name": "Protect"
+          },
+          "TimingByte": 37,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x26",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x26",
+            "Name": "Protect"
+          },
+          "TimingByte": 38,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x5C",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x5C",
+            "Name": "Protect"
+          },
+          "TimingByte": 92,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0xBF",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0xBF",
+            "Name": "Protect"
+          },
+          "TimingByte": 191,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x8E",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x8E",
+            "Name": "Protect"
+          },
+          "TimingByte": 142,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x45",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 182,
+            "Timing": "0x45",
+            "Name": "Protect"
+          },
+          "TimingByte": 69,
+          "SourceBaseValue": 0
+        },
+        {
+          "Timing": "0x61",
+          "Code": "70402DE90350A0E1040093E5000050E32000000A0160A0E10240A0E10400A0E3CC1EFAEB040050E11800001A6100A0E3C81EFAEB000050E31400000A0420A0E10D10A0E30600A0E1AA1DFAEB0040A0E10220A0E30420C4E5FE00A0E31100C4E51200D4E5260080E31200C4E50100A0E31000C4E50300A0E30500C4E5B51EFAEB0C00C4E50410A0E10600A0E118F3F9EB0000A0E30400C5E57080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 97,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QNQoOEEAJPlAABQ4yAAAAoBYKDhAkCg4QQAoOPMHvrrBABQ4RgAABphAKDjyB766wAAUOMUAAAKBCCg4Q0QoOMGAKDhqh366wBAoOECIKDjBCDE5f4AoOMRAMTlEgDU5SYAgOMSAMTlAQCg4xAAxOUDAKDjBQDE5bUe+usMAMTlBBCg4QYAoOEY8/nrAACg4wQAxeVwgL3o"
+        },
+        {
+          "Timing": "0xC4",
+          "Code": "70402DE90150A0E10240A0E10400A0E3D01EFAEB040050E11900001A6100A0E3CC1EFAEB000050E31500000A0420A0E10D10A0E30500A0E1AE1DFAEB0040A0E10220A0E30420C4E5FE00A0E31100C4E51200D4E5260080E31200C4E50100A0E31000C4E50300A0E30500C4E5B91EFAEB0C00C4E50410A0E10500A0E17040BDE81BF3F9EA7080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 196,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QFQoOECQKDhBACg49Ae+usEAFDhGQAAGmEAoOPMHvrrAABQ4xUAAAoEIKDhDRCg4wUAoOGuHfrrAECg4QIgoOMEIMTl/gCg4xEAxOUSANTlJgCA4xIAxOUBAKDjEADE5QMAoOMFAMTluR766wwAxOUEEKDhBQCg4XBAvegb8/nqcIC96A=="
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

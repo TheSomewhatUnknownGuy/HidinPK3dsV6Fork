@@ -4,12 +4,27 @@ using System.Linq;
 using pk3DS.Core.CTR;
 using pk3DS.Core.Structures.PersonalInfo;
 using pk3DS.Core.Structures;
+using pk3DS.Core.Modding;
 
 namespace pk3DS.Core;
 
 public class GameConfig
 {
     public static bool ExpandedAbilities { get; set; } = false;
+
+    /// <summary>Turns passives on or off (see <see cref="PassiveGuard"/>). Returns null on success, else the refusal reason.</summary>
+    public static string TrySetPassiveAbilities(bool on) => PassiveGuard.TrySet(on, ExpandedAbilities);
+
+    /// <summary>Turns Expanded Abilities on or off. Returns null on success, else the refusal reason (passives own the same bits).</summary>
+    public static string TrySetExpandedAbilities(bool on)
+    {
+        if (PassiveGuard.RefuseExpanded(on) is { } why) return why;
+        ExpandedAbilities = on;
+        return null;
+    }
+
+    /// <summary>Allows installer-implicit growth of code.bin and CROs. Experimental and not boot-proven.</summary>
+    public static bool AllowGrowth { get; set; } = false;
     private const int FILECOUNT_XY = 271;
     private const int FILECOUNT_ORASDEMO = 301;
     private const int FILECOUNT_ORAS = 299;
@@ -88,9 +103,13 @@ public class GameConfig
             case GameVersion.US:
             case GameVersion.UM:
             case GameVersion.USUM:
-                Files = GARCReference.GARCReference_US;
-                if (new FileInfo(Path.Combine(RomFS, GetGARCFileName("encdata"))).Length == 0)
-                    Files = GARCReference.GARCReference_UM;
+                // game == UM is the only authoritative signal here; the path check only runs
+                // for the ambiguous GameVersion.USUM case and is a best-effort fallback, not a
+                // real version detection - there is no verified in-file byte signature that
+                // distinguishes a US ROM dump from a UM one, so callers that actually know the
+                // version should pass GameVersion.US/UM explicitly rather than relying on this.
+                bool isUM = (game == GameVersion.UM) || LooksLikeUltraMoonPath(RomFS);
+                Files = isUM ? GARCReference.GARCReference_UM : GARCReference.GARCReference_US;
                 Variables = TextVariableCode.VariableCodes_SM;
                 GameText = TextReference.GameText_USUM;
                 break;
@@ -108,18 +127,24 @@ public class GameConfig
 
     public void InitializeAll()
     {
+        bool passivesAtBuild = PassiveGuard.Enabled;
         InitializePersonal();
         InitializeLearnset();
         InitializeGameText();
         InitializeMoves();
         InitializeEvos();
         InitializeGameInfo();
+        // Uhuru detection (in InitializeGameInfo) can force passives off after the personal table was built with TM bits 104+ masked.
+        if (passivesAtBuild != PassiveGuard.Enabled) InitializePersonal();
     }
 
     public void InitializePersonal()
     {
         GARCPersonal = GetGARCData("personal");
-        Personal = new PersonalTable(GARCPersonal.GetFile(GARCPersonal.FileCount - 1), Version);
+        // Uhuru's combined file has 93 junk entries + 36 trailing bytes; only FileCount-1 entries are real.
+        byte[] combined = GARCPersonal.GetFile(GARCPersonal.FileCount - 1);
+        int max = GARCPersonal.GetFile(0).Length * (GARCPersonal.FileCount - 1);
+        Personal = new PersonalTable(combined.Length > max ? combined[..max] : combined, Version);
     }
 
     public void InitializeLearnset()
@@ -176,6 +201,11 @@ public class GameConfig
     private void InitializeGameInfo()
     {
         Info = new GameInfo(this);
+        // Uhuru's trdata/trpoke hold 5/7 difficulty blocks per trainer name; stock ROMs stay at 0.
+        if (Generation == 7)
+            Info.TrainerBaseCount = TrainerBlocks.DetectBaseCount(GetText(TextName.TrainerNames).Length, GetGARCData("trdata")?.FileCount ?? 0, GetGARCData("trpoke")?.FileCount ?? 0);
+        pk3DS.Core.Modding.UhuruGuard.Active = Info.TrainerBaseCount > 0; // reset on every open, so a stock ROM clears it
+        PassiveGuard.EnforceOnOpen(); // after Uhuru detection: a toggle-only check is bypassed by enabling on one ROM and opening Uhuru next
     }
 
     public LazyGARCFile GetlzGARCData(string file)
@@ -233,13 +263,13 @@ public class GameConfig
     public TextVariableCode GetVariableCode(string name) { return Variables?.FirstOrDefault(v => v.Name == name); }
     public TextVariableCode GetVariableName(int value) { return Variables?.FirstOrDefault(v => v.Code == value); }
 
-    private TextReference GetGameText(TextName name) { return GameText.FirstOrDefault(f => f.Name == name); }
+    private TextReference GetGameText(TextName name) { return GameText?.FirstOrDefault(f => f.Name == name); }
     public TextData GetTextData(TextName file) => new(GetText(file));
 
     public string[] GetText(TextName file)
     {
         var textRef = GetGameText(file);
-        if (textRef == null || textRef.Index >= GameTextStrings.Length) return Array.Empty<string>();
+        if (textRef == null || GameTextStrings == null || textRef.Index >= GameTextStrings.Length) return Array.Empty<string>();
         string[] raw = (string[])GameTextStrings[textRef.Index].Clone();
 
         if (file == TextName.SpeciesNames && Info != null && Info.MaxSpeciesID > 807)
@@ -317,8 +347,8 @@ public class GameConfig
 
     public bool XY => Version == GameVersion.XY;
     public bool ORAS => Version is GameVersion.ORAS or GameVersion.ORASDEMO;
-    public bool SM => Version is GameVersion.SM or GameVersion.SMDEMO;
-    public bool USUM => Version == GameVersion.USUM;
+    public bool SM => Version is GameVersion.SM or GameVersion.SMDEMO or GameVersion.SN or GameVersion.MN;
+    public bool USUM => Version is GameVersion.USUM or GameVersion.US or GameVersion.UM;
     
     public bool X => Version == GameVersion.X;
     public bool Y => Version == GameVersion.Y;
@@ -326,8 +356,30 @@ public class GameConfig
     public bool AS => Version == GameVersion.AS;
     public bool Sun => Version == GameVersion.SN || Files == GARCReference.GARCReference_SN;
     public bool Moon => Version == GameVersion.MN || Files == GARCReference.GARCReference_MN;
-    public bool UltraSun => Version == GameVersion.US || Files == GARCReference.GARCReference_US;
-    public bool UltraMoon => Version == GameVersion.UM || Files == GARCReference.GARCReference_UM;
+    public bool UltraSun => Version == GameVersion.US || (USUM && !UltraMoon);
+    public bool UltraMoon => Version == GameVersion.UM ||
+        Files == GARCReference.GARCReference_UM ||
+        LooksLikeUltraMoonPath(RomFS);
+
+    /// <summary>
+    /// Best-effort fallback for telling a UM dump from a US one when the caller only knows
+    /// GameVersion.USUM. Matches whole path segments ("...\UM\..." or "...\Ultra Moon\...")
+    /// rather than raw substrings, so an unrelated folder that merely contains "UM" inside a
+    /// longer word (e.g. "Museum", "Album") won't false-positive. Not a real version check -
+    /// prefer passing GameVersion.US/UM explicitly wherever the actual version is known.
+    /// </summary>
+    private static bool LooksLikeUltraMoonPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        var segments = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var seg in segments)
+        {
+            if (seg.Equals("UM", StringComparison.OrdinalIgnoreCase)) return true;
+            if (seg.Contains("Ultra Moon", StringComparison.OrdinalIgnoreCase)) return true;
+            if (seg.Contains("UltraMoon", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
 
     public int VersionID => (int)Version;
 
@@ -354,8 +406,8 @@ public class GameConfig
             FILECOUNT_ORAS => Version == GameVersion.ORAS,
             FILECOUNT_ORASDEMO => Version == GameVersion.ORASDEMO,
             FILECOUNT_SMDEMO => Version == GameVersion.SMDEMO,
-            FILECOUNT_SM => Version == GameVersion.SM,
-            FILECOUNT_USUM => Version == GameVersion.USUM,
+            FILECOUNT_SM => Version is GameVersion.SM or GameVersion.SN or GameVersion.MN,
+            FILECOUNT_USUM => Version is GameVersion.USUM or GameVersion.US or GameVersion.UM,
             _ => false,
         };
     }

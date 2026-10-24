@@ -16,7 +16,7 @@ namespace pk3DS.WinForms
         public ShowdownSetStorage()
         {
             InitializeComponent();
-            WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
+            WinFormsUtil.ApplyTheme(this);
             RefreshList();
         }
 

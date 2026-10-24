@@ -12,13 +12,14 @@ using pk3DS.Core;
 using pk3DS.Core.Randomizers;
 using pk3DS.Core.Structures;
 using pk3DS.Core.Structures.PersonalInfo;
+using pk3DS.WinForms.Controls;
 
 namespace pk3DS.WinForms;
 
 public partial class SMTE : Form
 {
     private readonly LearnsetRandomizer learn = new(Main.Config, Main.Config.Learnsets);
-    private readonly TrainerData7[] Trainers;
+    private TrainerData7[] Trainers;
     private string[][] AltForms;
     private static int[] SpecialClasses;
     private static readonly int[] ImportantTrainers = Main.Config.USUM ? Legal.ImportantTrainers_USUM : Legal.ImportantTrainers_SM;
@@ -31,8 +32,8 @@ public partial class SMTE : Form
     private PictureBox[] pba;
     private CheckBox[] AIBits;
 
-    private readonly byte[][] trdata;
-    private readonly byte[][] trpoke;
+    private byte[][] trdata;
+    private byte[][] trpoke;
     private readonly string[] abilitylist = Main.Config.GetText(TextName.AbilityNames);
     private readonly string[] movelist = Main.Config.GetText(TextName.MoveNames);
     private readonly string[] itemlist = Main.Config.GetText(TextName.ItemNames);
@@ -40,9 +41,15 @@ public partial class SMTE : Form
     private readonly string[] types = Main.Config.GetText(TextName.Types);
     private readonly string[] natures = Main.Config.GetText(TextName.Natures);
     private readonly string[] forms = Enumerable.Range(0, 1000).Select(i => i.ToString("000")).ToArray();
-    private readonly string[] trName = Main.Config.GetText(TextName.TrainerNames);
+    private string[] trName = Main.Config.GetText(TextName.TrainerNames);
     private readonly string[] trClass = Main.Config.GetText(TextName.TrainerClasses);
-    private readonly TextData TrainerNames;
+    private TextData TrainerNames;
+
+    /// <summary>The (possibly grown-by-<see cref="B_AddTrainer_Click"/>) trainer arrays, read back by
+    /// the caller after the dialog closes - resizing inside the dialog rebinds these fields to new
+    /// array objects, which the caller's own pre-dialog locals would not see otherwise.</summary>
+    public byte[][] TrData => trdata;
+    public byte[][] TrPoke => trpoke;
 
     public SMTE(byte[][] trd, byte[][] trp)
     {
@@ -53,10 +60,10 @@ public partial class SMTE : Form
 
         ApplyUITweaks();
 
-        Trainers = new TrainerData7[trdata.Length];
+        Trainers = new TrainerData7[TrainerCount];
         Setup();
         
-        CB_TrainerID.SelectedIndex = 0;
+        LazyCombo.SetIndex(CB_TrainerID, 0);
         CB_Moves.SelectedIndex = 0;
         MegaDictionary = GiftEditor6.GetMegaDictionary(Main.Config);
 
@@ -80,6 +87,7 @@ public partial class SMTE : Form
     }
 
     private Label L_MoneyTranslated;
+    private readonly ToolTip toolTip1 = new();
 
     /// <summary>
     /// Shows what the trainer's money value works out to as a payout.
@@ -137,7 +145,18 @@ public partial class SMTE : Form
 
         if (L_Mode != null) { L_Mode.Parent = trainerParent; L_Mode.Location = new Point(10, 50); }
         if (CB_Mode != null) { CB_Mode.Parent = trainerParent; CB_Mode.Location = new Point(90, 48); CB_Mode.Size = new Size(150, 22); }
-        if (CHK_Flag != null) { CHK_Flag.Parent = trainerParent; CHK_Flag.Text = "Master AI"; CHK_Flag.Location = new Point(250, 50); CHK_Flag.Size = new Size(110, 20); }
+        if (CHK_Flag != null)
+        {
+            CHK_Flag.Parent = trainerParent;
+            CHK_Flag.Text = "Master AI";
+            CHK_Flag.Location = new Point(250, 50);
+            CHK_Flag.Size = new Size(110, 20);
+            CHK_Flag.Click += (s, e) =>
+            {
+                bool enable = CHK_Flag.Checked;
+                CHK_AI0.Checked = CHK_AI1.Checked = CHK_AI2.Checked = CHK_AI6.Checked = CHK_AI7.Checked = enable;
+            };
+        }
 
         if (L_Item_1 != null) { L_Item_1.Parent = trainerParent; L_Item_1.Location = new Point(10, 78); }
         if (CB_Item_1 != null) { CB_Item_1.Parent = trainerParent; CB_Item_1.Location = new Point(55, 76); CB_Item_1.Size = new Size(120, 22); }
@@ -153,8 +172,8 @@ public partial class SMTE : Form
         B_MaxIVsAll = new Button { Text = "Max IVs All", Size = new Size(155, 25), Location = new Point(10, 25) };
         B_DoublesAll = new Button { Text = "Doubles All", Size = new Size(155, 25), Location = new Point(10, 60) };
         B_PokeChangeAll = new Button { Text = "PokeChange All", Size = new Size(155, 25), Location = new Point(10, 95) };
-        Button B_FlagAll = new Button { Text = "Master AI Flag All", Size = new Size(155, 25), Location = new Point(10, 130) };
-        B_FlagAll.Click += (s, e) => { foreach (var t in Trainers) t.Flag = true; SaveAllEntries(); LoadEntry(); };
+        Button B_FlagAll = new Button { Text = "Master AI All", Size = new Size(155, 25), Location = new Point(10, 130) };
+        B_FlagAll.Click += (s, e) => { foreach (var t in Trainers) { t.AI |= 0xC7; t.Flag = true; } SaveAllEntries(); LoadEntry(); };
 
         B_MaxIVsAll.Click += B_MaxIVsAll_Click;
         B_DoublesAll.Click += B_DoublesAll_Click;
@@ -177,7 +196,7 @@ public partial class SMTE : Form
         // Restore Trainer Name, ID & Class below tab control
         if (TB_TrainerName != null)
         {
-            Label L_Name = new Label { Text = "Trainer Name:", Location = new Point(10, 460), AutoSize = true };
+            L_Name = new Label { Text = "Trainer Name:", Location = new Point(10, 460), AutoSize = true };
             TB_TrainerName.Location = new Point(10, 478);
             TB_TrainerName.Size = new Size(110, 23);
             this.Controls.Add(L_Name);
@@ -186,6 +205,14 @@ public partial class SMTE : Form
         if (CB_TrainerID != null) { CB_TrainerID.Location = new Point(130, 478); CB_TrainerID.Size = new Size(125, 23); }
         if (L_Trainer_Class != null) { L_Trainer_Class.Location = new Point(265, 460); }
         if (CB_Trainer_Class != null) { CB_Trainer_Class.Location = new Point(265, 478); CB_Trainer_Class.Size = new Size(135, 23); }
+
+        // Spans the full Name/ID/Class row's width (10 to CB_Trainer_Class's right edge at 400),
+        // per the user's own screenshot of where this button should sit.
+        B_AddTrainer = new Button { Text = "Add Trainer(s)", Location = new Point(10, 505), Size = new Size(390, 25) };
+        B_AddTrainer.Click += B_AddTrainer_Click;
+        this.Controls.Add(B_AddTrainer);
+        // Uhuru: Add Trainer(s) assumes one name per trainer; Randomize All waits for per-block support (Phase 5).
+        if (Main.Config.Info.TrainerBaseCount > 0) B_AddTrainer.Enabled = B_Randomize.Enabled = false;
 
         if (PB_Team1 != null)
         {
@@ -227,6 +254,165 @@ public partial class SMTE : Form
         if (B_EnableZMove != null) B_EnableZMove.Visible = false;
 
         BuildShowdownCardUI();
+        if (Main.Config.Info.TrainerBaseCount > 0) BuildUhuruControls();
+        BuildDrawerLayout();
+    }
+
+    // Layout: a top bar (settings toggle + trainer picker) over the team strip and Pokémon card, and a left drawer
+    // holding the trainer-level settings (money, battle mode, items, AI/difficulty bits, randomizer, Add Trainer,
+    // Uhuru options). Everything above was built at absolute positions for a fixed left column; this moves the
+    // controls into two panels without changing their names or handlers, so the load/save code is untouched.
+    private Label L_Name;
+    private Button B_AddTrainer, BTN_Drawer;
+    private Panel PNL_Drawer, PNL_Main;
+    private const int DrawerWidth = 410;
+    private const int TopBarHeight = 38;
+    private static bool drawerOpen;   // remembered for the session; closed by default so the editor starts uncluttered
+
+    private void BuildDrawerLayout()
+    {
+        SuspendLayout();
+        PNL_Main = new Panel { Dock = DockStyle.Fill, Name = "PNL_Main" };
+        PNL_Drawer = new Panel { Dock = DockStyle.Left, Width = DrawerWidth, Name = "PNL_Drawer" };
+        var top = new Panel { Dock = DockStyle.Top, Height = TopBarHeight, Name = "PNL_TopBar" };
+
+        // The drawer takes the old left column as it was: tabs, Add Trainer(s), Uhuru options.
+        foreach (Control c in new Control[] { TC_trdata, B_AddTrainer, GB_Uhuru })
+            if (c != null) { Controls.Remove(c); PNL_Drawer.Controls.Add(c); }
+        TC_trdata.Location = new Point(10, 10);
+        B_AddTrainer.Location = new Point(10, 456);
+        if (GB_Uhuru != null) GB_Uhuru.Location = new Point(10, 490);
+
+        // Top bar: the trainer picker lives here so it stays reachable with the drawer closed.
+        BTN_Drawer = new Button { Size = new Size(160, 26), Location = new Point(10, 6), Name = "BTN_Drawer" };
+        BTN_Drawer.Click += (s, e) => SetDrawer(!drawerShown);
+        void Place(Control c, int x, int w) { Controls.Remove(c); top.Controls.Add(c); c.Location = new Point(x, c is Label ? 11 : 7); if (w > 0) c.Width = w; }
+        foreach (Label l in new[] { L_TrainerID, L_Name, L_Trainer_Class }) l.AutoSize = true;
+        L_TrainerID.Text = "Trainer:";   Place(L_TrainerID, 178, 0);
+        Place(CB_TrainerID, 226, 150);
+        L_Name.Text = "Name:";           Place(L_Name, 384, 0);
+        Place(TB_TrainerName, 424, 100);
+        L_Trainer_Class.Text = "Class:"; Place(L_Trainer_Class, 532, 0);
+        Place(CB_Trainer_Class, 570, 176);
+        // Designer leftovers that the translucent main panel would let show through.
+        if (L_Team != null) L_Team.Visible = false;
+        if (L_TrainerName != null) L_TrainerName.Visible = false;
+        top.Controls.Add(BTN_Drawer);
+
+        // Team strip and card move into the main panel, below the bar.
+        PictureBox[] teamBoxes = { PB_Team1, PB_Team2, PB_Team3, PB_Team4, PB_Team5, PB_Team6 };
+        int spacing = PB_Team1.Width + 8;
+        for (int i = 0; i < teamBoxes.Length; i++)
+        {
+            Controls.Remove(teamBoxes[i]);
+            PNL_Main.Controls.Add(teamBoxes[i]);
+            teamBoxes[i].Location = new Point(10 + i * spacing, TopBarHeight + 10);
+        }
+        Controls.Remove(PNL_ShowdownCard);
+        PNL_Main.Controls.Add(PNL_ShowdownCard);
+        PNL_ShowdownCard.Location = new Point(10, TopBarHeight + 68);
+        PNL_Main.Controls.Add(top);
+
+        Controls.Add(PNL_Main);
+        Controls.Add(PNL_Drawer);
+        PNL_Main.BringToFront();   // the fill panel is laid out last, taking what the drawer leaves
+        Height += TopBarHeight;
+        ResumeLayout(true);
+        SetDrawer(drawerOpen);
+    }
+
+    private bool drawerShown = true;   // Control.Visible reads false for children until the form is shown, so track it here
+
+    private void SetDrawer(bool open)
+    {
+        if (drawerShown != open)
+            ClientSize = new Size(ClientSize.Width + (open ? DrawerWidth : -DrawerWidth), ClientSize.Height);
+        drawerShown = open;
+        PNL_Drawer.Visible = open;
+        drawerOpen = open;
+        BTN_Drawer.Text = open ? "⚙ Trainer settings ◂" : "⚙ Trainer settings ▸";
+    }
+
+    // Uhuru-only controls, created only on Uhuru (docs/uhuru/trainer-format.md). The Trainer tab has no free rows,
+    // so the trainer-level ones sit in a group under Add Trainer(s); colour and the trainer 481 warning sit in the
+    // Pokémon card, in the strip between the Item/Ability row and the EV panel.
+    private GroupBox GB_Uhuru;
+    private Label L_SharedRecord, L_Trainer481, L_Colour;
+    private NumericUpDown NUD_LevelOffset, NUD_TeamOffset;
+    private CheckBox CHK_TeamScale;
+    private ComboBox CB_Colour;
+    private static readonly string[] ColourNames = ["Random", "Normal", "Normal (2)", "Colour A", "Colour B", "Colour C"];
+
+    private void BuildUhuruControls()
+    {
+        GB_Uhuru = new GroupBox { Text = "Uhuru trainer options", Location = new Point(10, 536), Size = new Size(390, 86) };
+        L_SharedRecord = new Label { Text = "B5/B6 use B3/B4's trainer record: edit class, items and AI there.", Location = new Point(10, 16), AutoSize = true, Visible = false };
+        Label L_Level = new Label { Text = "Level offset (modes 4/5):", Location = new Point(10, 42), AutoSize = true };
+        NUD_LevelOffset = new NumericUpDown { Location = new Point(160, 39), Size = new Size(60, 22), Minimum = -128, Maximum = 127 };
+        CHK_TeamScale = new CheckBox { Text = "Scale team to party (modes 6/7)", Location = new Point(10, 62), AutoSize = true };
+        NUD_TeamOffset = new NumericUpDown { Location = new Point(230, 60), Size = new Size(60, 22), Minimum = -127, Maximum = 127 };
+        CHK_TeamScale.CheckedChanged += (s, e) => NUD_TeamOffset.Enabled = CHK_TeamScale.Enabled && CHK_TeamScale.Checked;
+        GB_Uhuru.Controls.Add(L_SharedRecord);
+        GB_Uhuru.Controls.Add(L_Level);
+        GB_Uhuru.Controls.Add(NUD_LevelOffset);
+        GB_Uhuru.Controls.Add(CHK_TeamScale);
+        GB_Uhuru.Controls.Add(NUD_TeamOffset);
+        this.Controls.Add(GB_Uhuru);
+
+        Control card = CB_Item.Parent;
+        L_Colour = new Label { Text = "Colour:", Location = new Point(125, 186), AutoSize = true, ForeColor = Color.LightGray, Font = new Font("Segoe UI", 8F) };
+        CB_Colour = new ComboBox { Location = new Point(172, 182), Size = new Size(140, 23), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Color.FromArgb(35, 39, 46), ForeColor = Color.White };
+        CB_Colour.Items.AddRange(ColourNames);
+        L_Trainer481 = new Label { Text = "Trainer 481: in game, slot 0 is replaced by a Pokémon from your save.", Location = new Point(320, 186), AutoSize = true, ForeColor = Color.Tomato, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Visible = false };
+        card.Controls.Add(L_Colour);
+        card.Controls.Add(CB_Colour);
+        card.Controls.Add(L_Trainer481);
+    }
+
+    private ComboBox[] CB_Passive;
+
+    /// <summary>
+    /// Rom Nueva + passives of the selected Pokémon, in the row Uhuru uses for Colour (never both: passives are off on Uhuru).
+    /// Nothing else edits those record bytes, so a slot saved without touching this row keeps what it had.
+    /// </summary>
+    private void BuildPassiveRow(Control card)
+    {
+        string[] abilityNames = Main.Config.GetText(TextName.AbilityNames);
+        var names = new string[pk3DS.Core.Modding.PassiveGuard.MaxId + 1];
+        for (int i = 0; i < names.Length; i++)
+            names[i] = i == 0 ? "(None)" : i < abilityNames.Length ? abilityNames[i] : $"Ability {i}";
+        card.Controls.Add(new Label { Text = "Passives (Rom Nueva +)", Location = new Point(125, 177), AutoSize = true, ForeColor = Color.LightGray, Font = new Font("Segoe UI", 8F) });
+        CB_Passive = new ComboBox[3];
+        for (int i = 0; i < 3; i++)
+        {
+            var cb = CB_Passive[i] = new ComboBox
+            {
+                Name = $"CB_Passive{i + 1}",
+                Location = new Point(125 + i * 103, 191),
+                Size = new Size(98, 22),
+                BackColor = Color.FromArgb(35, 39, 46),
+                ForeColor = Color.White,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems,
+            };
+            LazyCombo.Attach(cb, names);
+            LazyCombo.SetIndex(cb, 0);
+            card.Controls.Add(cb);
+        }
+    }
+
+    // Uhuru blocks 5/6 share blocks 3/4's trainer record, so the record controls cannot save for them (see SaveData).
+    private void UpdateUhuruAccess(int i)
+    {
+        if (GB_Uhuru == null) return;
+        int b = Main.Config.Info.TrainerBaseCount;
+        bool shared = i >= trdata.Length;
+        foreach (Control c in new Control[] { CB_Trainer_Class, CB_Item_1, CB_Item_2, CB_Item_3, CB_Item_4, CB_Money, CB_Mode, CHK_Flag, GB_AIBits, NUD_LevelOffset })
+            c.Enabled = !shared;
+        CHK_TeamScale.Enabled = shared && Trainers[i].Pokemon.Count > 0;
+        NUD_TeamOffset.Enabled = CHK_TeamScale.Enabled && CHK_TeamScale.Checked;
+        L_SharedRecord.Visible = shared;
+        L_Trainer481.Visible = TrainerBlocks.BaseId(i, b) == 481;
     }
 
     private Panel PNL_ShowdownCard;
@@ -370,15 +556,20 @@ public partial class SMTE : Form
         CB_Item.Parent = PNL_MainCard;
         CB_Item.Location = new Point(125, 152);
         CB_Item.Size = new Size(145, 23);
+        CB_Item.BackColor = Color.FromArgb(35, 39, 46);
+        CB_Item.ForeColor = Color.White;
 
         Label L_Abil = new Label { Text = "Ability", Location = new Point(280, 135), AutoSize = true, ForeColor = Color.LightGray, Font = new Font("Segoe UI", 8F) };
         CB_Ability.Parent = PNL_MainCard;
         CB_Ability.Location = new Point(280, 152);
         CB_Ability.Size = new Size(155, 23);
+        CB_Ability.BackColor = Color.FromArgb(35, 39, 46);
+        CB_Ability.ForeColor = Color.White;
         CB_Ability.SelectedIndexChanged += CB_Ability_SelectedIndexChanged;
 
         PNL_MainCard.Controls.Add(L_Itm);
         PNL_MainCard.Controls.Add(L_Abil);
+        if (pk3DS.Core.Modding.PassiveGuard.Enabled) BuildPassiveRow(PNL_MainCard);
 
         // 7. Moves Box
         Label L_Mvs = new Label { Text = "Moves", Location = new Point(445, 5), AutoSize = true, ForeColor = Color.LightGray, Font = new Font("Segoe UI", 8F) };
@@ -559,8 +750,14 @@ public partial class SMTE : Form
     }
 
 
-    private void UpdateMoveDropdowns(int sp, int fm)
+    // Level-up, TM/tutor and egg moves depend only on (species, form) and walking the evolution tree is slow,
+    // so keep the result for the life of this editor. Never hand out the cached set itself.
+    private readonly Dictionary<(int, int), HashSet<int>> legalMoveCache = new();
+
+    private HashSet<int> GetLegalMoves(int sp, int fm)
     {
+        if (legalMoveCache.TryGetValue((sp, fm), out var cached))
+            return cached;
         int formIdx = Main.Config.Personal.GetFormIndex(sp, fm);
         HashSet<int> legalMoves = new HashSet<int>();
 
@@ -600,31 +797,119 @@ public partial class SMTE : Form
             }
         }
 
-        // 3. Egg Moves
-        if (EggMovesData != null && formIdx < EggMovesData.Length)
+        // 3. Egg Moves - including every pre-evolution's egg moves, transitively. An evolved
+        // Pokemon can always know a move its pre-evolution could learn as an egg move (Alolan
+        // Raichu inheriting Fake Out from Pichu, even though Raichu itself carries no egg-move
+        // list) - real game legality, not something specific to this ROM. PossibleEvolutions.Species
+        // is a bare species id, not a form index (confirmed against EvolutionEditor7.cs, which
+        // keeps Species and Form as separate fields on the same entry), so this walk uses `sp`
+        // and re-resolves each ancestor species' own default-form index to read its egg moves.
+        if (EggMovesData != null)
         {
-            var em = EggMovesData[formIdx];
-            if (em != null && em.Moves != null)
-                foreach (int m in em.Moves) if (m > 0 && m < movelist.Length) legalMoves.Add(m);
+            if (formIdx < EggMovesData.Length)
+            {
+                var em = EggMovesData[formIdx];
+                if (em != null && em.Moves != null)
+                    foreach (int m in em.Moves) if (m > 0 && m < movelist.Length) legalMoves.Add(m);
+            }
+
+            if (Main.Config.Evolutions != null)
+            {
+                var seenSpecies = new HashSet<int> { sp };
+                var toCheck = new Queue<int>();
+                toCheck.Enqueue(sp);
+                while (toCheck.Count > 0)
+                {
+                    int curSpecies = toCheck.Dequeue();
+                    for (int s = 1; s < Main.Config.Evolutions.Length; s++)
+                    {
+                        var evoSet = Main.Config.Evolutions[s];
+                        if (evoSet?.PossibleEvolutions == null) continue;
+                        if (!evoSet.PossibleEvolutions.Any(ev => ev != null && ev.Species == curSpecies && ev.Method > 0)) continue;
+                        if (!seenSpecies.Add(s)) continue;
+
+                        int ancestorFormIdx = Main.Config.Personal.GetFormIndex(s, 0);
+                        if (ancestorFormIdx >= 0 && ancestorFormIdx < EggMovesData.Length)
+                        {
+                            var ancestorEm = EggMovesData[ancestorFormIdx];
+                            if (ancestorEm != null && ancestorEm.Moves != null)
+                                foreach (int m in ancestorEm.Moves) if (m > 0 && m < movelist.Length) legalMoves.Add(m);
+                        }
+                        toCheck.Enqueue(s);
+                    }
+                }
+            }
         }
+
+        legalMoveCache[(sp, fm)] = legalMoves;
+        return legalMoves;
+    }
+
+    private void UpdateMoveDropdowns(int sp, int fm)
+    {
+        var legalMoves = new HashSet<int>(GetLegalMoves(sp, fm));
 
         // 4. Preserve current moves
         int[] cur = { pkm != null ? pkm.Move1 : 0, pkm != null ? pkm.Move2 : 0, pkm != null ? pkm.Move3 : 0, pkm != null ? pkm.Move4 : 0 };
         foreach (int m in cur) if (m > 0 && m < movelist.Length) legalMoves.Add(m);
 
-        List<MoveComboItem> items = new List<MoveComboItem> { new MoveComboItem { Name = "(None)", ID = 0 } };
-        items.AddRange(legalMoves.OrderBy(m => movelist[m]).Select(m => new MoveComboItem { Name = movelist[m], ID = m }));
+        // Plain Items, not DataSource: binding ~800 moves x 4 combos is slow. The same list is reused while
+        // (species, form, current moves) stay the same, because a slot load asks twice.
+        var key = (sp, fm, cur[0], cur[1], cur[2], cur[3]);
+        if (!moveItemCache.TryGetValue(key, out var items))
+        {
+            items = new object[] { new MoveComboItem { Name = "(None)", ID = 0 } }
+                .Concat(legalMoves.OrderBy(m => movelist[m]).Select(m => new MoveComboItem { Name = movelist[m], ID = m })).ToArray();
+            moveItemCache[key] = items;
+        }
 
         ComboBox[] cbs = { CB_Move1, CB_Move2, CB_Move3, CB_Move4 };
         for (int i = 0; i < 4; i++)
+            SetMoveCombo(cbs[i], items, cur[i]);
+    }
+
+    private readonly Dictionary<(int, int, int, int, int, int), object[]> moveItemCache = new();
+
+    // A move combo holds only its selected move (adding ~300 items to each of 4 combos took ~70 ms per slot click)
+    // until the user touches it; then it gets the full list. `moveListFor` is the list it would get, and
+    // Tag is the list it currently holds in full.
+    private readonly Dictionary<ComboBox, object[]> moveListFor = new();
+    private readonly HashSet<ComboBox> expandedMoveCombos = new();
+
+    private void SetMoveCombo(ComboBox cb, object[] items, int moveID)
+    {
+        moveListFor[cb] = items;
+        var picked = items.Cast<MoveComboItem>().FirstOrDefault(x => x.ID == moveID) ?? (MoveComboItem)items[0];
+        cb.BeginUpdate();
+        if (expandedMoveCombos.Contains(cb))
         {
-            cbs[i].BeginUpdate();
-            cbs[i].DataSource = items.ToList();
-            cbs[i].DisplayMember = "Name";
-            cbs[i].ValueMember = "ID";
-            SetComboMoveValue(cbs[i], cur[i]);
-            cbs[i].EndUpdate();
+            if (!ReferenceEquals(cb.Tag, items))
+            {
+                cb.Items.Clear();
+                cb.Items.AddRange(items);
+                cb.Tag = items;
+            }
+            cb.SelectedIndex = Array.IndexOf(items, picked);
         }
+        else
+        {
+            if (!(cb.Items.Count == 1 && ReferenceEquals(cb.Items[0], picked)))
+            {
+                cb.Items.Clear();
+                cb.Items.Add(picked);
+            }
+            cb.SelectedIndex = 0;
+        }
+        cb.EndUpdate();
+    }
+
+    private void ExpandMoveCombo(object sender, EventArgs e)
+    {
+        var cb = (ComboBox)sender;
+        if (!moveListFor.TryGetValue(cb, out var items) || !expandedMoveCombos.Add(cb))
+            return;
+        // Delete clears a drop-down list to its first item ((None)); the control has already moved to index 0 of the one-item list
+        SetMoveCombo(cb, items, e is KeyEventArgs { KeyCode: Keys.Delete } ? 0 : GetComboMoveValue(cb));
     }
 
     public class MoveComboItem
@@ -634,13 +919,10 @@ public partial class SMTE : Form
         public override string ToString() => Name;
     }
 
-    private static void SetComboMoveValue(ComboBox cb, int moveID)
+    private void SetComboMoveValue(ComboBox cb, int moveID)
     {
-        if (cb.DataSource is List<MoveComboItem> list)
-        {
-            int idx = list.FindIndex(x => x.ID == moveID);
-            cb.SelectedIndex = idx >= 0 ? idx : 0;
-        }
+        if (moveListFor.TryGetValue(cb, out var items))
+            SetMoveCombo(cb, items, moveID);
     }
 
     private static int GetComboMoveValue(ComboBox cb)
@@ -695,7 +977,7 @@ public partial class SMTE : Form
                     else if (dr == DialogResult.No)
                     {
                         Trainers[index].Pokemon.RemoveAt(slot); Trainers[index].NumPokemon = (int)--NUD_NumPoke.Value;
-                        PopulateTeam(Trainers[index]); GetSlotColor(slot, null); currentSlot = -1;
+                        PopulateTeam(Trainers[index]); GetSlotColor(slot, null); currentSlot = -1; UpdateUhuruAccess(index);
                     }
                     return;
                 }
@@ -727,7 +1009,7 @@ public partial class SMTE : Form
                 if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Add this Pokémon to the team?") != DialogResult.Yes) return;
                 currentSlot = slot;
                 var pk = PrepareTP7(); Trainers[index].Pokemon.Add(pk); Trainers[index].NumPokemon = (int)++NUD_NumPoke.Value;
-                GetQuickFiller(pba[slot], pk); GetSlotColor(slot, Properties.Resources.slotView);
+                GetQuickFiller(pba[slot], pk); GetSlotColor(slot, Properties.Resources.slotView); UpdateUhuruAccess(index);
             }
         }
     }
@@ -753,7 +1035,7 @@ public partial class SMTE : Form
         int sp = CB_Species.SelectedIndex;
         int fm = CB_Forme.SelectedIndex >= 0 ? CB_Forme.SelectedIndex : 0;
         int gn = CB_Gender.SelectedIndex >= 0 ? CB_Gender.SelectedIndex : 0;
-        int it = CB_Item.SelectedIndex >= 0 ? CB_Item.SelectedIndex : 0;
+        int it = Math.Max(LazyCombo.GetIndex(CB_Item), 0);
         bool sh = CHK_Shiny.Checked;
 
         Bitmap rawImg = WinFormsUtil.GetSprite(sp, fm, gn, it, Main.Config, sh);
@@ -776,13 +1058,28 @@ public partial class SMTE : Form
         int pr = CB_Ability.SelectedIndex; int sp = CB_Species.SelectedIndex; int fm = CB_Forme.SelectedIndex >= 0 ? CB_Forme.SelectedIndex : 0;
         if (sp >= Main.SpeciesStat.Length) return;
         int formIdx = Main.Config.Personal.GetFormIndex(sp, fm);
-        
+        bool formFallback = formIdx < 0 || formIdx >= Main.SpeciesStat.Length;
+        if (formFallback) formIdx = sp;
+        if (formIdx >= Main.SpeciesStat.Length) return;
+
+        // formFallback means the requested form's data couldn't be resolved, so we're
+        // showing the base species instead. Silent substitution here previously let
+        // editors believe they were looking at the selected form's real ability/type/move
+        // data when they weren't - flag it visibly rather than failing quietly.
+        CB_Ability.BackColor = formFallback ? Color.LightYellow : Color.FromArgb(35, 39, 46);
+        CB_Ability.ForeColor = formFallback ? Color.Black : Color.White;
+        toolTip1.SetToolTip(CB_Ability, formFallback
+            ? "This form's data could not be resolved - showing the base species' abilities instead."
+            : null);
+
+        string GetAbilityName(int ab) => (ab >= 0 && ab < abilitylist.Length) ? abilitylist[ab] : $"Ability {ab}";
+
         CB_Ability.Items.Clear();
         CB_Ability.Items.Add("Any (1 or 2)");
         CB_Ability.Items.Add(AnyIncludingHiddenText);
-        CB_Ability.Items.Add(abilitylist[Main.SpeciesStat[formIdx].Abilities[0]] + " (1)");
-        CB_Ability.Items.Add(abilitylist[Main.SpeciesStat[formIdx].Abilities[1]] + " (2)");
-        CB_Ability.Items.Add(abilitylist[Main.SpeciesStat[formIdx].Abilities[2]] + " (H)");
+        CB_Ability.Items.Add(GetAbilityName(Main.SpeciesStat[formIdx].Abilities[0]) + " (1)");
+        CB_Ability.Items.Add(GetAbilityName(Main.SpeciesStat[formIdx].Abilities[1]) + " (2)");
+        CB_Ability.Items.Add(GetAbilityName(Main.SpeciesStat[formIdx].Abilities[2]) + " (H)");
         CB_Ability.SelectedIndex = Math.Min(Math.Max(0, pr), CB_Ability.Items.Count - 1);
 
         UpdateTypeBadges(formIdx);
@@ -849,15 +1146,85 @@ public partial class SMTE : Form
 
     private static string GetEntryTitle(string str, int i) => $"{str} - {i:000}";
 
+    // Uhuru stores 5/7 difficulty blocks per name; block b's trainer i shares name i % baseCount.
+    private static int NameIndex(int i) { int b = Main.Config.Info.TrainerBaseCount; return b > 0 ? i % b : i; }
+
+    // Uhuru: one entry per trpoke file (4571 teams, blocks 5/6 included); otherwise one per trdata record.
+    private int TrainerCount => Main.Config.Info.TrainerBaseCount > 0 ? trpoke.Length : trdata.Length;
+
+    /// <summary>Uhuru blocks 5/6 (Inferno): a copy of the shared block 3/4 record whose count is the team length,
+    /// so NumPokemon == Pokemon.Count and the rest of the editor works unchanged.</summary>
+    static TrainerData7 LoadInferno(byte[][] trdata, byte[][] trpoke, int i, int b)
+    {
+        int blk = TrainerBlocks.Block(i, b), id = TrainerBlocks.BaseId(i, b);
+        byte[] tr = (byte[])trdata[TrainerBlocks.TrdataBlockFor(blk) * b + id].Clone();
+        int n = TrainerBlocks.TeamCount(trpoke[i].Length);
+        tr[3] = (byte)n;
+        return new TrainerData7(tr, trpoke[i], n);
+    }
+
+    /// <summary>
+    /// Appends new trainer slots past the end of the table, the way Item Editor's Add Item Slots
+    /// does - a fresh id, a blank (no Pokémon) team the user fills in from here, and a placeholder
+    /// name grown into the same text table <see cref="SMTE.TrainerNames"/> already edits in place.
+    /// Actual overworld map placement and NPC/AMX scripting are out of scope here, same as this
+    /// editor already leaves them to the other tools that handle that.
+    /// </summary>
+    private void B_AddTrainer_Click(object sender, EventArgs e)
+    {
+        string input = WinFormsUtil.PromptInput("Add Trainer Slots", "How many new trainers? (1-255)", "1");
+        if (string.IsNullOrWhiteSpace(input)) return;
+        if (!int.TryParse(input.Trim(), out int count) || count <= 0 || count > 255)
+        {
+            WinFormsUtil.Alert("Enter a whole number from 1 to 255.");
+            return;
+        }
+
+        SaveEntry();
+
+        int firstNew = trdata.Length;
+        Array.Resize(ref trdata, firstNew + count);
+        Array.Resize(ref trpoke, firstNew + count);
+        Array.Resize(ref Trainers, firstNew + count);
+        Array.Resize(ref trName, firstNew + count);
+
+        for (int i = firstNew; i < trdata.Length; i++)
+        {
+            trName[i] = $"New Trainer {i}";
+            Trainers[i] = new TrainerData7 { Name = trName[i], ID = i };
+            SaveData(Trainers[i], i);
+        }
+        LazyCombo.Append(CB_TrainerID, Enumerable.Range(firstNew, count).Select(i => (object)GetEntryTitle(trName[i], i)).ToArray());
+
+        // TrainerNames wraps the array this grew out from under it - rebuild it over the new one so
+        // later TB_TrainerName edits (and OnFormClosing's Modified check) still reach the right,
+        // bigger backing array instead of the stale pre-resize one.
+        TrainerNames = new TextData(trName);
+        // SetText alone only updates the in-memory GameTextStrings cache - SaveText actually
+        // writes the gametext GARC back to disk, so the new names survive without requiring the
+        // user to separately open and close the general Game Text editor afterward.
+        Main.Config.SetText(TextName.TrainerNames, trName);
+        Main.Config.SaveText(TextName.TrainerNames);
+
+        LazyCombo.SetIndex(CB_TrainerID, firstNew);
+        WinFormsUtil.Alert($"Added {count} trainer slot(s): ids {firstNew}-{trdata.Length - 1}.",
+            "Each new trainer starts with an empty team - add Pokémon from the Team boxes above. "
+            + "Placing this trainer in the overworld and any NPC/script hookup still needs the "
+            + "map/AMX script editors, same as for existing trainers.");
+    }
+
     private void Setup()
     {
         AltForms = Main.Config.Personal.GetFormList(specieslist, Main.Config.MaxSpeciesID);
-        CB_TrainerID.Items.Clear(); for (int i = 0; i < trdata.Length; i++) CB_TrainerID.Items.Add(GetEntryTitle(trName[i] ?? "UNKNOWN", i));
-        CB_Trainer_Class.Items.Clear(); for (int i = 0; i < trClass.Length; i++) CB_Trainer_Class.Items.Add(GetEntryTitle(trClass[i], i));
-        Trainers[0] = new TrainerData7(); for (int i = 1; i < trdata.Length; i++) Trainers[i] = new TrainerData7(trdata[i], trpoke[i]) { Name = trName[i], ID = i };
+        int count = TrainerCount, b = Main.Config.Info.TrainerBaseCount;
+        LazyCombo.Attach(CB_TrainerID, Enumerable.Range(0, count).Select(i => (object)GetEntryTitle((trName[NameIndex(i)] ?? "UNKNOWN") + TrainerBlocks.Label(i, b), i)).ToArray());
+        LazyCombo.Attach(CB_Trainer_Class, Enumerable.Range(0, trClass.Length).Select(i => (object)GetEntryTitle(trClass[i], i)).ToArray());
+        Trainers[0] = new TrainerData7(); for (int i = 1; i < count; i++) { Trainers[i] = i < trdata.Length ? new TrainerData7(trdata[i], trpoke[i]) : LoadInferno(trdata, trpoke, i, b); Trainers[i].Name = trName[NameIndex(i)]; Trainers[i].ID = i; }
         specieslist[0] = "---"; abilitylist[0] = itemlist[0] = movelist[0] = "(None)";
         pba = [PB_Team1, PB_Team2, PB_Team3, PB_Team4, PB_Team5, PB_Team6]; foreach (var pb in pba) pb.MouseClick += ClickSlot;
         AIBits = [CHK_AI0, CHK_AI1, CHK_AI2, CHK_AI3, CHK_AI4, CHK_AI5, CHK_AI6, CHK_AI7];
+        foreach (var chk in new[] { CHK_AI0, CHK_AI1, CHK_AI2, CHK_AI6, CHK_AI7 })
+            chk.CheckedChanged += (s, e) => { if (!loading && CHK_Flag != null) CHK_Flag.Checked = CHK_AI0.Checked && CHK_AI1.Checked && CHK_AI2.Checked && CHK_AI6.Checked && CHK_AI7.Checked; };
         CB_Species.Items.Clear(); CB_Species.Items.AddRange(specieslist);
         
         if (EggMovesData == null)
@@ -869,11 +1236,10 @@ public partial class SMTE : Form
 
         CB_HPType.DataSource = types.Skip(1).Take(16).ToArray();
         CB_Nature.Items.Clear(); CB_Nature.Items.AddRange(natures.Take(25).ToArray());
-        CB_Item.Items.Clear(); CB_Item.Items.AddRange(itemlist);
+        LazyCombo.Attach(CB_Item, itemlist);
         CB_Gender.Items.Clear(); CB_Gender.Items.Add("- / Genderless/Random"); CB_Gender.Items.Add("♂ / Male"); CB_Gender.Items.Add("♀ / Female");
         CB_Forme.Items.Add(""); CB_Species.SelectedIndex = 0;
-        CB_Item_1.Items.Clear(); CB_Item_2.Items.Clear(); CB_Item_3.Items.Clear(); CB_Item_4.Items.Clear();
-        foreach (string s in itemlist) { CB_Item_1.Items.Add(s); CB_Item_2.Items.Add(s); CB_Item_3.Items.Add(s); CB_Item_4.Items.Add(s); }
+        foreach (var cbi in new[] { CB_Item_1, CB_Item_2, CB_Item_3, CB_Item_4 }) LazyCombo.Attach(cbi, itemlist);
         CB_Money.Items.Clear(); for (int i = 0; i < 256; i++) CB_Money.Items.Add(i.ToString());
         
         // Autocomplete
@@ -886,12 +1252,21 @@ public partial class SMTE : Form
         CB_Move1.AutoCompleteSource = CB_Move2.AutoCompleteSource = CB_Move3.AutoCompleteSource = CB_Move4.AutoCompleteSource = 
         CB_Nature.AutoCompleteSource = CB_Item.AutoCompleteSource = CB_Item_1.AutoCompleteSource = CB_Item_2.AutoCompleteSource = 
         CB_Item_3.AutoCompleteSource = CB_Item_4.AutoCompleteSource = AutoCompleteSource.ListItems;
+        foreach (var mc in new[] { CB_Move1, CB_Move2, CB_Move3, CB_Move4 })
+        {
+            mc.MouseDown += ExpandMoveCombo;
+            mc.KeyDown += ExpandMoveCombo;
+            mc.MouseWheel += ExpandMoveCombo;
+        }
+        WinFormsUtil.DeferAutoComplete(this);   // list refills cost ~4x with autocomplete on; it switches on when the user touches a combo
 
-        CB_TrainerID.SelectedIndex = 0; index = 0; pkm = new TrainerPoke7(); PopulateFieldsTP7(pkm);
+        LazyCombo.SetIndex(CB_TrainerID, 0); index = 0; pkm = new TrainerPoke7(); PopulateFieldsTP7(pkm);
     }
 
     private void ChangeTrainerIndex(object sender, EventArgs e)
     {
+        // The lazy list's refill re-selects the trainer that is already showing; that is not a switch.
+        if (LazyCombo.IsExpanding(CB_TrainerID) || LazyCombo.GetIndex(CB_TrainerID) < 0) return;
         if (currentSlot != -1 && index >= 0 && currentSlot < Trainers[index].NumPokemon)
         {
             var pk_current = PrepareTP7();
@@ -908,8 +1283,21 @@ public partial class SMTE : Form
         currentSlot = -1; SaveEntry(); LoadEntry(); if (TC_trdata.SelectedIndex == TC_trdata.TabCount - 1) TC_trdata.SelectedIndex = 0;
     }
 
-    private void SaveEntry() { if (index < 0) return; var tr = Trainers[index]; PrepareTR7(tr); SaveData(tr, index); TrainerNames[index] = TB_TrainerName.Text; }
-    private void SaveData(TrainerData7 tr, int i) { tr.Write(out byte[] trd, out byte[] trp); trdata[i] = trd; trpoke[i] = trp; }
+    private void SaveEntry() { if (index < 0) return; var tr = Trainers[index]; PrepareTR7(tr); SaveData(tr, index); TrainerNames[NameIndex(index)] = TB_TrainerName.Text; }
+    private void SaveData(TrainerData7 tr, int i)
+    {
+        // Uhuru blocks 5/6 have no trdata record of their own: write only the team, and set slot 0's 0x0C
+        // (team-size override) from the real shared record's count.
+        if (i >= trdata.Length)
+        {
+            int b = Main.Config.Info.TrainerBaseCount;
+            int blk = TrainerBlocks.Block(i, b), id = TrainerBlocks.BaseId(i, b);
+            int sharedCount = trdata[TrainerBlocks.TrdataBlockFor(blk) * b + id][3];
+            if (tr.Pokemon.Count > 0) tr.Pokemon[0].Friendship = TrainerBlocks.TeamSizeOverride(tr.Pokemon.Count, sharedCount);
+            tr.Write(out _, out byte[] team); trpoke[i] = team; return;
+        }
+        tr.Write(out byte[] trd, out byte[] trp); trdata[i] = trd; trpoke[i] = trp;
+    }
 
     /// <summary>
     /// Serialises every trainer back into the arrays that get written to the ROM.
@@ -925,11 +1313,12 @@ public partial class SMTE : Form
 
     private void LoadEntry()
     {
-        index = CB_TrainerID.SelectedIndex;
+        index = LazyCombo.GetIndex(CB_TrainerID);
         var tr = Trainers[index];
         loading = true;
-        TB_TrainerName.Text = TrainerNames[index];
+        TB_TrainerName.Text = TrainerNames[NameIndex(index)];
         PopulateFieldsTD7(tr);
+        UpdateUhuruAccess(index);
         loading = false;
 
         UpdateMoneyTranslation();
@@ -951,10 +1340,21 @@ public partial class SMTE : Form
         pkm.Form = CB_Forme.SelectedIndex >= 0 ? CB_Forme.SelectedIndex : 0;
 
         CB_Ability.SelectedIndex = Math.Min(AbilitySlotToIndex(pkm.Ability), CB_Ability.Items.Count - 1);
-        CB_Item.SelectedIndex = Math.Min(pkm.Item, CB_Item.Items.Count - 1);
+        LazyCombo.SetIndex(CB_Item, Math.Min(pkm.Item, LazyCombo.Count(CB_Item) - 1));
         CHK_Shiny.Checked = pkm.Shiny;
+        if (CB_Colour != null)
+        {
+            while (CB_Colour.Items.Count > ColourNames.Length) CB_Colour.Items.RemoveAt(CB_Colour.Items.Count - 1);
+            if (pkm.Colour >= ColourNames.Length) CB_Colour.Items.Add($"Raw {pkm.Colour}");
+            CB_Colour.SelectedIndex = Math.Min(pkm.Colour, CB_Colour.Items.Count - 1);
+        }
         CB_Gender.SelectedIndex = Math.Min(pkm.Gender, CB_Gender.Items.Count - 1);
-        
+        if (CB_Passive != null)
+        {
+            var passives = pkm.Passives;
+            for (int i = 0; i < 3; i++) LazyCombo.SetIndex(CB_Passive[i], Math.Min(passives[i], pk3DS.Core.Modding.PassiveGuard.MaxId)); // a stored id above 345 shows as the last entry
+        }
+
         UpdateMoveDropdowns(pkm.Species, pkm.Form);
         SetComboMoveValue(CB_Move1, pkm.Move1);
         SetComboMoveValue(CB_Move2, pkm.Move2);
@@ -968,6 +1368,8 @@ public partial class SMTE : Form
         TB_HPEV.Text = pkm.EV_HP.ToString(); TB_ATKEV.Text = pkm.EV_ATK.ToString(); TB_DEFEV.Text = pkm.EV_DEF.ToString();
         TB_SPAEV.Text = pkm.EV_SPA.ToString(); TB_SPEEV.Text = pkm.EV_SPE.ToString(); TB_SPDEV.Text = pkm.EV_SPD.ToString();
         if (TB_Happiness != null) TB_Happiness.Text = pkm.Friendship.ToString();
+        // Inferno slot 0's 0x0C is the team-size override, rewritten on save (SaveData): not editable as happiness.
+        if (TB_Happiness != null) TB_Happiness.Enabled = !(GB_Uhuru != null && index >= trdata.Length && currentSlot == 0);
         var ts = new TrackBar[] { TB_HPEV_Slider, TB_ATKEV_Slider, TB_DEFEV_Slider, TB_SPAEV_Slider, TB_SPDEV_Slider, TB_SPEEV_Slider };
         var tbs = new MaskedTextBox[] { TB_HPEV, TB_ATKEV, TB_DEFEV, TB_SPAEV, TB_SPDEV, TB_SPEEV };
         for(int i = 0; i < 6; i++) if (ts[i] != null) { int val = WinFormsUtil.ToInt32(tbs[i]); ts[i].Value = val > 252 ? 252 : val; }
@@ -980,7 +1382,8 @@ public partial class SMTE : Form
     private TrainerPoke7 PrepareTP7()
     {
         var pk = pkm.Clone(); pk.Species = CB_Species.SelectedIndex; pk.Form = CB_Forme.SelectedIndex >= 0 ? CB_Forme.SelectedIndex : 0; pk.Level = (byte)NUD_Level.Value;
-        pk.Ability = AbilityIndexToSlot(CB_Ability.SelectedIndex); pk.Item = CB_Item.SelectedIndex; pk.Shiny = CHK_Shiny.Checked; pk.Nature = CB_Nature.SelectedIndex; pk.Gender = CB_Gender.SelectedIndex;
+        pk.Ability = AbilityIndexToSlot(CB_Ability.SelectedIndex); pk.Item = LazyCombo.GetIndex(CB_Item); pk.Shiny = CHK_Shiny.Checked; pk.Nature = CB_Nature.SelectedIndex; pk.Gender = CB_Gender.SelectedIndex;
+        if (CB_Colour != null && CB_Colour.SelectedIndex >= 0) pk.Colour = CB_Colour.SelectedIndex < ColourNames.Length ? CB_Colour.SelectedIndex : pkm.Colour;
         pk.Move1 = GetComboMoveValue(CB_Move1);
         pk.Move2 = GetComboMoveValue(CB_Move2);
         pk.Move3 = GetComboMoveValue(CB_Move3);
@@ -990,21 +1393,35 @@ public partial class SMTE : Form
         pk.IV_HP = WinFormsUtil.ToInt32(TB_HPIV); pk.IV_ATK = WinFormsUtil.ToInt32(TB_ATKIV); pk.IV_DEF = WinFormsUtil.ToInt32(TB_DEFIV);
         pk.IV_SPA = WinFormsUtil.ToInt32(TB_SPAIV); pk.IV_SPE = WinFormsUtil.ToInt32(TB_SPEIV); pk.IV_SPD = WinFormsUtil.ToInt32(TB_SPDIV);
         if (TB_Happiness != null) pk.Friendship = WinFormsUtil.ToInt32(TB_Happiness);
+        if (CB_Passive != null) pk.Passives = CB_Passive.Select(cb => Math.Max(LazyCombo.GetIndex(cb), 0)).ToArray();
         return pk;
     }
 
     private void PopulateFieldsTD7(TrainerData7 tr)
     {
-        CB_Trainer_Class.SelectedIndex = tr.TrainerClass; NUD_NumPoke.Value = tr.NumPokemon;
-        CB_Item_1.SelectedIndex = tr.Item1; CB_Item_2.SelectedIndex = tr.Item2; CB_Item_3.SelectedIndex = tr.Item3; CB_Item_4.SelectedIndex = tr.Item4;
-        CB_Money.SelectedIndex = tr.Money; CB_Mode.SelectedIndex = (int)tr.Mode; LoadAIBits((uint)tr.AI); CHK_Flag.Checked = tr.Flag; PopulateTeam(tr);
+        LazyCombo.SetIndex(CB_Trainer_Class, tr.TrainerClass); NUD_NumPoke.Value = tr.NumPokemon;
+        LazyCombo.SetIndex(CB_Item_1, tr.Item1); LazyCombo.SetIndex(CB_Item_2, tr.Item2); LazyCombo.SetIndex(CB_Item_3, tr.Item3); LazyCombo.SetIndex(CB_Item_4, tr.Item4);
+        CB_Money.SelectedIndex = tr.Money; CB_Mode.SelectedIndex = (int)tr.Mode; LoadAIBits((uint)tr.AI); CHK_Flag.Checked = (tr.AI & 0xC7) == 0xC7 || tr.Flag; PopulateTeam(tr);
+        if (GB_Uhuru != null)
+        {
+            NUD_LevelOffset.Value = tr.LevelOffset;
+            int raw = tr.Pokemon.Count > 0 ? tr.Pokemon[0].TeamLevelOffset : 0;
+            CHK_TeamScale.Checked = raw != 0;
+            NUD_TeamOffset.Value = raw != 0 ? raw - 0x80 : 0;
+        }
     }
 
     private void PrepareTR7(TrainerData7 tr)
     {
-        tr.TrainerClass = (byte)CB_Trainer_Class.SelectedIndex; tr.NumPokemon = (byte)NUD_NumPoke.Value;
-        tr.Item1 = CB_Item_1.SelectedIndex; tr.Item2 = CB_Item_2.SelectedIndex; tr.Item3 = CB_Item_3.SelectedIndex; tr.Item4 = CB_Item_4.SelectedIndex;
+        tr.TrainerClass = (byte)LazyCombo.GetIndex(CB_Trainer_Class); tr.NumPokemon = (byte)NUD_NumPoke.Value;
+        tr.Item1 = LazyCombo.GetIndex(CB_Item_1); tr.Item2 = LazyCombo.GetIndex(CB_Item_2); tr.Item3 = LazyCombo.GetIndex(CB_Item_3); tr.Item4 = LazyCombo.GetIndex(CB_Item_4);
         tr.Money = CB_Money.SelectedIndex; tr.Mode = (BattleMode)CB_Mode.SelectedIndex; tr.AI = (int)SaveAIBits(); tr.Flag = CHK_Flag.Checked;
+        if (GB_Uhuru != null)
+        {
+            tr.LevelOffset = (int)NUD_LevelOffset.Value;
+            if (index >= trdata.Length && tr.Pokemon.Count > 0)
+                tr.Pokemon[0].TeamLevelOffset = CHK_TeamScale.Checked ? 0x80 + (int)NUD_TeamOffset.Value : 0;
+        }
     }
 
     private void LoadAIBits(uint val) { for (int i = 0; i < AIBits.Length; i++) AIBits[i].Checked = ((val >> i) & 1) == 1; }
@@ -1016,7 +1433,12 @@ public partial class SMTE : Form
         // SaveEntry covers the visible trainer; SaveAllEntries catches anything edited in memory by
         // a bulk action, so nothing depends on which trainer happened to be selected at close.
         SaveEntry(); SaveAllEntries();
-        if (TrainerNames.Modified) Main.Config.SetText(TextName.TrainerNames, TrainerNames.Lines);
+        if (TrainerNames.Modified)
+        {
+            // SetText only updates memory; SaveText writes the gametext GARC (same as Add Trainer).
+            Main.Config.SetText(TextName.TrainerNames, TrainerNames.Lines);
+            Main.Config.SaveText(TextName.TrainerNames);
+        }
         base.OnFormClosing(e); RandSettings.SetFormSettings(this, Tab_Rand.Controls);
     }
 
@@ -1042,7 +1464,13 @@ public partial class SMTE : Form
     }
 
     private void UpdateNumPokemon(object sender, EventArgs e) { if (index < 0) return; Trainers[index].NumPokemon = (int)NUD_NumPoke.Value; }
-    private void UpdateTrainerName(object sender, EventArgs e) { if (loading) return; string str = TB_TrainerName.Text; CB_TrainerID.Items[index] = GetEntryTitle(str, index); }
+    private void UpdateTrainerName(object sender, EventArgs e)
+    {
+        if (loading) return;
+        // Every difficulty block's copy of this trainer shares the name; a normal ROM visits only `index`.
+        int b = Main.Config.Info.TrainerBaseCount, n = LazyCombo.Count(CB_TrainerID);
+        for (int i = NameIndex(index); i < n; i += b > 0 ? b : n) LazyCombo.SetItem(CB_TrainerID, i, GetEntryTitle(TB_TrainerName.Text + TrainerBlocks.Label(i, b), i));
+    }
     private static bool updatingStats;
 
     private void UpdateStats(object sender, EventArgs e)
@@ -1127,7 +1555,7 @@ public partial class SMTE : Form
 
                 int needed = TextRenderer.MeasureText(text, L_StatBars[i].Font).Width + 6;
                 L_StatBars[i].Width = Math.Min(80, Math.Max(needed, val / 4));
-                L_StatBars[i].BackColor = val >= 300 ? Color.FromArgb(70, 200, 250) : val >= 200 ? Color.FromArgb(120, 220, 100) : val >= 100 ? Color.FromArgb(240, 220, 80) : Color.FromArgb(250, 150, 80);
+                L_StatBars[i].BackColor = pk3DS.WinForms.Controls.StatBar.GetDynamicTrainerStatColor(val);
                 L_StatBars[i].ForeColor = Color.Black;
             }
         }
@@ -1145,7 +1573,7 @@ public partial class SMTE : Form
     private void B_Randomize_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Randomize all?") != DialogResult.Yes) return;
-        CB_TrainerID.SelectedIndex = 0; var rnd = new SpeciesRandomizer(Main.Config) { G1 = CHK_G1.Checked, G2 = CHK_G2.Checked, G3 = CHK_G3.Checked, G4 = CHK_G4.Checked, G5 = CHK_G5.Checked, G6 = CHK_G6.Checked, G7 = CHK_G7.Checked, G8 = CHK_G8.Checked, G9 = CHK_G9.Checked, E = CHK_E.Checked, L = CHK_L.Checked, rBST = CHK_BST.Checked }; rnd.Initialize();
+        LazyCombo.SetIndex(CB_TrainerID, 0); var rnd = new SpeciesRandomizer(Main.Config) { G1 = CHK_G1.Checked, G2 = CHK_G2.Checked, G3 = CHK_G3.Checked, G4 = CHK_G4.Checked, G5 = CHK_G5.Checked, G6 = CHK_G6.Checked, G7 = CHK_G7.Checked, G8 = CHK_G8.Checked, G9 = CHK_G9.Checked, E = CHK_E.Checked, L = CHK_L.Checked, rBST = CHK_BST.Checked }; rnd.Initialize();
         var move = new MoveRandomizer(Main.Config) { rSTABCount = (int)NUD_STAB.Value, rDMGCount = (int)NUD_Damage.Value };
         var items = Randomizer.GetRandomItemList();
         for (int i = 0; i < Trainers.Length; i++)
@@ -1605,13 +2033,13 @@ public partial class SMTE : Form
     private void B_MaxIVsAll_Click(object sender, EventArgs e) { foreach (var t in Trainers) foreach (var p in t.Pokemon) p.IV_HP = p.IV_ATK = p.IV_DEF = p.IV_SPA = p.IV_SPD = p.IV_SPE = 31; SaveAllEntries(); LoadEntry(); }
     private void B_DoublesAll_Click(object sender, EventArgs e) { foreach (var t in Trainers) t.Mode = BattleMode.Doubles; SaveAllEntries(); LoadEntry(); }
     private void B_PokeChangeAll_Click(object sender, EventArgs e) { foreach (var t in Trainers) t.AI |= (1 << 6); SaveAllEntries(); LoadEntry(); }
-    private void B_Master_Click(object sender, EventArgs e) { CHK_AI0.Checked = CHK_AI1.Checked = CHK_AI2.Checked = true; }
-    private void B_MasterAll_Click(object sender, EventArgs e) { foreach (var t in Trainers) t.AI |= 0x7; SaveAllEntries(); LoadEntry(); }
+    private void B_Master_Click(object sender, EventArgs e) { CHK_AI0.Checked = CHK_AI1.Checked = CHK_AI2.Checked = CHK_AI6.Checked = CHK_AI7.Checked = true; if (CHK_Flag != null) CHK_Flag.Checked = true; }
+    private void B_MasterAll_Click(object sender, EventArgs e) { foreach (var t in Trainers) { t.AI |= 0xC7; t.Flag = true; } SaveAllEntries(); LoadEntry(); }
 
     private void B_Clear_Click(object sender, EventArgs e) => SetMoves(new int[4]);
     private void B_CurrentAttack_Click(object sender, EventArgs e) { var m = learn.GetCurrentMoves(CB_Species.SelectedIndex, CB_Forme.SelectedIndex, (int)NUD_Level.Value, 4); SetMoves(m); }
     private void B_HighAttack_Click(object sender, EventArgs e) { TB_ATKIV.Text = "31"; TB_ATKEV.Text = "252"; }
-    private void SetMoves(IList<int> moves) { var cbs = new[] { CB_Move1, CB_Move2, CB_Move3, CB_Move4 }; for (int i = 0; i < 4; i++) cbs[i].SelectedIndex = moves[i]; }
+    private void SetMoves(IList<int> moves) { var cbs = new[] { CB_Move1, CB_Move2, CB_Move3, CB_Move4 }; for (int i = 0; i < 4; i++) SetComboMoveValue(cbs[i], moves[i]); }
     private void CB_Moves_SelectedIndexChanged(object sender, EventArgs e) { CHK_Damage.Enabled = CHK_STAB.Enabled = CB_Moves.SelectedIndex == 1; }
     private void CHK_Damage_CheckedChanged(object sender, EventArgs e) => NUD_Damage.Enabled = CHK_Damage.Checked;
     private void CHK_STAB_CheckedChanged(object sender, EventArgs e) => NUD_STAB.Enabled = CHK_STAB.Checked;

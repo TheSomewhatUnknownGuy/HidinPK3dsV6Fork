@@ -25,6 +25,10 @@
     <Content Include="..\patch-packages\*.json" LinkBase="patch-packages">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Translations (TextPackage JSON), installed by the Uhuru English prompt; kept out of patch-packages so the Recipes list never shows them. -->
+    <Content Include="..\text-packages\*.json" LinkBase="text-packages">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <!-- Loose .ips code patches, kept in per-version folders. US and UM share file names but hold
          different offsets, so the folder structure is what keeps them apart. -->
     <Content Include="..\other-ips\**\*.ips" LinkBase="other-ips">
@@ -76,8 +80,20 @@
       <Link>UM\%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\4.xdelta" Condition="Exists('..\4.xdelta')">
-      <Link>4.xdelta</Link>
+    <!-- CustomSpriteEditor reads/writes Application.StartupPath\CustomSprites at runtime, so the
+         real source of truth for these sprites (checked into the repo root) needs to be synced
+         into every build output directory, the same way US\/UM\ are — otherwise sprites only
+         exist wherever someone happened to manually drop them into a bin\ folder and are lost on
+         a clean build or when running from a different configuration. -->
+    <Content Include="..\CustomSprites\**\*.*" Condition="Exists('..\CustomSprites')">
+      <Link>CustomSprites\%(RecursiveDir)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- ItemSpriteCache reads AppDomain.BaseDirectory\ItemSprites at runtime, so the downloaded
+         art has to reach every build output the same way CustomSprites does - otherwise the
+         sprites only exist in the repo root and every lookup misses. -->
+    <Content Include="..\ItemSprites\**\*.*" Condition="Exists('..\ItemSprites')">
+      <Link>ItemSprites\%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <!-- CustomSpriteEditor reads/writes Application.StartupPath\CustomSprites at runtime, so the

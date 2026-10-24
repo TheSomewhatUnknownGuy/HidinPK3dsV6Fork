@@ -1,0 +1,31 @@
+{
+  "Name": "Hadron Engine",
+  "Description": "Hadron Engine (Ability 289). Sets Electric Terrain upon switch-in (timing 0xA7 via 0x5F200) and boosts Special Attack by 33% (1.33x in Q12 fixed-point) while Electric Terrain is active during damage calculation (timing 0x4A via terrain check 0xE2274 and stat boost channel 0x83108).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 289,
+      "Name": "Hadron Engine",
+      "Slots": [
+        {
+          "Timing": "0xA7",
+          "Code": "00402DE97D7CF9EB0080BDE8",
+          "SourceBase": "0x200000"
+        },
+        {
+          "Timing": "0x4A",
+          "Code": "70402DE90150A0E10240A0E10300A0E3D01EFAEB040050E10B00001A1E00A0E3CC1EFAEB020050E30700001A0500A0E18F88FBEB030050E30300001A3900A0E3151CA0E3551081E32E0CFAEB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

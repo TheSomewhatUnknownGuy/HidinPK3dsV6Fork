@@ -1,0 +1,26 @@
+{
+  "Name": "Intrepid Sword",
+  "Description": "Intrepid Sword (Ability 234). Boosts the Pokémon's Attack stat by 1 stage upon entering battle (timing 0xA7 switch-in, flashing banner via 0x89E28 and queueing stat boost packet via 0x7CCF4).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 234,
+      "Name": "Intrepid Sword",
+      "Slots": [
+        {
+          "Timing": "0xA7",
+          "Code": "70402DE90140A0E10250A0E10400A0E10110A0E30520A0E18227FAEB0400A0E10D10A0E30520A0E1B21DFAEB0060A0E10100A0E30400C6E50C50C6E51000C6E51100C6E50600A0E31200C6E50400A0E10610A0E126F3F9EB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

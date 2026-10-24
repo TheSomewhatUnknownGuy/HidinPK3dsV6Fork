@@ -1,0 +1,42 @@
+{
+  "Name": "Pastel Veil",
+  "Description": "Pastel Veil (Ability 257). Prevents the Pok\u00E9mon and its allies from being poisoned (timing 0x3A \u0026 0x7C).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 257,
+      "Name": "Pastel Veil",
+      "Slots": [
+        {
+          "Timing": "0x3A",
+          "Code": "0100A0E10210A0E10320A0E3310BFAEA",
+          "SourceBase": "0x200000",
+          "TimingByte": 58,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "AQCg4QIQoOEDIKDjMQv66g=="
+        },
+        {
+          "Timing": "0x7C",
+          "Code": "F0402DE90260A0E10170A0E10340A0E10400A0E3CF1EFAEBFF5000E2040097E50610A0E10520A0E1E850FAEB000050E30400000A0520A0E30510A0E10700A0E16E7EF9EB000084E5F080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 124,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "8EAt6QJgoOEBcKDhA0Cg4QQAoOPPHvrr/1AA4gQAl+UGEKDhBSCg4ehQ+usAAFDjBAAACgUgoOMFEKDhBwCg4W5++esAAITl8IC96A=="
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

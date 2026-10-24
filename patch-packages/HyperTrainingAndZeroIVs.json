@@ -1,0 +1,118 @@
+{
+  "Name": "Hyper Training and Zero IV Shards",
+  "Description": "Golden Bottle Cap sets all six IVs to 31; Zero Attack / Zero Speed Shards set that IV to 0. REBUILT 2026-09-26 on the bag's real use path, replacing the FlipTokuseiIndex/Ability-Capsule design, which could never run for these items: Bag.cro 0x99D4 sends only item 645 to the Ability Capsule flow, so the old 0x099DC/0x0DCBC hooks forced every custom id into the 'change Ability?' prompt instead. Now the item is an ordinary non-645 clone: Use goes 0x977C -> 0x9C50 -> 0xC2F0, where one shared block (bag-item-effects) hooks both ITEM_RCV_RecoverCheck calls (0xC318 use, 0xDDC8 ABLE label), the no-handler branch (0xC358) and the message fallback (0x80DC). Handlers call code.bin directly (ChangeTalentPower / ChangeEffortPower / SetTokuseiIndex recalc stats themselves; nature is written where GetSeikaku reads it and stats refreshed), with the Ultra Moon +8 drift of 0x4A____ functions probed at runtime. Success plays the stock use sound and a message (bag text file 1, lines 159-164, added by this package); no effect shows 'It won't have any effect.' Consumption follows the item's own UseKeep flag.",
+  "Category": "Item",
+  "Requires": [],
+  "Parameters": {
+    "goldenCapId": {
+      "Description": "Item ID for Golden Bottle Cap (default: 871).",
+      "Type": "item",
+      "Default": "871",
+      "AllowUnnamed": true
+    },
+    "zeroAtkId": {
+      "Description": "Item ID for Zero Attack Shard (default: 872).",
+      "Type": "item",
+      "Default": "872",
+      "AllowUnnamed": true
+    },
+    "zeroSpeedId": {
+      "Description": "Item ID for Zero Speed Shard (default: 873).",
+      "Type": "item",
+      "Default": "873",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {
+    "Bag.cro": {
+      "Blocks": [
+        {
+          "Name": "bag-item-effects",
+          "Code": "1F402DE93B0000EB000050E30600000A00009DE50210A0E3B4A1FFEB010000E2010020E204D08DE21E80BDE81F40BDE8D4A1FFEA0510A0E12E0000EB000050E301D2FF0A0010A0E144009DE5320000EB000050E31ED2FF0A020050E30D00000A0160A0E10030A0E388039FE50020E0E30310A0E161A0FFEB000056E3F2D1FF0A700094E5011C86E244209DE50030A0E3FFBFFFEBECD1FFEA08D04DE200908DE50000A0E304008DE50400A0E10410A0E30520A0E10030A0E318C5FFEB08D08DE20400A0E16AC4FFEBF9D1FFEA010C55E3DAC0FF3A0720A0E10010A0E30900A0E140A1FFEB012C45E20810A0E10900A0E1DAA0FFEBD5C0FFEAE32F8FE20000A0E1040092E4000050E31EFF2F010038A0E1230851E1F9FFFF1A1EFF2FE1F0412DE90040A0E1215CA0E12168A0E1FF6006E2C4029FE5000090E5C0129FE5010050E10080A0030880A013080056E306F18F30070000EA0C0000EA170000EA3E0000EA550000EA6B0000EA7A0000EA8A0000EA9D0000EA0000A0E30010A0E3F081BDE80100A0E30710A0E1F081BDE8190055E3F7FFFF2A0400A0E15CC29FE508C08CE03CFF2FE1050050E1F1FFFF0A0510A0E10B0000EB9F70A0E3F0FFFFEA0400A0E134C29FE508C08CE03CFF2FE1011080E2190051E30010A023010000EB9F70A0E3E6FFFFEAE0402DE90150A0E10C6094E50600A0E108C29FE53CFF2FE10600A0E10010A0E3FCC19FE508C08CE03CFF2FE11450C0E50600A0E1ECC19FE53CFF2FE10150A0E30400A0E10510A0E1DCC19FE508C08CE03CFF2FE10020A0E10400A0E10510A0E1C8C19FE53CFF2FE1015085E2060055E3F2FFFF3AE080BDE80400A0E1B0C19FE508C08CE03CFF2FE10060A0E1020050E30010A0030210A0130400A0E194C19FE53CFF2FE10400A0E18CC19FE508C08CE03CFF2FE1000050E30400001A0400A0E10610A0E16CC19FE53CFF2FE1AFFFFFEAA070A0E3B0FFFFEA1F0055E3ABFFFF8A0060A0E30070A0E30400A0E10610A0E134C19FE508C08CE03CFF2FE1050050E10170A0130400A0E10610A0E10520A0E118C19FE53CFF2FE1016086E2060056E3F0FFFF3A000057E398FFFF0AA170A0E399FFFFEA060055E394FFFF2A0400A0E10510A0E1E0C09FE508C08CE03CFF2FE1000050E38DFFFF0A0400A0E10510A0E10020A0E3C4C09FE53CFF2FE1A270A0E389FFFFEA100055E384FFFF2AC4708FE20000A0E1857087E0057187E00060A0E30620D7E70400A0E10610A0E18CC09FE53CFF2FE1016086E2060056E3F7FFFF3AA370A0E378FFFFEA0060A0E30070A0E30400A0E10610A0E170C09FE508C08CE03CFF2FE1007087E10400A0E10610A0E10020A0E358C09FE53CFF2FE1016086E2060056E3F1FFFF3A000057E363FFFF0AA470A0E364FFFFEA0200A0E30010A0E3F081BDE821000500E0E04A0010402DE98C25320088D54A00142532001CEA4A00844D32000CE84A00804832000CD04A00FCE54A000C4C32001F1F1E1E1E1E1F1F1F1E1E1E1F1F1E1E1E1F1F1F1F1E1E1F1F1F1E1F1E1E1F1F1F1F1E1E1F1E1F1F1E1F1F1F1F1F1E1F1F1E1F1E1F1E1F1F1F1E1F1E1F1E1F1E1F1F1F1F1F1E1F1F1F1E1F1F1F1E1F1F1F1F1F1E1F1E1F1F1F1F1F1F1F1F1F1F00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "SourceBase": "0x018010"
+        }
+      ],
+      "SitePatches": [
+        {
+          "Offset": "0x0C318",
+          "Original": "1ED1FFEB",
+          "Patched": "3C2F00EB",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:recover"
+        },
+        {
+          "Offset": "0x0DDC8",
+          "Original": "72CAFFEB",
+          "Patched": "902800EB",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:recover"
+        },
+        {
+          "Offset": "0x0C358",
+          "Original": "3F0100EA",
+          "Patched": "392F00EA",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:dispatch"
+        },
+        {
+          "Offset": "0x080DC",
+          "Original": "DB0000EA",
+          "Patched": "FE3F00EA",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:message"
+        }
+      ]
+    }
+  },
+  "CodeBin": null,
+  "DataTables": [
+    {
+      "Target": "Bag.cro",
+      "Block": "bag-item-effects",
+      "Offset": "0x48C",
+      "ElementSize": 4,
+      "Values": "${goldenCapId}+0x1F030000,${zeroAtkId}+0x1040000,${zeroSpeedId}+0x5040000",
+      "Terminate": true,
+      "Capacity": 96
+    }
+  ],
+  "ItemData": {
+    "${goldenCapId}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${zeroAtkId}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    },
+    "${zeroSpeedId}": {
+      "CloneFrom": "645",
+      "Pocket": "0"
+    }
+  },
+  "ItemNames": {
+    "${goldenCapId}": "Golden Bottle Cap",
+    "${zeroAtkId}": "Zero Attack Shard",
+    "${zeroSpeedId}": "Zero Speed Shard"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${goldenCapId}": "A beautiful golden bottle cap. When used on a Pokémon, all six of its Individual Values (IVs) become 31.",
+    "${zeroAtkId}": "A mysterious shard. When used on a Pokémon, its Attack Individual Value (IV) becomes 0.",
+    "${zeroSpeedId}": "A mysterious shard. When used on a Pokémon, its Speed Individual Value (IV) becomes 0."
+  },
+  "GameTextLines": {
+    "1": {
+      "159": "[VAR PKNICK(0000)]’s Nature changed!",
+      "160": "[VAR PKNICK(0000)]’s Ability changed!",
+      "161": "[VAR PKNICK(0000)]’s potential was\\nmaxed out!",
+      "162": "[VAR PKNICK(0000)]’s potential was\\nlowered!",
+      "163": "[VAR PKNICK(0000)]’s Hidden Power\\nchanged!",
+      "164": "[VAR PKNICK(0000)]’s base stats\\nwere reset!"
+    }
+  }
+}

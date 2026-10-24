@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -59,6 +60,16 @@ public static class Util
         {
             int r = i + (int)(Rand.NextDouble() * (n - i));
             (array[r], array[i]) = (array[i], array[r]);
+        }
+    }
+
+    public static void Shuffle<T>(IList<T> list)
+    {
+        int n = list.Count;
+        for (int i = 0; i < n; i++)
+        {
+            int r = i + (int)(Rand.NextDouble() * (n - i));
+            (list[r], list[i]) = (list[i], list[r]);
         }
     }
 

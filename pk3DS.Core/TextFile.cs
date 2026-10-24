@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -196,6 +196,9 @@ public class TextFile
 
             switch (val)
             {
+                // Carriage return: ignore raw CR to prevent 0x000D injection
+                case '\r':
+                    break;
                 // Variable
                 case '[':
                 {
@@ -212,8 +215,15 @@ public class TextFile
                 // Escaped Formatting
                 case '\\':
                 {
-                    var escapeValues = GetEscapeValues(line[i++]);
-                    foreach (ushort v in escapeValues) bw.Write(v);
+                    if (i < line.Length)
+                    {
+                        var escapeValues = GetEscapeValues(line[i++]);
+                        foreach (ushort v in escapeValues) bw.Write(v);
+                    }
+                    else
+                    {
+                        bw.Write(val);
+                    }
                     break;
                 }
                 default:
@@ -325,7 +335,7 @@ public class TextFile
             case '[': vals.Add('['); return vals;
             case 'r': vals.AddRange([KEY_VARIABLE, 1, KEY_TEXTRETURN]); return vals;
             case 'c': vals.AddRange([KEY_VARIABLE, 1, KEY_TEXTCLEAR]); return vals;
-            default: throw new Exception("Invalid terminated line: \\" + esc);
+            default: vals.Add(esc); return vals;
         }
     }
 

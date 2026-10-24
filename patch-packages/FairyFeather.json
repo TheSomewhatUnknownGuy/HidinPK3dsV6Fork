@@ -46,5 +46,14 @@
   },
   "ItemNames": {
     "${itemId}": "Fairy Feather"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Fairy Feathers"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Fairy Feather[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis feather boosts the power of\nFairy-type moves."
   }
 }

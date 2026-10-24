@@ -1,0 +1,34 @@
+{
+  "Name": "Sharpness",
+  "Description": "Sharpness (Ability 292). Powers up slicing moves by 50% during damage calculation (timing 0x4A).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 292,
+      "Name": "Sharpness",
+      "Slots": [
+        {
+          "Timing": "0x4A",
+          "Code": "10402DE90240A0E10300A0E3D11EFAEB040050E10A00001A1200A0E3CD1EFAEB7000FFE61110A0E36E00F8EB010050E30300001A061BA0E31040BDE83900A0E3300CFAEA1080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 74,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "EEAt6QJAoOEDAKDj0R766wQAUOEKAAAaEgCg480e+utwAP/mERCg424A+OsBAFDjAwAAGgYboOMQQL3oOQCg4zAM+uoQgL3o"
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

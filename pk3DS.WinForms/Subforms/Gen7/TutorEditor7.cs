@@ -108,6 +108,7 @@ public partial class TutorEditor7 : Form
 
     private void B_Save_Click(object sender, EventArgs e)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(CROPath) is { } uhuru) { WinFormsUtil.Alert(uhuru); Close(); return; }
         if (entryBPMove > -1) SetListBPMove();
         SyncTutorsToCodeBin();
         File.WriteAllBytes(CROPath, data);
@@ -119,6 +120,7 @@ public partial class TutorEditor7 : Form
     {
         string fullCodePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.ExeFSPath);
         if (!File.Exists(fullCodePath)) return;
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(fullCodePath) != null) return;
 
         // Use the IN-MEMORY data instead of reading from disk to avoid race conditions
         var tutorData = GetUSUMTutorData(CROPath, Tutors_USUM, data);

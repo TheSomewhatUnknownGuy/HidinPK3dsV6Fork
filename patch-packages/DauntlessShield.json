@@ -1,0 +1,26 @@
+{
+  "Name": "Dauntless Shield",
+  "Description": "Dauntless Shield (Ability 235). Boosts the Pokémon's Defense stat by 1 stage upon entering battle (timing 0xA7 switch-in, flashing banner via 0x89E28 and queueing stat boost packet via 0x7CCF4).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 235,
+      "Name": "Dauntless Shield",
+      "Slots": [
+        {
+          "Timing": "0xA7",
+          "Code": "70402DE90140A0E10250A0E10400A0E10110A0E30520A0E18227FAEB0400A0E10D10A0E30520A0E1B21DFAEB0060A0E10200A0E30400C6E50C50C6E50100A0E31000C6E51100C6E50600A0E31200C6E50400A0E10610A0E125F3F9EB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

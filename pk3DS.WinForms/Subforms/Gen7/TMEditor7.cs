@@ -7,220 +7,209 @@ using pk3DS.Core;
 using pk3DS.Core.Modding;
 using pk3DS.Core.Modding.Research;
 using pk3DS.Core.CTR;
+using pk3DS.Core.Structures.PersonalInfo;
 
 namespace pk3DS.WinForms;
 
 public partial class TMEditor7 : Form
 {
-    private bool isSplitTablePatchApplied = false;
+    private readonly string codebin;
+    private byte[] data;                     // code.bin as this form last read or wrote it
+    private readonly TMTable table;          // null = read-only, reason in L_Status
+    private readonly ushort[] openMoves;     // moves as opened, for the compatibility remap
+    private readonly string[] movelist = Main.Config.GetText(TextName.MoveNames);
+    private bool dirty;
+
     public TMEditor7()
     {
         InitializeComponent();
-        if (Main.ExeFSPath == null) { WinFormsUtil.Alert("No exeFS code to load."); Close(); }
-        string[] files = Directory.GetFiles(Main.ExeFSPath);
-        if (!File.Exists(files[0]) || !Path.GetFileNameWithoutExtension(files[0]).Contains("code")) { WinFormsUtil.Alert("No .code.bin detected."); Close(); }
-        data = File.ReadAllBytes(files[0]);
-        if (data.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); }
-
-        // Universal TM Table Detection
-        // TM01: Work Up (526), TM02: Dragon Claw (337), TM03: Psyshock (473)
-        // Little-endian ushorts: [0x0E, 0x02, 0x51, 0x01, 0xD9, 0x01]
-        byte[] tmSig = [0x0E, 0x02, 0x51, 0x01, 0xD9, 0x01];
-        int foundOfs = Util.IndexOfBytes(data, tmSig, 0x100000, 0);
-        if (foundOfs >= 0)
-        {
-            offset = foundOfs;
-        }
-        else
-        {
-            // Fallback to standard signature search
-            offset = Util.IndexOfBytes(data, Signature, 0x400000, 0) + Signature.Length;
-            if (Main.Config.USUM) offset += 0x22;
-        }
-        codebin = files[0];
+        codebin = Main.ExeFSPath == null ? null : ExeFS.ResolveCodeBin(Main.ExeFSPath);
+        if (codebin == null || !File.Exists(codebin)) { WinFormsUtil.Alert("No .code.bin detected."); Close(); return; }
+        data = File.ReadAllBytes(codebin);
+        if (data.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); return; }
         movelist[0] = "";
-
-
-        // Auto-detect expansion start ID
-        DetectExpansionStartID();
-        
-        // Auto-detect expansion from binary by scanning for CMP instructions
-        if (File.Exists(codebin))
-        {
-            int detectedCount = DetectTMCount(data);
-            if (detectedCount > 0 && detectedCount != (int)NUD_TMCount.Value)
-            {
-                skipUpdate = true;
-                NUD_TMCount.Value = Math.Min(detectedCount, NUD_TMCount.Maximum);
-                skipUpdate = false;
-            }
-        }
-
+        table = TMTable.Locate(data, out string err);
+        L_Status.Text = table == null ? "TM table not recognised: " + err + " (read-only)" : $"{table.Layout}, {table.Count} TMs";
+        openMoves = table?.ReadMoves(data) ?? [];
         SetupDGV();
         GetList();
-        TB_Offset.Text = offset.ToString("X");
-        
-        if (isSplitTablePatchApplied)
-        {
-            TB_Offset.Enabled = false;
-        }
-
-        // TM expansion initialization complete
+        B_Save.Enabled = B_RTM.Enabled = B_ImportTxt.Enabled = table != null;
+        B_Expand.Enabled = table?.Layout == TMTable.Kind.Stock;
+        dgvTM.CellValueChanged += (_, _) => dirty = true;
     }
 
-    /// <summary>
-    /// True when the loaded ROM is an Expansion Pack build, which is what decides whether the TM
-    /// table is treated as 128 pure TMs or as the stock 100 TMs plus the vestigial HM block.
-    /// </summary>
-    private bool expansionActive;
-
-    // Resolved from the loaded game's item table rather than fixed, so the block lands after
-    // whatever that ROM actually has. 1024 is only correct for the checked UM Expansion build.
-    private int expandedTMStartID = ExpandedTMItems.ResolveStartId(Main.Config);
-
-    private void B_TMPreflight_Click(object sender, EventArgs e) => RunExpansionPreflight(apply: false);
-
-    private void B_TMApply_Click(object sender, EventArgs e) => RunExpansionPreflight(apply: true);
-
-    /// <summary>
-    /// Checks and applies the three patches the expanded TMs depend on.
-    /// </summary>
-    private void RunExpansionPreflight(bool apply)
+    /// <summary>code.bin as it is on disk now, if its TM table is still where this form opened it; otherwise null, with the error shown.</summary>
+    private byte[] FreshCodeBin()
     {
-        var log = new System.Text.StringBuilder();
-
-        // Re-resolve rather than trusting the field: the language may have changed, or a previous
-        // apply may have grown the item table since this form opened.
-        expandedTMStartID = ExpandedTMItems.ResolveStartId(Main.Config);
-        int highest = ExpandedTMItems.HighestId(expandedTMStartID);
-
-        log.AppendLine(ExpandedTMItems.DescribeAllocation(Main.Config));
-
-        // Refuse rather than overwrite: this is the failure that renamed real Expansion Pack items.
-        if (!ExpandedTMItems.IsSafeStartId(Main.Config, expandedTMStartID))
-        {
-            log.AppendLine();
-            log.AppendLine($"IDs {expandedTMStartID}-{highest} are not all free - real items live there.");
-            log.AppendLine("Refusing to allocate. Grow the item name table first so the block has room past the end.");
-            WinFormsUtil.Error("TM expansion", log.ToString());
-            return;
-        }
-        log.AppendLine();
-
-        string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.ExeFSPath);
-        if (!File.Exists(codePath))
-        {
-            log.AppendLine($"code.bin was not found at {codePath}.");
-            log.AppendLine("The ceiling and icon patches cannot run without it.");
-            WinFormsUtil.Alert("TM expansion preflight", log.ToString());
-            return;
-        }
-
-        byte[] code = File.ReadAllBytes(codePath);
-
-        // 1. Item ceiling.
-        var sites = ItemCeilingPatcher.Analyze(code);
-        log.AppendLine($"Item ceiling: {sites.Count} candidate site(s) found.");
-        var ceiling = ItemCeilingPatcher.Raise(code, highest);
-        log.AppendLine(ceiling.Describe());
-        log.AppendLine();
-
-        // 2. TM icon routing.
-        var icon = TMIconPatcher.Retarget(code);
-        log.AppendLine($"TM icon: {icon.Message}");
-        if (icon.Applied)
-            log.AppendLine($"  icon {icon.PreviousIcon} -> {icon.NewIcon}");
-        log.AppendLine();
-
-        // 3. Name and description rows, in every language.
-        var text = ExpandedTMText.EnsureCapacity(Main.Config, highest + 1);
-        log.AppendLine("Item text capacity:");
-        log.AppendLine(text.Describe());
-        log.AppendLine();
-
-        if (!apply)
-        {
-            log.AppendLine("Preflight only - nothing was written.");
-            WinFormsUtil.Alert("TM expansion preflight", log.ToString());
-            return;
-        }
-
-        if (!ceiling.Success && !icon.Applied)
-        {
-            log.AppendLine("Neither code patch had anything to apply; code.bin left untouched.");
-            WinFormsUtil.Alert("TM expansion", log.ToString());
-            return;
-        }
-
-        bool written = BinaryWriteGuard.TryWrite(codePath, code,
-            "Apply the expanded-TM code patches",
-            $"Raises the item ceiling to {highest} and points TM icons at the status-TM icon.");
-
-        log.AppendLine(written
-            ? "code.bin written."
-            : "The write was declined; code.bin is unchanged and the expansion will not work.");
-
-        WinFormsUtil.Alert("TM expansion", log.ToString());
+        // The form is non-modal, so a randomizer run or an install may have rewritten code.bin since it opened.
+        byte[] fresh = File.ReadAllBytes(codebin);
+        var now = TMTable.Locate(fresh, out _);
+        if (now != null && now.MoveOffset == table.MoveOffset && now.ItemOffset == table.ItemOffset && now.Count == table.Count && fresh.Length == data.Length)
+            return fresh;
+        WinFormsUtil.Error("Nothing was written.", "code.bin changed after this editor opened, so its TM table moved or changed size. Close and reopen the TM editor, then redo the edit.");
+        return null;
     }
 
-    private void DetectExpansionStartID()
+    private bool Save()
     {
-        expansionActive = Main.Config?.Info != null && Main.Config.Info.MaxSpeciesID >= 1025;
+        dgvTM.EndEdit(); // a combo edit commits (and fires CellValueChanged) only when the cell is left
+        if (table == null || !dirty) return true;
+        var names = dgvTM.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[2].Value?.ToString()).ToArray();
+        ushort[] moves = names.Select(n => (ushort)Math.Max(0, Array.IndexOf(movelist, n))).ToArray();
+        // Changed and changed back: nothing to write, so no approval prompt.
+        if (moves.SequenceEqual(openMoves)) { dirty = false; return true; }
+        // A name that is not in movelist would save as move 0 and wipe that TM. Refuse rather than write it.
+        for (int i = 0; i < moves.Length; i++)
+            if (moves[i] == 0 && openMoves[i] != 0 && Array.IndexOf(movelist, names[i]) < 0)
+            { WinFormsUtil.Error("TM save refused; nothing was written.", $"TM{i + 1:00} is \"{names[i]}\", which is not a move name."); return false; }
+        if (TMCompat.PassiveRefusal(openMoves, moves) is { } passiveWhy) { WinFormsUtil.Error("TM save refused; nothing was written.", passiveWhy); return false; } // Remap runs after code.bin is written, so decide now
+        byte[] fresh = FreshCodeBin();
+        if (fresh == null) return false;
+        if (!table.ReadMoves(fresh).SequenceEqual(openMoves))
+        { WinFormsUtil.Error("TM save refused; nothing was written.", "The TM moves in code.bin changed after this editor opened. Close and reopen the TM editor, then redo the edit."); return false; }
+        ushort[] items = table.ReadItems(fresh);
+        table.Write(fresh, moves, items);
+        if (!BinaryWriteGuard.TryWrite(codebin, fresh, "Save TM moves", $"{moves.Where((m, i) => m != openMoves[i]).Count()} TM slot(s) changed", uhuruDiffChecked: true))
+        { WinFormsUtil.Alert("TM save was refused or declined; nothing was written."); return false; }
+        data = fresh;
 
-        // Where the block would go on this ROM, read from its own item table.
-        expandedTMStartID = ExpandedTMItems.ResolveStartId(Main.Config);
+        // Descriptions: only for slots whose move changed.
+        var flavor = Main.Config.GetText(TextName.ItemFlavor);
+        var moveFlavor = Main.Config.GetText(TextName.MoveFlavor);
+        bool textChanged = false;
+        for (int i = 0; i < moves.Length; i++)
+            if (moves[i] != openMoves[i] && items[i] < flavor.Length && moves[i] < moveFlavor.Length)
+            { flavor[items[i]] = moveFlavor[moves[i]]; textChanged = true; }
+        if (textChanged) { Main.Config.SetText(TextName.ItemFlavor, flavor); Main.Config.SaveText(TextName.ItemFlavor); }
+
+        // Compatibility follows moved moves.
+        var from = TMCompat.FromSlots(openMoves, moves);
+        var files = Main.Config.GARCPersonal.Files;
+        int changed = TMCompat.Remap(files, from);
+        if (changed > 0)
+        {
+            Main.Config.GARCPersonal.Files = files;
+            Main.Config.GARCPersonal.Save();
+            // Same refresh PersonalEditor7 does (PersonalEditor7.cs:555), so other editors and the randomizer see the new bits this session.
+            Main.Config.Personal.Table = files.Where(f => f.Length == files[0].Length).Select(f => PersonalTable.GetInfo(f, Main.Config.Version)).ToArray();
+        }
+
+        int movedSlots = from.Where((f, i) => f >= 0 && f != i).Count(), newSlots = from.Count(f => f < 0);
+        WinFormsUtil.Alert("TMs saved.", $"{movedSlots} slot(s) took their move's old learnability; {newSlots} slot(s) with a new move kept the slot's learnability; {changed} Pokémon entries updated.");
+        moves.CopyTo(openMoves, 0);
+        dirty = false;
+        return true;
+    }
+
+    private void B_Save_Click(object sender, EventArgs e) => Save();
+
+    private void Form_Closing(object sender, FormClosingEventArgs e)
+    {
+        dgvTM.EndEdit();
+        if (!dirty) return;
+        var r = WinFormsUtil.Prompt(MessageBoxButtons.YesNoCancel, "Save TM changes?");
+        if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) e.Cancel = true;
+    }
+
+    private void B_Expand_Click(object sender, EventArgs e)
+    {
+        if (table == null || table.Layout != TMTable.Kind.Stock) return;
+        dgvTM.EndEdit(); // a pending combo edit sets dirty only when committed, so commit it before the check
+        if (dirty && !Save()) return;
+        int n;
+        using (var f = new Form { Text = "Expand TMs", FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent, ClientSize = new System.Drawing.Size(240, 70), MaximizeBox = false, MinimizeBox = false })
+        {
+            var nud = new NumericUpDown { Minimum = table.Count + 1, Maximum = TMExpansion.EffectiveMax, Value = TMExpansion.EffectiveMax, Location = new System.Drawing.Point(12, 12), Width = 80 };
+            var ok = new Button { Text = "Expand", DialogResult = DialogResult.OK, Location = new System.Drawing.Point(100, 10) };
+            var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new System.Drawing.Point(100, 38) };
+            f.Controls.AddRange([nud, ok, cancel]);
+            f.AcceptButton = ok; f.CancelButton = cancel;
+            if (f.ShowDialog(this) != DialogResult.OK) return;
+            n = (int)nud.Value;
+        }
+        ushort[] newMoves = Enumerable.Repeat((ushort)1, n - table.Count).ToArray(); // Pound; edit them after expanding
+        byte[] fresh = FreshCodeBin();
+        if (fresh == null) return;
+        var grown = ExpandedTMItems.ExpandCode(Main.Config, fresh, n, newMoves,
+            out ushort[] ids, out string err, out GrowResult growth);
+        if (grown == null) { WinFormsUtil.Error("TM expansion refused; nothing was written.", err); return; }
+        if (growth != null)
+        {
+            // code.bin and the exheader must land together: refuse before writing anything if either file cannot be written.
+            string? root = Directory.GetParent(Path.GetFullPath(Main.Config.ExeFS))?.FullName;
+            foreach (string name in new[] { "ExHeader.bin", "HeaderNCCH0.bin" })
+            {
+                string path = root == null ? "" : Path.Combine(root, name);
+                if (!File.Exists(path)) continue;
+                try
+                {
+                    using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                    // The .orig backup is made now, so nothing can fail on it after code.bin is written.
+                    if (!File.Exists(path + ".orig")) File.Copy(path, path + ".orig", false);
+                }
+                catch (Exception ex) { WinFormsUtil.Error($"{name} cannot be written, so code.bin was not grown; nothing was written.", ex.Message); return; }
+            }
+        }
+        if (!BinaryWriteGuard.TryWrite(codebin, grown, $"Expand TMs to {n}", $"New TM items {ids.First()}-{ids.Last()}")) return;
+        // code.bin now holds the expanded table. Whatever happens next, this form must not save its old buffer over it.
+        if (growth != null)
+        {
+            try
+            {
+                string romRoot = Directory.GetParent(Path.GetFullPath(Main.Config.ExeFS))?.FullName
+                    ?? throw new DirectoryNotFoundException("The ROM root next to ExeFS was not found");
+                string exHeaderPath = Path.Combine(romRoot, "ExHeader.bin");
+                byte[] oldExHeader = File.ReadAllBytes(exHeaderPath);
+                long insertionOffset = CodeGrowth.TextEndFor(oldExHeader);
+                long addedBytes = growth.Pages * 0x1000L;
+                if (insertionOffset < 0 || insertionOffset > uint.MaxValue || addedBytes <= 0 || addedBytes > uint.MaxValue)
+                    throw new InvalidDataException("The code.bin growth journal offsets are outside the supported range");
+
+                CodeBinExpansionJournal.RecordExpansion(Main.Config.ExeFS, CodeBinExpander.Segment.Text,
+                    (uint)insertionOffset, (uint)addedBytes);
+                WriteWithOrigBackup(exHeaderPath, growth.ExHeader);
+
+                string ncch0Path = Path.Combine(romRoot, "HeaderNCCH0.bin");
+                if (File.Exists(ncch0Path) && growth.Ncch0.Length > 0)
+                    WriteWithOrigBackup(ncch0Path, growth.Ncch0);
+            }
+            catch (Exception ex)
+            {
+                WinFormsUtil.Error("code.bin was expanded, but its ExHeader.bin or HeaderNCCH0.bin could not be updated.", ex.Message);
+                dirty = false;
+                Close();
+                return;
+            }
+        }
 
         try
         {
-            if (!File.Exists(codebin)) return;
-            ushort[] itemIDs = ResearchEngine.GetTMItemArray(data, (int)NUD_TMCount.Value, GetDefaultTMItems());
-            int firstNew = ExpandedTMItems.VanillaTMCount;
-            if (itemIDs.Length > firstNew
-                && itemIDs[firstNew] > 0
-                && ExpandedTMItems.IsSafeStartId(Main.Config, itemIDs[firstNew]))
-            {
-                expandedTMStartID = itemIDs[firstNew];
-            }
+            ExpandedTMItems.WriteItemData(Main.Config, ids, newMoves, table.Count);
+            string detail = "Reopen the TM editor to edit the new slots.";
+            if (growth != null)
+                detail += "\n\nIMPORTANT deployment step: the mod folder also needs the new ExHeader.bin. " +
+                    "Copy it into the mods folder ROOT (next to the exefs/romfs folders, not inside exefs) as " +
+                    "\"exheader.bin\" so Citra or Luma3DS reads the new code size. Skipping this can hang at " +
+                    "\"Now Loading...\" instead of booting. Please reload your ROM in pk3DS (File -> Open) " +
+                    "so all editors update to the new size.";
+            WinFormsUtil.Alert($"Expanded to {n} TMs.", detail);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            WinFormsUtil.Error("code.bin was expanded, but the TM names and descriptions were not written.", ex.Message);
+        }
+        finally
+        {
+            dirty = false;
+            Close();
+        }
     }
 
-    private static readonly byte[] Signature = [0x03, 0x40, 0x03, 0x41, 0x03, 0x42, 0x03, 0x43, 0x03]; // tail end of item::ITEM_CheckBeads
-    private readonly string codebin;
-    private readonly string[] movelist = Main.Config.GetText(TextName.MoveNames);
-    private bool skipUpdate = false;
-    private int offset = 0x0059795A; // Default
-    private readonly byte[] data;
-    private int dataoffset;
-
-    private void GetDataOffset()
+    private static void WriteWithOrigBackup(string path, byte[] bytes)
     {
-        dataoffset = offset; // reset
-    }
-
-    private int GetTMOffset(int index)
-    {
-        if (isSplitTablePatchApplied)
-        {
-            // Table 1 (TM 01-68) is located 0x1FA bytes before Table 2.
-            if (index < 68) return offset - 0x1FA + (2 * index);
-            // Table 2 (TM 69+) is located at the original offset.
-            else return offset + (2 * (index - 68));
-        }
-
-        // TM01 to TM100 are always contiguous from the detected base
-        if (index < 100) return offset + (2 * index);
-
-        // For expanded TMs (101+), we check if there's a second table (sandbox)
-        // or if they are contiguous. Most expansion patches jump at 108.
-        if (index >= 107)
-        {
-             // If a known sandbox offset is provided in the textbox or research, use it.
-             // Otherwise, check for the 108+ sandbox (0x4BB794) if it contains a move ID.
-             if (offset < 0x100000 && data.Length > 0x4BB794 + 2)
-                 return 0x4BB794 + (2 * (index - 107));
-        }
-        return offset + (2 * index);
+        string backup = path + ".orig";
+        if (!File.Exists(backup)) File.Copy(path, backup, false);
+        File.WriteAllBytes(path, bytes);
     }
 
     private void SetupDGV()
@@ -240,6 +229,7 @@ public partial class TMEditor7 : Form
             dgvItem.HeaderText = "Item ID";
             dgvItem.DisplayIndex = 1;
             dgvItem.Width = 55;
+            dgvItem.ReadOnly = true; // item ids come from the table; only the move is edited
             dgvItem.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dgvItem.SortMode = DataGridViewColumnSortMode.NotSortable;
         }
@@ -258,329 +248,24 @@ public partial class TMEditor7 : Form
         dgvTM.Columns.Add(dgvMove);
     }
 
-    private List<ushort> tms = [];
-
     private void GetList()
     {
         dgvTM.Rows.Clear();
-        tms = [];
+        if (table == null) return;
 
-        // Dynamic Repointing: Parse the offset box
-        if (!int.TryParse(TB_Offset.Text, System.Globalization.NumberStyles.HexNumber, null, out int currentOffset))
-            currentOffset = offset;
-
-        int count = (int)NUD_TMCount.Value;
-        if (currentOffset + (count * 2) > data.Length)
+        ushort[] items = table.ReadItems(data);
+        for (int i = 0; i < table.Count; i++)
         {
-             WinFormsUtil.Alert("Offset is out of bounds for the current code.bin.");
-             return;
+            int moveId = openMoves[i] < movelist.Length ? openMoves[i] : 0;
+            dgvTM.Rows.Add((i + 1).ToString(), items[i].ToString(), movelist[moveId]);
         }
-
-        ushort[] defaultTMs = new ushort[count];
-        for (int i = 0; i < count; i++)
-        {
-            int offset = GetTMOffset(i);
-            if (offset + 1 < data.Length)
-                defaultTMs[i] = BitConverter.ToUInt16(data, offset);
-        }
-
-        ushort[] tmlist = ResearchEngine.GetTMMoveArray(data, count, defaultTMs);
-        tms.AddRange(tmlist);
-
-        ushort[] defaultItems = GetDefaultTMItems();
-        ushort[] itemIDs = ResearchEngine.GetTMItemArray(data, count, defaultItems);
-        for (int i = 0; i < tmlist.Length; i++)
-        {
-            dgvTM.Rows.Add();
-            dgvTM.Rows[i].Cells[0].Value = (i + 1).ToString();
-
-            ushort itemID = i < itemIDs.Length ? itemIDs[i] : (ushort)0;
-
-            if (expansionActive && ExpandedTMItems.IsNewSlot(i))
-                itemID = (ushort)ExpandedTMItems.GetItemId(i, expandedTMStartID);
-            else if (i >= 107 && (itemID == 0 || IsProtectedItemID(itemID) || itemID >= 960))
-                itemID = GetUnusedItemID(i - 107);
-
-            dgvTM.Rows[i].Cells[1].Value = itemID.ToString();
-            // Vanilla item IDs are fixed; so is the new block, which must stay contiguous.
-            if (i < 107 || (expansionActive && ExpandedTMItems.IsNewSlot(i)))
-                dgvTM.Rows[i].Cells[1].ReadOnly = true;
-
-            ushort moveId = tmlist[i];
-            if (moveId >= movelist.Length) moveId = 0;
-
-            dgvTM.Rows[i].Cells[2].Value = movelist[moveId];
-        }
-    }
-
-    // ── Protected Item ID Ranges (USUM) ───────────────────────────────────────
-    // These item IDs must NEVER be assigned to expanded TMs. Each range is
-    // documented with its contents so future edits know exactly what is protected.
-    //
-    //  328– 419  TM01–TM92  (standard disc TMs)
-    //  420– 425  HM01–HM06
-    //  618– 620  TM93–TM95  (was Cut/Fly/Surf in XY)
-    //  690– 694  TM96–TM100 (extra TM block)
-    //  737       HM07 Dive
-    //  798– 920  Vanilla Z-Crystals (Normalium Z → Steelium Z and more)
-    //  921– 927  Exclusive Z-Crystals added in USUM:
-    //              921 Pikashunium Z
-    //              922 Solganium Z
-    //              923 Lunalium Z
-    //              924 Ultranecrozium Z
-    //              925 Mimikium Z
-    //              926 Lycanium Z
-    //              927 Kommonium Z
-    //  928– 937  Reserved / event items
-    //  938– 949  Roto Powers (Roto Boost → Roto Stealth)
-    // ─────────────────────────────────────────────────────────────────────────
-    private static bool IsProtectedItemID(int id)
-    {
-        return (id >= 328 && id <= 419)   // TM01–TM92
-            || (id >= 420 && id <= 425)   // HM01–HM06
-            || id == 737                  // HM07 Dive
-            || (id >= 618 && id <= 620)   // TM93–TM95
-            || (id >= 690 && id <= 694)   // TM96–TM100
-            || (id >= 798 && id <= 920)   // Vanilla Z-Crystals
-            || (id >= 921 && id <= 927)   // Exclusive Z-Crystals (USUM)
-            || (id >= 928 && id <= 937)   // Reserved / event items
-            || (id >= 938 && id <= 949);  // Roto Powers
-    }
-
-    private ushort GetUnusedItemID(int expandedIndex)
-    {
-        string[] itemNames = Main.Config.GetText(TextName.ItemNames);
-        var unused = new System.Collections.Generic.List<int>();
-        for (int i = 894; i < itemNames.Length; i++)
-        {
-            // Never assign a protected ID to an expanded TM slot
-            if (IsProtectedItemID(i)) continue;
-
-            string name = itemNames[i];
-            if (name != null && (name.StartsWith("???") || name.Contains("Teru-sama") || string.IsNullOrWhiteSpace(name)))
-                unused.Add(i);
-        }
-        if (expandedIndex < unused.Count) return (ushort)unused[expandedIndex];
-        return (ushort)(960 + expandedIndex); // fallback
-    }
-
-    private ushort[] GetDefaultTMItems() => ExpandedTMItems.GetVanillaItemTable();
-
-    /// <summary>
-    /// Whether this editor may rename the item behind a slot. TM01-TM100 always, and the 28
-    /// expansion slots only on an Expansion Pack build. The leftover HM entries at 100-106 are
-    /// never touched on an unexpanded ROM.
-    /// </summary>
-    private bool IsEditorOwnedSlot(int index) =>
-        index < ExpandedTMItems.VanillaTMCount || (expansionActive && ExpandedTMItems.IsNewSlot(index));
-
-    /// <summary>
-    /// Scans code.bin for the CMP instruction that originally checked #100 (0x64) for TM count.
-    /// Only searches near the TM table offset to avoid false positives from unrelated CMP instructions.
-    /// Decodes ARM rotated immediates to return the actual patched value.
-    /// </summary>
-    private int DetectTMCount(byte[] codeData)
-    {
-        int detected = DetectTMCount(codeData, offset, out bool split);
-        isSplitTablePatchApplied = split;
-        return detected;
-    }
-
-    /// <summary>
-    /// How many TMs this build actually has, read from the bound the game itself checks.
-    /// </summary>
-    internal static int DetectTMCount(byte[] codeData, int tableOffset, out bool splitTablePatch)
-    {
-        splitTablePatch = false;
-        int offset = tableOffset;
-        // Try to find if already patched with our custom generic patch
-        byte[] customSig = [0x10, 0x40, 0x2D, 0xE9, 0x00, 0x00, 0x50, 0xE3, 0x0C, 0x40, 0x9F, 0x35, 0x00, 0x00, 0xA0, 0x23];
-        byte[] mask = [0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-        int customOfs = ResearchEngine.IndexOfBytesMasked(codeData, customSig, mask, 0);
-
-        if (customOfs >= 0)
-        {
-            return codeData[customOfs + 4]; // Extract count from CMP instruction directly
-        }
-
-        // The original instruction is CMP R0, #0x64 (100) => E3 50 00 64
-        // After a TM expansion patch (legacy layout), this immediate is changed to the new count.
-        // We ONLY search near the TM table region to avoid matching random CMP instructions
-        // elsewhere in the binary (which was causing false positive 128-slot detection).
-        
-        // Search within a reasonable window around the TM table offset
-        int searchStart = Math.Max(0, offset - 0x2000);
-        int searchEnd = Math.Min(codeData.Length - 4, offset + 0x2000);
-        
-        // First pass: look for the exact original CMP R0, #100 (unpatched)
-        for (int i = searchStart; i < searchEnd; i += 4)
-        {
-            uint word = BitConverter.ToUInt32(codeData, i);
-            if (word == 0xE3500064) // CMP R0, #0x64 (exactly 100, unpatched)
-                return 100; // Original game, no expansion
-            
-            // Check for TM HM Expansion patch (CMP R0, 0x5B) 
-            // The logic splits up TMs, meaning the patch is applied.
-            if (word == 0xE350005B)
-            {
-                splitTablePatch = true;
-                return 128; // TM HM Expansion patch implies 128 TMs
-            }
-        }
-        
-        // Second pass: the CMP was patched  find the new value
-        int bestCount = 0;
-        for (int i = searchStart; i < searchEnd; i += 4)
-        {
-            uint word = BitConverter.ToUInt32(codeData, i);
-            // Match CMP R0, #imm (condition AL, opcode CMP, Rn=R0)
-            if ((word & 0xFFF00000) != 0xE3500000) continue;
-            
-            // Decode ARM rotated immediate
-            uint imm8 = word & 0xFF;
-            uint rot = (word >> 8) & 0xF;
-            uint value = rot == 0 ? imm8 : (imm8 >> (int)(rot * 2)) | (imm8 << (int)(32 - rot * 2));
-            
-            // Valid expanded TM counts: 101-128
-            if (value > 100 && value <= 128 && (int)value > bestCount)
-                bestCount = (int)value;
-        }
-        return bestCount > 0 ? bestCount : 100;
-    }
-
-    private void SetList()
-    {
-        tms = [];
-        List<ushort> items = [];
-        for (int i = 0; i < dgvTM.Rows.Count; i++)
-        {
-            if (ushort.TryParse(dgvTM.Rows[i].Cells[1].Value?.ToString(), out ushort itemID))
-                items.Add(itemID);
-            else
-                items.Add(0);
-
-            var val = dgvTM.Rows[i].Cells[2].Value;
-            if (val == null) tms.Add(0);
-            else tms.Add((ushort)Array.IndexOf(movelist, val.ToString()));
-        }
-
-        ushort[] tmlist = [.. tms];
-        ushort[] itemlist = [.. items];
-
-        if (expansionActive)
-            ExpandedTMItems.AssignTo(itemlist, expandedTMStartID);
-
-        // Saving TM table without annoying popup
-
-
-        if (!int.TryParse(TB_Offset.Text, System.Globalization.NumberStyles.HexNumber, null, out int currentOffset))
-            currentOffset = offset;
-
-        int count = Math.Min(tmlist.Length, (int)NUD_TMCount.Value);
-
-        // Pass the expansion to ResearchEngine which handles Assembly patching
-        if (isSplitTablePatchApplied)
-        {
-            // Write directly to the split tables instead of running C# code patcher
-            for (int i = 0; i < tmlist.Length; i++)
-            {
-                int destOffset = GetTMOffset(i);
-                if (destOffset >= 0 && destOffset + 1 < data.Length)
-                {
-                    data[destOffset] = (byte)(tmlist[i] & 0xFF);
-                    data[destOffset + 1] = (byte)(tmlist[i] >> 8);
-                }
-            }
-        }
-        else
-        {
-            ResearchEngine.ApplyExpandedTMCodePatch(data, tmlist, itemlist);
-        }
-        int maxItemID = 0; for (int i = 0; i < itemlist.Length; i++) { if (itemlist[i] > maxItemID) maxItemID = itemlist[i]; }
-
-        if (expansionActive && maxItemID >= (int)ItemCeilingPatcher.RetailCeiling)
-        {
-            var ceiling = ItemCeilingPatcher.Raise(data, maxItemID);
-
-            if (!ceiling.Success)
-            {
-                WinFormsUtil.Alert("Could not widen the item ID limit in code.bin.",
-                                   "TM101-128 may not work in game.\n\n" + ceiling.Describe());
-            }
-            else if (ceiling.PatchedCount == 0)
-            {
-                // Silent by design: nothing changed because nothing needed to. The detail is still
-                // available in the log for anyone checking.
-                System.Diagnostics.Debug.WriteLine(ceiling.Describe());
-            }
-
-            // Without this the new items resolve to icon 768, which is the blank slot item 0 uses,
-            // so they would sit in the bag with no icon.
-            TMIconPatcher.Retarget(data);
-        }
-
-        ResearchEngine.ApplyExpandedTMItemAttributesPatch(Main.Config.RomFS, maxItemID, itemlist);
-        ResearchEngine.ApplyExpandedTMBattleBagPatch(Main.Config.RomFS, maxItemID, itemlist);
-
-        // Update descriptions
-        string[] itemNames = Main.Config.GetText(TextName.ItemNames);
-        if (maxItemID >= itemNames.Length)
-        {
-            Array.Resize(ref itemNames, maxItemID + 1);
-            for (int i = 0; i < itemNames.Length; i++)
-                if (itemNames[i] == null) itemNames[i] = "???";
-        }
-        for (int i = 0; i < tmlist.Length; i++)
-        {
-            if (!IsEditorOwnedSlot(i)) continue;
-            int target = itemlist[i];
-            if (target > 0 && target < itemNames.Length)
-                itemNames[target] = ExpandedTMItems.GetTMName(i);
-        }
-        Main.Config.SetText(TextName.ItemNames, itemNames);
-        
-        string[] itemDescriptions = Main.Config.GetText(TextName.ItemFlavor);
-        if (maxItemID >= itemDescriptions.Length)
-        {
-            Array.Resize(ref itemDescriptions, maxItemID + 1);
-            for (int i = 0; i < itemDescriptions.Length; i++)
-                if (itemDescriptions[i] == null) itemDescriptions[i] = "???";
-        }
-        string[] moveDescriptions = Main.Config.GetText(TextName.MoveFlavor);
-        
-        // Each TM's description is the flavour text of the move it teaches. Same ownership rule as
-        // the names above, for the same reason.
-        for (int i = 0; i < tmlist.Length; i++)
-        {
-            if (!IsEditorOwnedSlot(i)) continue;
-            int targetID = itemlist[i];
-            if (targetID > 0 && targetID < itemDescriptions.Length
-                && tmlist[i] > 0 && tmlist[i] < moveDescriptions.Length)
-                itemDescriptions[targetID] = moveDescriptions[tmlist[i]];
-        }
-
-        Main.Config.SetText(TextName.ItemFlavor, itemDescriptions);
-
-        Main.Config.SaveText(TextName.ItemNames);
-        Main.Config.SaveText(TextName.ItemFlavor);
-
-        if (expansionActive && maxItemID >= (int)ItemCeilingPatcher.RetailCeiling)
-            ExpandedTMText.EnsureCapacity(Main.Config, maxItemID + 1);
-
-        File.WriteAllBytes(codebin, data);
-    }
-
-
-    private void Form_Closing(object sender, FormClosingEventArgs e)
-    {
-        SetList();
     }
 
     private void B_RandomTM_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Randomize TMs?", "Move compatibility will be the same as the base TMs.") != DialogResult.Yes) return;
 
-        int[] randomMoves = Enumerable.Range(1, movelist.Length - 1).Select(i => i).ToArray();
+        int[] randomMoves = Enumerable.Range(1, movelist.Length - 1).Where(i => Legal.IsUsableMove(i, movelist)).ToArray();
         Util.Shuffle(randomMoves);
 
         int[] banned = [.. Legal.Z_Moves, .. new[] { 165, 464, 621 }];
@@ -590,47 +275,26 @@ public partial class TMEditor7 : Form
         {
             int val = Array.IndexOf(movelist, dgvTM.Rows[i].Cells[2].Value);
             if (banned.Contains(val)) continue;
-            while (banned.Contains(randomMoves[ctr])) ctr++;
+            while (ctr < randomMoves.Length && banned.Contains(randomMoves[ctr])) ctr++;
+            if (ctr >= randomMoves.Length)
+            {
+                Util.Shuffle(randomMoves);
+                ctr = 0;
+                while (ctr < randomMoves.Length && banned.Contains(randomMoves[ctr])) ctr++;
+            }
 
             dgvTM.Rows[i].Cells[2].Value = movelist[randomMoves[ctr++]];
+            dirty = true;
         }
         WinFormsUtil.Alert("Randomized!");
     }
 
-    internal static ushort[] GetTMHMList()
+    public static ushort[] GetTMHMList()
     {
-        if (Main.ExeFSPath == null) return [];
-        string[] files = Directory.GetFiles(Main.ExeFSPath);
-        if (!File.Exists(files[0]) || !Path.GetFileNameWithoutExtension(files[0]).Contains("code")) return [];
-        
-        byte[] data = File.ReadAllBytes(files[0]);
-        if (data.Length % 0x200 != 0) return [];
-
-        // Use universal TM table signature detection
-        byte[] tmSig = [0x0E, 0x02, 0x51, 0x01, 0xD9, 0x01];
-        int dataoffset = Util.IndexOfBytes(data, tmSig, 0x100000, 0);
-        if (dataoffset < 0)
-        {
-            dataoffset = Util.IndexOfBytes(data, Signature, 0x400000, 0) + Signature.Length;
-            if (Main.Config.USUM) dataoffset += 0x22;
-        }
-
-        // Static callers always get the base 100 TMs — expansion detection
-        // requires the instance context (offset) to avoid false positives.
-        int count = DetectTMCount(data, dataoffset, out _);
-        if (count < 1) count = 100;
-        if (count > 128) count = 128;   // the personal record holds exactly 128 TM bits
-
-        List<ushort> tms = [];
-        for (int i = 0; i < count; i++) 
-            tms.Add(BitConverter.ToUInt16(data, dataoffset + (2 * i)));
-        return [.. tms];
-    }
-
-    private void NUD_TMCount_ValueChanged(object sender, EventArgs e)
-    {
-        if (skipUpdate) return;
-        GetList();
+        string path = Main.ExeFSPath == null ? null : ExeFS.ResolveCodeBin(Main.ExeFSPath);
+        if (path == null || !File.Exists(path)) return [];
+        byte[] code = File.ReadAllBytes(path);
+        return code.Length % 0x200 == 0 ? TMTable.Locate(code, out _)?.ReadMoves(code) ?? [] : [];
     }
 
     private void B_ExportTxt_Click(object sender, EventArgs e)
@@ -679,57 +343,9 @@ public partial class TMEditor7 : Form
             if (moveIdx < 0) continue;
 
             dgvTM.Rows[rowIdx].Cells[2].Value = movelist[moveIdx];
+            dirty = true;
             updated++;
         }
         WinFormsUtil.Alert($"Imported {updated} TM entries!");
-    }
-
-    private void B_UpdateDesc_Click(object sender, EventArgs e)
-    {
-        const string disclaimer = "Warning: This will overwrite ALL TM item descriptions in the game text with the descriptions of the moves they currently teach.\n\n" +
-                                   "This action cannot be undone. Are you sure you want to proceed?";
-        
-        if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, disclaimer) != DialogResult.Yes)
-            return;
-
-        List<ushort> tms = [];
-        List<ushort> items = [];
-        for (int i = 0; i < dgvTM.Rows.Count; i++)
-        {
-            if (ushort.TryParse(dgvTM.Rows[i].Cells[1].Value?.ToString(), out ushort itemID))
-                items.Add(itemID);
-            else
-                items.Add(0);
-
-            var val = dgvTM.Rows[i].Cells[2].Value;
-            if (val == null) tms.Add(0);
-            else tms.Add((ushort)Array.IndexOf(movelist, val.ToString()));
-        }
-
-        ushort[] tmlist = [.. tms];
-        ushort[] itemlist = [.. items];
-
-        // Sync move descriptions into item descriptions (same logic as SetList)
-        string[] itemDescriptions = Main.Config.GetText(TextName.ItemFlavor);
-        string[] moveDescriptions = Main.Config.GetText(TextName.MoveFlavor);
-        for (int i = 0; i < tmlist.Length; i++)
-        {
-            int targetID = itemlist[i];
-            if (targetID > 0 && targetID < itemDescriptions.Length)
-                itemDescriptions[targetID] = moveDescriptions[tmlist[i]];
-        }
-        Main.Config.SetText(TextName.ItemFlavor, itemDescriptions);
-        Main.Config.SaveText(TextName.ItemFlavor);
-
-        WinFormsUtil.Alert("TM item descriptions updated to match current moves!");
-    }
-
-    private void TB_Offset_TextChanged(object sender, EventArgs e)
-    {
-        if (uint.TryParse(TB_Offset.Text, System.Globalization.NumberStyles.HexNumber, null, out uint res))
-        {
-            offset = (int)res;
-            GetList();
-        }
     }
 }

@@ -191,6 +191,7 @@ namespace pk3DS.Core.CTR
                 "B" => EncodeBranch(condBits, operands, pc, labels, false),
                 "BL" => EncodeBranch(condBits, operands, pc, labels, true),
                 "BX" => EncodeBX(condBits, operands),
+                "BLX" => EncodeBLX(condBits, operands),
                 "MOV" => EncodeDataProc(condBits, 0xD, operands, false),
                 "MVN" => EncodeDataProc(condBits, 0xF, operands, false),
                 "MOVS" => EncodeDataProc(condBits, 0xD, operands, true),
@@ -272,7 +273,7 @@ namespace pk3DS.Core.CTR
                 {
                     string base_mn = upper[..^2];
                     // Only strip if base is a known mnemonic
-                    string[] known = { "MOV","MVN","CMP","CMN","TST","TEQ","ADD","SUB","RSB","AND","ORR","EOR","BIC","LDR","STR","MUL","LSL","LSR","ASR","ROR" };
+                    string[] known = { "MOV","MVN","CMP","CMN","TST","TEQ","ADD","SUB","RSB","AND","ORR","EOR","BIC","LDR","STR","MUL","LSL","LSR","ASR","ROR","BX","ADDS","SUBS","MOVS","ANDS","PUSH","POP" };
                     if (known.Contains(base_mn)) { cond = suffix; return base_mn; }
                 }
             }
@@ -300,8 +301,7 @@ namespace pk3DS.Core.CTR
                     target = uint.Parse(op);
             }
 
-            int offset = (int)target - (int)(pc + 8);
-            uint offset24 = (uint)(offset >> 2) & 0x00FFFFFF;
+            uint offset24 = BranchOffset24(pc, target);
             uint opcode = link ? 0x0B000000u : 0x0A000000u;
             return (cond << 28) | opcode | offset24;
         }
@@ -310,6 +310,12 @@ namespace pk3DS.Core.CTR
         {
             int rm = ParseReg(operands.Trim());
             return (cond << 28) | 0x012FFF10 | (uint)rm;
+        }
+
+        private static uint EncodeBLX(uint cond, string operands)
+        {
+            int rm = ParseReg(operands.Trim());
+            return (cond << 28) | 0x012FFF30 | (uint)rm;
         }
 
         private static uint EncodeDataProc(uint cond, uint opcode, string operands, bool setFlags)
@@ -393,7 +399,7 @@ namespace pk3DS.Core.CTR
             }
             else
             {
-                uint amt = uint.Parse(parts[1].TrimStart('#'));
+                uint amt = ShiftAmount(uint.Parse(parts[1].TrimStart('#')), shiftType);
                 return (amt << 7) | (shiftType << 5);
             }
         }
@@ -471,7 +477,7 @@ namespace pk3DS.Core.CTR
                 if (load) word |= (1u << 20);
                 word |= ((uint)rn << 16) | ((uint)rd << 12);
                 if (!isReg)
-                    word |= offset & 0xFFF;
+                    word |= CheckRange(offset, 0xFFF, "LDR/STR offset");
                 else
                     word |= (1u << 25) | offset;
                 return word;
@@ -485,7 +491,7 @@ namespace pk3DS.Core.CTR
                 if (load) word |= (1u << 20);
                 word |= ((uint)rn << 16) | ((uint)rd << 12);
                 if (!isReg)
-                    word |= offset & 0xFFF;
+                    word |= CheckRange(offset, 0xFFF, "LDR/STR offset");
                 else
                     word |= (1u << 25) | offset;
                 return word;
@@ -521,6 +527,7 @@ namespace pk3DS.Core.CTR
             word |= (1u << 22); // I (immediate offset)
             if (load) word |= (1u << 20);
             word |= ((uint)rn << 16) | ((uint)rd << 12);
+            offset = CheckRange(offset, 0xFF, "LDRH/STRH offset");
             word |= ((offset >> 4) & 0xF) << 8;
             word |= 0xB0; // 1011 pattern
             word |= offset & 0xF;
@@ -547,7 +554,7 @@ namespace pk3DS.Core.CTR
                 string amt = parts[2].Trim();
                 if (amt.StartsWith('#'))
                 {
-                    uint immAmt = ParseImmediate(amt);
+                    uint immAmt = ShiftAmount(ParseImmediate(amt), shiftType);
                     return (cond << 28) | 0x01A00000 | ((uint)rd << 12) | (immAmt << 7) | (shiftType << 5) | (uint)rm;
                 }
                 else
@@ -596,11 +603,16 @@ namespace pk3DS.Core.CTR
                 return $"{(link ? "BL" : "B")}{cs} 0x{target:X8}";
             }
 
-            // BX
+            // BX / BLX
             if ((word & 0x0FFFFFF0) == 0x012FFF10)
             {
                 int rm = (int)(word & 0xF);
                 return $"BX{cs} R{rm}";
+            }
+            if ((word & 0x0FFFFFF0) == 0x012FFF30)
+            {
+                int rm = (int)(word & 0xF);
+                return $"BLX{cs} R{rm}";
             }
 
             // Data Processing
@@ -780,13 +792,13 @@ namespace pk3DS.Core.CTR
         /// Generate a B (branch) instruction from one absolute address to another.
         /// </summary>
         public static byte[] EncodeBranch(uint from, uint to) =>
-            BitConverter.GetBytes(0xEA000000 | ((uint)((int)(to - from - 8) >> 2) & 0x00FFFFFF));
+            BitConverter.GetBytes(0xEA000000 | BranchOffset24(from, to));
 
         /// <summary>
         /// Generate a BL (branch-with-link) instruction from one absolute address to another.
         /// </summary>
         public static byte[] EncodeBranchLink(uint from, uint to) =>
-            BitConverter.GetBytes(0xEB000000 | ((uint)((int)(to - from - 8) >> 2) & 0x00FFFFFF));
+            BitConverter.GetBytes(0xEB000000 | BranchOffset24(from, to));
 
         /// <summary>
         /// Generate a conditional branch instruction.
@@ -795,9 +807,42 @@ namespace pk3DS.Core.CTR
         {
             uint cond = CondCodes.TryGetValue(condition, out uint cc) ? cc : 0xE;
             uint opcode = link ? 0x0B000000u : 0x0A000000u;
-            uint offset24 = (uint)((int)(to - from - 8) >> 2) & 0x00FFFFFF;
-            return BitConverter.GetBytes((cond << 28) | opcode | offset24);
+            return BitConverter.GetBytes((cond << 28) | opcode | BranchOffset24(from, to));
         }
+
+        /// <summary>
+        /// Re-aim an authored B/BL at a new target, keeping its condition and link bit. A hook
+        /// authored as BL returns into the caller and one authored as BNE is conditional; a plain
+        /// <see cref="EncodeBranch"/> would silently drop both.
+        /// </summary>
+        public static byte[] RetargetBranch(uint authored, uint from, uint to)
+        {
+            uint cond = (authored >> 28) & 0xF;
+            uint opcode = IsBranchLink(authored) ? 0x0B000000u : 0x0A000000u;
+            return BitConverter.GetBytes((cond << 28) | opcode | BranchOffset24(from, to));
+        }
+
+        // The encoders refuse an operand their field cannot hold. Masking it instead silently
+        // produced a different instruction (LDR [R1,#0x1000] became [R1,#0], LSL #33 spilled into Rd,
+        // and an out-of-range branch landed somewhere else entirely).
+
+        /// <summary>The 24-bit word offset of a B/BL at <paramref name="from"/> to <paramref name="to"/>.</summary>
+        public static uint BranchOffset24(uint from, uint to)
+        {
+            long delta = (long)to - from - 8;
+            if (delta % 4 != 0)
+                throw new ArgumentException($"branch 0x{from:X} -> 0x{to:X}: target is not word-aligned");
+            if (delta < -0x2000000 || delta > 0x1FFFFFC)
+                throw new ArgumentException($"branch 0x{from:X} -> 0x{to:X} is out of range (B/BL reach +-32 MB)");
+            return (uint)(delta >> 2) & 0x00FFFFFF;
+        }
+
+        private static uint CheckRange(uint value, uint max, string what) =>
+            value <= max ? value : throw new ArgumentException($"{what} 0x{value:X} does not fit (largest is 0x{max:X})");
+
+        /// <summary>Immediate shift amount; LSR/ASR #32 are legal and encoded as 0.</summary>
+        private static uint ShiftAmount(uint amount, uint shiftType) =>
+            amount == 32 && shiftType is 1 or 2 ? 0 : CheckRange(amount, 31, "shift amount");
 
         /// <summary>Decode a B/BL target address from an instruction word.</summary>
         public static uint DecodeBranchTarget(uint word, uint pc)

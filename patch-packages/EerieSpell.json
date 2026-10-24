@@ -1,0 +1,34 @@
+{
+  "Name": "Eerie Spell",
+  "Description": "Eerie Spell (Move 826). The user attacks with psychic power, deducting 3 PP from the last move the target used.",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 826,
+      "Name": "Eerie Spell",
+      "Slots": [
+        {
+          "Timing": "0x60",
+          "Code": "F0412DE90240A0E10180A0E10300A0E3D01EFAEB040050E12400001A0400A0E3CC1EFAEBFF7000E20710A0E10800A0E19848FAEB0050A0E1AF81F9EB000050E31A00001A0500A0E18F82F9EB0010A0E10500A0E1D14AFAEB040050E31300000A0060A0E10010A0E10500A0E10B4BFAEBFF5000E2030055E30350A083000055930A00000A0420A0E10910A0E30800A0E1981DFAEB0660C0E50570C0E50450C0E50010A0E10800A0E1F041BDE810F3F9EAF081BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 96,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "8EEt6QJAoOEBgKDhAwCg49Ae+usEAFDhJAAAGgQAoOPMHvrr/3AA4gcQoOEIAKDhmEj66wBQoOGvgfnrAABQ4xoAABoFAKDhj4L56wAQoOEFAKDh0Ur66wQAUOMTAAAKAGCg4QAQoOEFAKDhC0v66/9QAOIDAFXjA1CggwAAVZMKAAAKBCCg4QkQoOMIAKDhmB366wZgwOUFcMDlBFDA5QAQoOEIAKDh8EG96BDz+erwgb3o"
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

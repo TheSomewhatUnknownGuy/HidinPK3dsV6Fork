@@ -22,6 +22,7 @@ public partial class MoveEditor7 : Form
     public byte[][] Files => files;
     private string[] types = Main.Config.GetText(TextName.Types);
     private string[] moveflavor = Main.Config.GetText(TextName.MoveFlavor);
+    private bool flavorChanged; // descriptions are written to the gametext GARC once, on close
     private string[] movelist = Main.Config.GetText(TextName.MoveNames);
     private byte[][] _originalInfiles;
     private static byte[][] _sessionMoveData;
@@ -94,7 +95,6 @@ public partial class MoveEditor7 : Form
         LoadAnimationHashes();
 
         InitializeComponent();
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
         RTB_MoveDesc.ReadOnly = false;
         RTB_MoveDesc.KeyDown += RTB_KeyDown;
         this.FormClosing += CloseForm;
@@ -572,7 +572,8 @@ public partial class MoveEditor7 : Form
 
             if (moveflavor != null && entry < moveflavor.Length)
             {
-                moveflavor[entry] = RTB_MoveDesc.Text.Replace("\r\n", "\\n").Replace("\n", "\\n");
+                string desc = RTB_MoveDesc.Text.Replace("\r\n", "\\n").Replace("\n", "\\n");
+                if (moveflavor[entry] != desc) { moveflavor[entry] = desc; flavorChanged = true; }
                 Main.Config.SetText(TextName.MoveFlavor, moveflavor);
             }
 
@@ -593,6 +594,8 @@ public partial class MoveEditor7 : Form
     private void CloseForm(object sender, FormClosingEventArgs e)
     {
         try { SetEntry(); } catch { }
+        // SetText alone only updates memory; nothing else saves the gametext GARC for this editor.
+        if (flavorChanged) Main.Config.SaveText(TextName.MoveFlavor);
         SaveAnimationMap();
         SaveLogs();
         SaveFlagNames();
@@ -719,6 +722,7 @@ public partial class MoveEditor7 : Form
         {
             Array.Resize(ref moveflavor, newId + 1);
             moveflavor[newId] = "New Move Description.";
+            flavorChanged = true;
         }
 
         Array.Resize(ref _originalMoves, newId + 1);
@@ -731,22 +735,131 @@ public partial class MoveEditor7 : Form
     private void B_ChampionsPP_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Apply Pokemon Champions PP settings to all moves?") != DialogResult.Yes) return;
-        
+
+        var zMoves = new HashSet<int>(Legal.Z_Moves);
+        for (int j = 1; j < files.Length; j++)
+        {
+            if (files[j] != null && files[j].Length >= 0x20)
+            {
+                int zm = BitConverter.ToUInt16(files[j], 0x1E);
+                if (zm > 0 && zm < files.Length)
+                    zMoves.Add(zm);
+            }
+        }
+
         for (int i = 1; i < files.Length; i++)
         {
+            if (files[i] == null || files[i].Length < 0x24 || zMoves.Contains(i))
+                continue;
+
             var move = new Move7(files[i]);
             int pp = move.PP;
-            
+
             if (pp > 0 && pp <= 5) move.PP = 8;
             else if (pp > 5 && pp <= 10) move.PP = 12;
             else if (pp > 10 && pp <= 15) move.PP = 16;
             else if (pp > 15) move.PP = 20;
-            
+
             files[i] = move.Write();
         }
-        
+
         entry = -1;
         if (CB_Move.SelectedIndex >= 0) { entry = CB_Move.SelectedIndex + 1; GetEntry(); }
+    }
+
+    private void B_FixZMoves_Click(object sender, EventArgs e)
+    {
+        if (files.Length <= 729)
+        {
+            WinFormsUtil.Alert("No expansion moves detected in this ROM (moves end at ID " + (files.Length - 1) + ").");
+            return;
+        }
+
+        if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo,
+            $"Fix Z-Moves for all {files.Length - 729} expansion moves (Move 729 to {files.Length - 1})?",
+            "Attacking moves will receive matching generic Z-Moves and scaled Z-Power.\nStatus moves will receive Z-Power Reset Lowered Stats.") != DialogResult.Yes)
+            return;
+
+        int count = 0;
+        for (int i = 729; i < files.Length; i++)
+        {
+            if (files[i] == null || files[i].Length < 0x24)
+                continue;
+
+            var move = new Move7(files[i]);
+            move.FixZMove(26);
+            files[i] = move.Write();
+            count++;
+        }
+
+        entry = -1;
+        if (CB_Move.SelectedIndex >= 0) { entry = CB_Move.SelectedIndex + 1; GetEntry(); }
+        WinFormsUtil.Alert($"Successfully updated Z-Move data for {count} expansion move(s)!");
+    }
+
+    /// <summary>
+    /// Moves that carry the "Slicing" category in the games this ROM's move roster is descended
+    /// from (Sharpness reads this for its 1.5x power boost). Matched by name rather than a fixed id
+    /// range so it also catches any Gen 8/9 move a patch package has already installed under its
+    /// real name (Stone Axe, Ceaseless Edge, etc.) without needing to know its assigned id.
+    /// </summary>
+    private static readonly HashSet<string> SlicingMoveNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cut", "Razor Leaf", "Razor Wind", "Slash", "Fury Cutter", "False Swipe",
+        "Aerial Ace", "Air Cutter", "Air Slash", "Night Slash", "X-Scissor", "Leaf Blade",
+        "Psycho Cut", "Cross Poison", "Sacred Sword", "Solar Blade", "Behemoth Blade",
+        "Stone Axe", "Ceaseless Edge", "Bitter Blade", "Kowtow Cleave", "Tachyon Cutter",
+    };
+
+    /// <summary>
+    /// Moves that carry the "Wind" category (what Wind Power and Wind Rider react to when the
+    /// holder is hit by one, and what Tailwind/Sandstorm-adjacent wind checks key off).
+    /// </summary>
+    private static readonly HashSet<string> WindMoveNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Gust", "Razor Wind", "Whirlwind", "Twister", "Tailwind", "Hurricane", "Icy Wind",
+        "Petal Blizzard", "Leaf Tornado", "Fairy Wind", "Silver Wind",
+        "Bleakwind Storm", "Sandsear Storm", "Springtide Storm", "Wildbolt Storm",
+    };
+
+    /// <summary>
+    /// Sets the Slicing/WindPower/WindRider flag bits (see MoveFlag7.cs) on every move in this ROM
+    /// that is actually slicing or wind, by name. WindPower and WindRider are both set together on
+    /// every wind move - they're separate bits because they're two distinct abilities, not because
+    /// a wind move is only "some" wind moves' worth of windy.
+    /// </summary>
+    private void B_SetSlicingWindFlags_Click(object sender, EventArgs e)
+    {
+        if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo,
+            "Set Slicing and Wind flags on every matching move in this ROM?",
+            $"Slicing: {SlicingMoveNames.Count} known moves.\nWind (Wind Power + Wind Rider): {WindMoveNames.Count} known moves.\n\n" +
+            "Matched by move name - only moves that exist in this ROM's move list are touched.") != DialogResult.Yes)
+            return;
+
+        int slicing = 0, wind = 0;
+        for (int i = 1; i < files.Length && i < movelist.Length; i++)
+        {
+            if (files[i] == null || files[i].Length < 0x24) continue;
+            string name = movelist[i];
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            bool isSlicing = SlicingMoveNames.Contains(name);
+            bool isWind = WindMoveNames.Contains(name);
+            if (!isSlicing && !isWind) continue;
+
+            var move = new Move7(files[i]);
+            var flags = move.Flags;
+            if (isSlicing) { flags |= MoveFlag7.Slicing; slicing++; }
+            if (isWind) { flags |= MoveFlag7.WindPower | MoveFlag7.WindRider; wind++; }
+            move.Flags = flags;
+            files[i] = move.Write();
+        }
+
+        entry = -1;
+        if (CB_Move.SelectedIndex >= 0) { entry = CB_Move.SelectedIndex + 1; GetEntry(); }
+        WinFormsUtil.Alert($"Flagged {slicing} slicing move(s) and {wind} wind move(s).",
+            "Sharpness needs binding to the Slicing flag to actually apply its power boost - " +
+            "select \"Slicing\" in the flag list and use \"Bind Flag to Ability\" to wire it up.");
     }
 
     private void B_Metronome_Click(object sender, EventArgs e)

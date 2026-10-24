@@ -1,0 +1,34 @@
+{
+  "Name": "Transistor",
+  "Description": "Transistor (Ability 262). Powers up Electric-type moves by 50% during damage calculation (timing 0x47).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 262,
+      "Name": "Transistor",
+      "Slots": [
+        {
+          "Timing": "0x47",
+          "Code": "30402DE90240A0E10300A0E3D11EFAEB040050E10700001A1900A0E3CD1EFAEB0D0050E30300001A061BA0E33500A0E33040BDE8330CFAEA3080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 71,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "MEAt6QJAoOEDAKDj0R766wQAUOEHAAAaGQCg480e+usNAFDjAwAAGgYboOM1AKDjMEC96DMM+uowgL3o"
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

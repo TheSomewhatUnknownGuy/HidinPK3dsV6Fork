@@ -15,6 +15,7 @@
 
 using pk3DS.Core;
 using pk3DS.Core.CTR;
+using pk3DS.Core.Modding.Research;
 using pk3DS.Core.Structures.PersonalInfo;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -42,6 +43,7 @@ namespace pk3DS.WinForms;
     private Color GradientStart = Color.FromArgb(45, 25, 60);
     private Color GradientEnd = Color.FromArgb(30, 30, 30);
     public static Main Instance;
+    private readonly ToolStripMenuItem menuPassiveAbilities;
     public Main()
     {
         Instance = this;
@@ -52,6 +54,73 @@ namespace pk3DS.WinForms;
         this.Paint += new PaintEventHandler(Main_Paint);
         ShowdownSetManager.Load();
         ExpansionCodeMap.EnsureLoaded();
+
+        // 10-bit ability ids (bit 9 in personal 0x52 bits 4-6, see PersonalInfoSM.Abilities). Off = 9-bit, max 511.
+        // Mutually exclusive with passive abilities (same bits): GameConfig.TrySet* enforces it, the menus undo a refused tick.
+        GameConfig.ExpandedAbilities = Properties.Settings.Default.ExpandedAbilities;
+        var menuExpandedAbilities = new ToolStripMenuItem("Expanded Abilities (10-bit, ids up to 1023)")
+        {
+            CheckOnClick = true,
+            Checked = GameConfig.ExpandedAbilities,
+            ToolTipText = "Stores ability bit 9 in personal byte 0x52 bits 4-6. Ids above 511 also need a code.bin read patch.",
+        };
+        menuExpandedAbilities.CheckedChanged += (s, e) =>
+        {
+            if (GameConfig.TrySetExpandedAbilities(menuExpandedAbilities.Checked) is { } why)
+            {
+                menuExpandedAbilities.Checked = false; // a refusal is always a tick-on, so this re-enters as an off
+                WinFormsUtil.Alert(why);
+                return;
+            }
+            Properties.Settings.Default.ExpandedAbilities = menuExpandedAbilities.Checked;
+            Properties.Settings.Default.Save();
+        };
+        Menu_Options.DropDownItems.Add(menuExpandedAbilities);
+
+        // Rom Nueva + passive abilities (Vanilla/Expansion only). Saved preference loads only if the exclusions allow it.
+        GameConfig.TrySetPassiveAbilities(Properties.Settings.Default.PassiveAbilities);
+        menuPassiveAbilities = new ToolStripMenuItem("Passive Abilities (Rom Nueva +)")
+        {
+            CheckOnClick = true,
+            Checked = pk3DS.Core.Modding.PassiveGuard.Enabled,
+            ToolTipText = "Shows the passive ability rows in the Personal and Trainer editors (personal 0x35-0x37, trainer 0x0D/0x0F/0x13). Caps the TM list at 104. Not for Uhuru.",
+        };
+        menuPassiveAbilities.CheckedChanged += (s, e) =>
+        {
+            if (GameConfig.TrySetPassiveAbilities(menuPassiveAbilities.Checked) is { } why)
+            {
+                menuPassiveAbilities.Checked = false;
+                WinFormsUtil.Alert(why);
+                return;
+            }
+            Properties.Settings.Default.PassiveAbilities = menuPassiveAbilities.Checked;
+            Properties.Settings.Default.Save();
+            Config?.InitializePersonal(); // entries read TM bits 104+ (or not) depending on this setting when they are built
+        };
+        Menu_Options.DropDownItems.Add(menuPassiveAbilities);
+        pk3DS.Core.Modding.PassiveGuard.ForcedOff += why =>
+        {
+            void Apply()
+            {
+                menuPassiveAbilities.Checked = false; // saves the off preference through the handler above
+                WinFormsUtil.Alert("Passive abilities were switched off for this ROM.", why);
+            }
+            if (InvokeRequired) BeginInvoke((MethodInvoker)Apply); else Apply();
+        };
+
+        GameConfig.AllowGrowth = Properties.Settings.Default.AllowGrowth;
+        var menuAllowGrowth = new ToolStripMenuItem("Allow code.bin and CRO growth (experimental, not boot-tested)")
+        {
+            CheckOnClick = true,
+            Checked = GameConfig.AllowGrowth,
+        };
+        menuAllowGrowth.CheckedChanged += (s, e) =>
+        {
+            GameConfig.AllowGrowth = menuAllowGrowth.Checked;
+            Properties.Settings.Default.AllowGrowth = menuAllowGrowth.Checked;
+            Properties.Settings.Default.Save();
+        };
+        Menu_Options.DropDownItems.Add(menuAllowGrowth);
 
         // Prepare DragDrop Functionality
         AllowDrop = TB_Path.AllowDrop = true;
@@ -77,19 +146,8 @@ namespace pk3DS.WinForms;
         if (settings.Language >= 0 && settings.Language < CB_Lang.Items.Count)
             CB_Lang.SelectedIndex = settings.Language;
 
-        var path = settings.GamePath;
-        if (!string.IsNullOrWhiteSpace(path))
-        {
-            try
-            {
-                OpenQuick(path);
-            }
-            catch (Exception ex)
-            {
-                WinFormsUtil.Error($"Unable to automatically load the previously opened ROM dump located at -- {path}.", ex.Message);
-                ResetStatus();
-            }
-        }
+        // The last ROM opens from OnShown, so the window paints before the load starts.
+        autoOpenPath = settings.GamePath;
 
         string[] args = Environment.GetCommandLineArgs();
         string filename = args.Length > 0 ? Path.GetFileNameWithoutExtension(args[0]).ToLower() : "";
@@ -158,6 +216,33 @@ namespace pk3DS.WinForms;
         UpdateMascot();
         AddThemeMenu();
         AddModdingToolsMenu();
+    }
+
+    private string autoOpenPath;
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        var path = autoOpenPath;
+        autoOpenPath = null;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        // BeginInvoke queues the load behind the first paint instead of running inside Shown.
+        BeginInvoke(() =>
+        {
+            try
+            {
+                UpdateStatus($"Loading {path}…", false);
+                L_Status.Refresh(); // the load blocks the UI thread, so paint the label now
+                OpenQuick(path);
+            }
+            catch (Exception ex)
+            {
+                WinFormsUtil.Error($"Unable to automatically load the previously opened ROM dump located at -- {path}.", ex.Message);
+                ResetStatus();
+            }
+        });
     }
 
     private void InitializeMascotUI()
@@ -320,6 +405,8 @@ namespace pk3DS.WinForms;
         string customTheme = Properties.Settings.Default.CustomTheme;
         if (!string.IsNullOrEmpty(customTheme) && customTheme != "Dark" && customTheme != "Light" && customTheme != "Grey" && customTheme != "GalaxyPurple")
             themeName = customTheme;
+
+        WinFormsUtil.CurrentGradientName = themeName;   // sub-forms opened later reuse it
 
         var size = ClientSize;
         if (size.Width <= 0 || size.Height <= 0) return;
@@ -528,6 +615,14 @@ namespace pk3DS.WinForms;
             string xdeltaPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "4.xdelta");
             if (!File.Exists(xdeltaPath))
                 xdeltaPath = Path.Combine(Directory.GetCurrentDirectory(), "4.xdelta");
+            if (!File.Exists(xdeltaPath))
+            {
+                var searchDir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+                while (searchDir != null && !File.Exists(Path.Combine(searchDir.FullName, "4.xdelta")))
+                    searchDir = searchDir.Parent;
+                if (searchDir != null)
+                    xdeltaPath = Path.Combine(searchDir.FullName, "4.xdelta");
+            }
 
             bool success = pk3DS.Core.Modding.PokemonPlusPatcher.ApplyPokemonPlusPatch(RomFSPath, ExeFSPath, patchSource, xdeltaPath, out string status);
             if (success)
@@ -647,20 +742,26 @@ namespace pk3DS.WinForms;
             }
         };
 
-        var exportLumaItem = new ToolStripMenuItem("Export Luma3DS / LayeredFS Mod Package (Compact)");
+        var exportLumaItem = new ToolStripMenuItem("Export LayeredFS Mod Folder (Azahar / Luma3DS)");
         exportLumaItem.Click += (s, e) => {
-            if (Config == null)
+            if (Config == null || RomFSPath == null || ExeFSPath == null || ExHeaderPath == null)
             {
-                WinFormsUtil.Alert("Please open a game workspace before exporting a Luma3DS mod package.");
+                WinFormsUtil.Alert("Open a full game folder (RomFS, ExeFS and exheader) before exporting a mod folder.");
                 return;
             }
 
-            var fbd = new FolderBrowserDialog { Description = "Select output folder to save the Luma3DS / LayeredFS mod package" };
+            var choice = WinFormsUtil.Prompt(MessageBoxButtons.YesNoCancel, "Export the mod folder for which loader?",
+                "Yes: Azahar (load/mods/<title ID>/)", "No: Luma3DS (luma/titles/<title ID>/)");
+            if (choice == DialogResult.Cancel) return;
+            var layout = choice == DialogResult.Yes ? pk3DS.Core.Modding.ModExport.Layout.Azahar : pk3DS.Core.Modding.ModExport.Layout.Luma;
+
+            var fbd = new FolderBrowserDialog { Description = "Select the output folder for the mod folder" };
             if (fbd.ShowDialog() != DialogResult.OK) return;
 
-            bool success = pk3DS.Core.Modding.PokemonPlusPatcher.ExportLayeredFSModPackage(RomFSPath, ExeFSPath, fbd.SelectedPath, out string status);
+            bool uhuru = Config.Info is { TrainerBaseCount: > 0 };
+            bool success = pk3DS.Core.Modding.PokemonPlusPatcher.ExportLayeredFSModPackage(RomFSPath, ExeFSPath, ExHeaderPath, fbd.SelectedPath, layout, uhuru, out string status);
             if (success)
-                WinFormsUtil.Alert(status, "Luma3DS / LayeredFS Patch Export");
+                WinFormsUtil.Alert(status, "Mod Folder Export");
             else
                 WinFormsUtil.Error(status);
         };
@@ -1574,14 +1675,49 @@ namespace pk3DS.WinForms;
         }
     }
 
+    /// <summary>
+    /// Uhuru ships its new facility text in Korean only. When this ROM is Uhuru and has no English for it,
+    /// offer the bundled translation; it is asked again on every open until English is installed.
+    /// </summary>
+    private void OfferUhuruEnglish()
+    {
+        string pkg = Path.Combine(AppContext.BaseDirectory, TextPackageInstaller.UhuruEnglishPath);
+        // Info is null on a RomFS-only open (Initialize needs ExeFS).
+        if (Config.Info is not { TrainerBaseCount: > 0 } || !File.Exists(pkg)) return;
+        int f = TextPackage.UhuruFacilityStoryFile;
+        if (!TextPackage.NeedsUhuruEnglish(Config.Info.TrainerBaseCount,
+                TextPackageInstaller.LineCount(Config, "storytext", 2, f),
+                TextPackageInstaller.LineCount(Config, "storytext", 7, f)))
+            return;
+        const string msg = "This Uhuru ROM has no English for its new text.\n\nInstall the English translation? (writes English text only)";
+        if (MessageBox.Show(msg, "Uhuru English", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        PackageResult r;
+        try { r = TextPackageInstaller.Apply(TextPackage.Load(pkg), Config); }
+        catch (Exception ex) { WinFormsUtil.Error("Could not read the English translation.", ex.Message); return; }
+        string report = string.Join(Environment.NewLine, r.Log.Concat(r.Errors));
+        if (r.Success) WinFormsUtil.Alert("English installed.", report);
+        else WinFormsUtil.Error("English was not installed.", report);
+    }
+
+    /// <summary>
+    /// Passives live in GARCs pk3DS edits outside any recipe, and ModExport only copies recorded files, so a passives save records its GARC.
+    /// Only while the setting is on: a plain save of the same GARC stays unrecorded, as before.
+    /// </summary>
+    private static void RecordForExport(string garcName)
+    {
+        if (!pk3DS.Core.Modding.PassiveGuard.Enabled || Config?.GetGARCPath(garcName) is not { } full) return;
+        pk3DS.Core.Modding.ProjectState.Instance.RecordModifiedFile("romfs/" + Path.GetRelativePath(RomFSPath, full).Replace('\\', '/'));
+    }
+
     private void OpenDirectory(string path)
     {
         if (!Directory.Exists(path))
             return;
 
         // Check for ROMFS/EXEFS/EXHEADER
-        RomFSPath = ExeFSPath = null; // Reset
+        RomFSPath = ExeFSPath = ExHeaderPath = null; // Reset
         Config = null;
+        pk3DS.Core.Modding.UhuruGuard.Active = false; // set again by Config.Initialize below
         SMDH = null;
         HANSgameID = 0;
 
@@ -1645,8 +1781,7 @@ namespace pk3DS.WinForms;
         if (RomFSPath != null)
         {
             HandleFriendship(1); // Editor open
-            UpdateMascot();
-            
+
             // Trigger Data Loading
             if (RTB_Status.Text.Length > 0)
                 RTB_Status.Clear();
@@ -1654,18 +1789,17 @@ namespace pk3DS.WinForms;
             UpdateStatus("Data found! Loading persistent data for subforms...", false);
             try
             {
-                if (Config is not null)
-                {
-                    if (ExeFSPath is not null)
-                        Config.Initialize(RomFSPath, ExeFSPath, Language);
-                }
+                // Initialize reads only RomFS, so RomFS-only opens get it too (Uhuru detection, UhuruGuard.Active).
+                Config?.Initialize(RomFSPath, ExeFSPath, Language);
             }
             catch (Exception ex)
             {
                 WinFormsUtil.Error("Failed to initialize game logic.", ex.Message);
                 ResetStatus();
+                UpdateMascot(); // the normal refresh below is skipped by this return
                 return;
             }
+            ApplyUhuruButtonState();
         }
 
         // Take a pristine backup the first time this game folder is opened.
@@ -1674,6 +1808,8 @@ namespace pk3DS.WinForms;
             try { Config.BackupFiles(); }
             catch (Exception ex) { UpdateStatus("Could not create a backup: " + ex.Message, false); }
         }
+        if (Config != null && RomFSPath != null)
+            OfferUhuruEnglish();
 
         UpdateProgramTitle();
 
@@ -1914,6 +2050,14 @@ namespace pk3DS.WinForms;
         }
     }
 
+    // Species insertion is measured-impossible on Uhuru (a/0/9/4 is 3.83 GiB, past its 32-bit offsets): grey the button instead of letting it fail on click.
+    private void ApplyUhuruButtonState()
+    {
+        bool uhuru = pk3DS.Core.Modding.UhuruGuard.Active;
+        B_SpeciesInsertion.Enabled = !uhuru;
+        B_SpeciesInsertion.Text = uhuru ? "Insert Species (not on Uhuru)" : "Insert Species";
+    }
+
     private void ToggleSubEditors()
     {
         // Hide all buttons
@@ -1937,7 +2081,7 @@ namespace pk3DS.WinForms;
                 B_MoveTutor.Visible = Config.ORAS; // Default false unless loaded
                 break;
             case 7:
-                romfs = [B_UniversalRandomizer, B_GameText, B_StoryText, B_Personal, B_Evolution, B_LevelUp, B_Wild, B_MegaEvo, B_EggMove, B_Trainer, B_Item, B_Move, B_Royal, B_Pickup, B_OWSE,
+                romfs = [B_UniversalRandomizer, B_GameText, B_StoryText, B_Personal, B_Evolution, B_LevelUp, B_Wild, B_MegaEvo, B_EggMove, B_Trainer, B_Item, B_Move, B_Royal, B_Pickup, B_OWSE, B_SpeciesInsertion, B_AMXScript, B_IconEditor, B_GiftItemEditor, B_ModelScale, B_OWModelSwap, B_FacilityPools,
                 ];
                 exefs = [B_TM, B_TypeChart, B_ShinyRate];
                 cro = [B_Mart, B_MoveTutor, B_CROExpander, B_ResearchCenter];
@@ -2093,10 +2237,25 @@ namespace pk3DS.WinForms;
     private static bool CheckIfExHeader(string path)
     {
         ExHeaderPath = null;
-        // Input folder path should contain the ExHeader.
+        // Input folder path should contain the ExHeader. Excludes ".bak" backups (the species
+        // insertion wizard makes one, byte-for-byte, before its first code.bin/ExHeader edit) - a
+        // stray backup is the same 0x800 size and name-prefix, so without excluding it here the old
+        // loop's "last match wins" behavior would silently and permanently pick the STALE backup the
+        // moment one exists, since "ExHeader.bin.bak" sorts after "ExHeader.bin". Confirmed live: the
+        // external "Rebuild 3DS" tool was being fed the pre-expansion ExHeader this way, while the
+        // wizard's own save path (which resolves this path independently, not through here) was
+        // never affected - only the rebuild-tool integration silently regressed.
         string[] files = Directory.GetFiles(path);
-        foreach (string fp in from s in files let f = new FileInfo(s) where (f.Name.StartsWith("exh", StringComparison.OrdinalIgnoreCase) || f.Name.StartsWith("decryptedexh", StringComparison.OrdinalIgnoreCase)) && f.Length == 0x800 select s)
+        foreach (string fp in from s in files
+                               let f = new FileInfo(s)
+                               where (f.Name.StartsWith("exh", StringComparison.OrdinalIgnoreCase) || f.Name.StartsWith("decryptedexh", StringComparison.OrdinalIgnoreCase))
+                                     && f.Length == 0x800
+                                     && !f.Name.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)
+                               select s)
+        {
             ExHeaderPath = fp;
+            break;
+        }
 
         return ExHeaderPath != null;
     }
@@ -2197,7 +2356,9 @@ namespace pk3DS.WinForms;
     /// data they need is not there.
     /// </para>
     /// </summary>
-    private void RunEditor(string what, Action work) => StartGuarded(what, work, count: false, editor: true);
+    // Counted like any worker: an editor's file save runs after its dialog closes, and uncounted, a
+    // second editor could open and read (then save back) a file that save was still rewriting.
+    private void RunEditor(string what, Action work) => StartGuarded(what, work, count: true, editor: true);
 
     /// <summary>
     /// Runs non-editor background work (packing, compression, extraction) under the same guard.
@@ -2298,7 +2459,15 @@ namespace pk3DS.WinForms;
                 return;
             }
             Invoke(() => { var ed = new TextEditor(files, "gametext"); WinFormsUtil.ApplyTheme(ed); HandleFriendship(1); ed.ShowDialog(); });
-            g.Files = TryWriteText(files, g);
+            var data = TryWriteText(files, g);
+            if (data == null)
+            {
+                // The editor changed Config.GameTextStrings in place; reload it so a discard really
+                // discards (the Item editor used to write these "discarded" lines out later).
+                Config.InitializeGameText();
+                return;
+            }
+            g.Files = data;
             g.Save();
         });
     }
@@ -2314,11 +2483,15 @@ namespace pk3DS.WinForms;
                 return;
             string[][] files = g.Files.Select(file => new TextFile(Config, file).Lines).ToArray();
             Invoke(() => { var ed = new TextEditor(files, "storytext"); WinFormsUtil.ApplyTheme(ed); HandleFriendship(1); ed.ShowDialog(); });
-            g.Files = TryWriteText(files, g);
+            var data = TryWriteText(files, g);
+            if (data == null)
+                return; // discarded; story text is only held in this local copy
+            g.Files = data;
             g.Save();
         });
     }
 
+    /// <summary>Encodes every text file; null means the user chose to discard all changes.</summary>
     private static byte[][] TryWriteText(string[][] files, GARCFile g)
     {
         byte[][] data = new byte[files.Length][];
@@ -2349,7 +2522,7 @@ namespace pk3DS.WinForms;
                                                                     + Environment.NewLine + "Example: " + errata[0],
             string.Join(Environment.NewLine, options));
         if (dr == DialogResult.Cancel)
-            return g.Files; // discard
+            return null; // discard: the caller restores whatever it edited in memory
         if (dr == DialogResult.No)
             return data;
 
@@ -2397,7 +2570,16 @@ namespace pk3DS.WinForms;
                     Invoke(() => { var ed = new MaisonEditor6(trd, trp, super); WinFormsUtil.ApplyTheme(ed); HandleFriendship(1); ed.ShowDialog(); });
                     break;
                 case 7:
-                    Invoke(() => { var ed = new MaisonEditor7(trd, trp, super); WinFormsUtil.ApplyTheme(ed); HandleFriendship(1); ed.ShowDialog(); });
+                    Invoke(() => {
+                        var ed = new MaisonEditor7(trd, trp, super);
+                        WinFormsUtil.ApplyTheme(ed);
+                        HandleFriendship(1);
+                        ed.ShowDialog();
+                        // Add Trainer(s)/Add Pokémon Set(s) resize these to new array objects - read
+                        // them back or newly added slots would silently not be saved to the ROM.
+                        trd = ed.TrFiles;
+                        trp = ed.PkFiles;
+                    });
                     break;
             }
             trdata.Files = trd;
@@ -2419,12 +2601,14 @@ namespace pk3DS.WinForms;
                 return;
             }
             if (!TryGetGarc("eggmove", out var ge) || !TryGetGarc("evolution", out var gev)) return;
+            var gevb = Config?.GetGARCData("evolutionbase"); // optional - silently absent on ROMs that don't have it yet
 
             byte[][] d = Config.GARCPersonal.Files;
             var gl = Config.GARCLearnsets;
             byte[][] l = gl.Files;
             byte[][] eg = ge.Files;
             byte[][] ev = gev.Files;
+            byte[][] evb = gevb?.Files;
             switch (Config.Generation)
             {
                 case 6:
@@ -2432,38 +2616,25 @@ namespace pk3DS.WinForms;
                     break;
                 case 7:
                     PersonalEditor7 ped = null;
-                    Invoke(() => { ped = new PersonalEditor7(d, l, eg, ev); WinFormsUtil.ApplyTheme(ped); HandleFriendship(1); ped.ShowDialog(); });
+                    Invoke(() => { ped = new PersonalEditor7(d, l, eg, ev, evb); WinFormsUtil.ApplyTheme(ped); HandleFriendship(1); ped.ShowDialog(); });
                     if (ped != null)
                     {
                         d = ped.Files;
                         l = ped.Learnsets;
                         eg = ped.EggMoves;
                         ev = ped.EvolutionFiles;
+                        evb = ped.EvolutionBaseFiles;
                     }
                     break;
             }
 
-            // Set Master Table back (Safely reconstruct to avoid length mismatches)
+            // The master table is the last file; copy the entries over it in place (rebuilding it dropped Uhuru's junk entries and tail).
             if (d.Length > 1)
-            {
-                int entryLen = d[0].Length;
-                // In Gen 7, all personal entries are the same size. 
-                // The Master Table is the last entry and is much larger.
-                var actualEntries = d.Where(f => f != null && f.Length == entryLen).ToList();
-                int tableSize = actualEntries.Count * entryLen;
-                byte[] masterTable = new byte[tableSize];
-                for (int i = 0; i < actualEntries.Count; i++)
-                    actualEntries[i].CopyTo(masterTable, i * entryLen);
-
-                // Re-assemble the file list: [Entries...] + [MasterTable]
-                var finalFiles = actualEntries.ToArray();
-                Array.Resize(ref finalFiles, finalFiles.Length + 1);
-                finalFiles[^1] = masterTable;
-                d = finalFiles;
-            }
+                pk3DS.Core.Modding.TMCompat.SyncMaster(d);
 
             Config.GARCPersonal.Files = d;
             Config.GARCPersonal.Save();
+            RecordForExport("personal");
             Config.InitializePersonal();
 
             // Save any changes from jumps
@@ -2484,6 +2655,16 @@ namespace pk3DS.WinForms;
                 g_evo.Files = ev;
                 g_evo.Save();
                 Config.InitializeEvos();
+            }
+
+            if (evb != null)
+            {
+                var g_evb = Config.GetGARCData("evolutionbase");
+                if (g_evb != null)
+                {
+                    g_evb.Files = evb;
+                    g_evb.Save();
+                }
             }
         });
     }
@@ -2507,12 +2688,17 @@ namespace pk3DS.WinForms;
                     Invoke(() => { var ed = new RSTE(trd, trp); WinFormsUtil.ApplyTheme(ed); HandleFriendship(1); ed.ShowDialog(); });
                     break;
                 case 7:
-                    Invoke(() => { 
+                    Invoke(() => {
                         try {
-                            var ed = new SMTE(trd, trp); 
-                            WinFormsUtil.ApplyTheme(ed); 
-                            HandleFriendship(1); 
-                            ed.ShowDialog(); 
+                            var ed = new SMTE(trd, trp);
+                            WinFormsUtil.ApplyTheme(ed);
+                            HandleFriendship(1);
+                            ed.ShowDialog();
+                            // Add Trainer(s) resizes trdata/trpoke to new array objects internally -
+                            // read those back rather than reusing the stale pre-dialog locals below,
+                            // or newly added trainers would silently not be saved to the ROM.
+                            trd = ed.TrData;
+                            trp = ed.TrPoke;
                         } catch (Exception ex) {
                             WinFormsUtil.Error("Failed to open Trainer Editor (SMTE):\n" + ex.Message + "\n" + ex.StackTrace);
                         }
@@ -2525,6 +2711,8 @@ namespace pk3DS.WinForms;
             trclass.Save();
             trdata.Save();
             trpoke.Save();
+            RecordForExport("trdata"); // a team's size lives in trdata, its passives in trpoke
+            RecordForExport("trpoke");
         });
     }
 
@@ -2641,7 +2829,6 @@ namespace pk3DS.WinForms;
 
     private void RunOWSE6()
     {
-        Enabled = false;
         RunEditor("Overworld", () =>
         {
             bool reload = ModifierKeys is Keys.Control or (Keys.Alt | Keys.Control);
@@ -2653,19 +2840,14 @@ namespace pk3DS.WinForms;
             {
                 var g = Config.GetGARCData("storytext");
                 string[][] tfiles = g.Files.Select(file => new TextFile(Config, file).Lines).ToArray();
-                Invoke(() => { var ed = new OWSE(); WinFormsUtil.ApplyTheme(ed); ed.Show(); });
-                Invoke(() => { var te = new TextEditor(tfiles, "storytext"); WinFormsUtil.ApplyTheme(te); te.Show(); });
-                while (Application.OpenForms.Count > 1)
-                    Thread.Sleep(200);
+                ShowAndWait(() => new OWSE(), () => new TextEditor(tfiles, "storytext"));
             }
-            Invoke((MethodInvoker)delegate { Enabled = true; });
             FileSet(files);
         });
     }
 
     private void RunOWSE7()
     {
-        Enabled = false;
         RunEditor("Overworld", () =>
         {
             var files = new[] { "encdata", "zonedata", "worlddata" };
@@ -2678,12 +2860,39 @@ namespace pk3DS.WinForms;
 
             var g = Config.GetGARCData("storytext");
             string[][] tfiles = g.Files.Select(file => new TextFile(Config, file).Lines).ToArray();
-            Invoke(() => { var te = new TextEditor(tfiles, "storytext"); WinFormsUtil.ApplyTheme(te); te.Show(); });
-            Invoke(() => { var ow = new OWSE7(ed, zd, wd); WinFormsUtil.ApplyTheme(ow); ow.Show(); });
-            while (Application.OpenForms.Count > 1)
-                Thread.Sleep(200);
-            Invoke((MethodInvoker)delegate { Enabled = true; });
+            ShowAndWait(() => new TextEditor(tfiles, "storytext"), () => new OWSE7(ed, zd, wd));
         });
+    }
+
+    /// <summary>
+    /// Shows non-modal editors and keeps the main window disabled until those editors close.
+    /// The window used to be disabled before the "no ROM" guard and only re-enabled on success, so
+    /// any error left it dead until restart; and it waited for every open form, not just these.
+    /// </summary>
+    private void ShowAndWait(params Func<Form>[] create)
+    {
+        var forms = new List<Form>();
+        try
+        {
+            Invoke(() =>
+            {
+                Enabled = false;
+                foreach (var make in create)
+                {
+                    var f = make();
+                    WinFormsUtil.ApplyTheme(f);
+                    f.Show();
+                    forms.Add(f);
+                }
+            });
+            while (forms.Any(f => !f.IsDisposed))
+                Thread.Sleep(200);
+        }
+        finally
+        {
+            if (!IsDisposed)
+                Invoke(() => Enabled = true);
+        }
     }
 
     private void B_Evolution_Click(object sender, EventArgs e)
@@ -2704,8 +2913,10 @@ namespace pk3DS.WinForms;
                     break;
             }
             g.Files = d;
-            Config.InitializeEvos();
             g.Save();
+            // InitializeEvos re-reads the GARC from disk, so it has to come after the save or the
+            // in-memory evolutions stay pre-edit (and the randomizer later writes them back).
+            Config.InitializeEvos();
         });
     }
 
@@ -2779,8 +2990,12 @@ namespace pk3DS.WinForms;
 
             // Persist any game text changes made by the item editor (item names/flavor)
             var gt = Config.GARCGameText;
-            gt.Files = TryWriteText(Config.GameTextStrings, gt);
-            gt.Save();
+            var textData = TryWriteText(Config.GameTextStrings, gt);
+            if (textData != null)
+            {
+                gt.Files = textData;
+                gt.Save();
+            }
             Config.InitializeGameText();
         });
     }
@@ -3337,6 +3552,153 @@ namespace pk3DS.WinForms;
     private void Menu_Shuffler_Click(object sender, EventArgs e)
     {
         new Shuffler().ShowDialog();
+    }
+
+    private void Menu_ZoneData_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "Zone data editing is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        RunEditor("ZoneData", () =>
+        {
+            var zd = Config.GetlzGARCData("zonedata");
+            if (zd == null)
+            {
+                Invoke(() => WinFormsUtil.Error("Missing game data.", "The zone data archive could not be read from this ROM."));
+                return;
+            }
+
+            var locationList = Config.GetText(TextName.metlist_000000);
+            locationList = SMWE.GetGoodLocationList(locationList);
+
+            Invoke(() => { var editor = new ZoneDataEditor7(zd, locationList); WinFormsUtil.ApplyTheme(editor); HandleFriendship(1); editor.ShowDialog(); });
+        });
+    }
+
+    private void B_SpeciesInsertion_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "Species insertion is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        var kind = pk3DS.Core.Modding.Insertion.RomLayout.DetectFromRomFs(RomFSPath, out _, out _);
+        if (pk3DS.Core.Modding.UhuruGuard.Active) kind = pk3DS.Core.Modding.Insertion.RomKind.Uhuru;
+        string refusal = pk3DS.Core.Modding.Insertion.RomLayout.Refusal(kind, species: true);
+        if (refusal != null)
+        {
+            WinFormsUtil.Error(refusal);
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var ed = new SpeciesInsertionWizard(); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_AMXScript_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "AMX script editing is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var amx = Config.GetGARCData("amxscript");
+        if (amx?.Files == null)
+        {
+            WinFormsUtil.Error("Missing game data.", "This ROM doesn't have the 'amxscript' (a/0/9/2) archive.");
+            return;
+        }
+        var ed = new AMXScriptEditor(amx); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_IconEditor_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "Icon editing is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var ed = new IconEditor(); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_GiftItemEditor_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "The NPC gift editor is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var amx = Config.GetGARCData("amxscript");
+        if (amx?.Files == null)
+        {
+            WinFormsUtil.Error("Missing game data.", "This ROM doesn't have the 'amxscript' (a/0/9/2) archive.");
+            return;
+        }
+        var ed = new GiftItemEditor(amx); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_ModelScale_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "Model scale editing is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var ed = new ModelScaleEditor(); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_OWModelSwap_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "Overworld model swapping is only supported for Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) right now.");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var ed = new OverworldModelSwapper(); WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
+    }
+
+    private void B_FacilityPools_Click(object sender, EventArgs e)
+    {
+        if (Config == null || Config.Generation != 7)
+        {
+            WinFormsUtil.Error("No Gen 7 ROM loaded.", "The facility pool editor is only supported for Pokémon Uhuru.");
+            return;
+        }
+        if (Config.Info is not { TrainerBaseCount: > 0 })
+        {
+            WinFormsUtil.Error("Not an Uhuru ROM.", "The facility pool editor only works on Pokémon Uhuru Gift v16.0.3 (its pools are in scripts 26 and 217 of the amxscript archive).");
+            return;
+        }
+        if (ThreadActive())
+            return;
+        var amx = Config.GetGARCData("amxscript");
+        if (amx?.Files == null)
+        {
+            WinFormsUtil.Error("Missing game data.", "This ROM doesn't have the 'amxscript' (a/0/9/2) archive.");
+            return;
+        }
+        FacilityPoolEditor ed;
+        try { ed = new FacilityPoolEditor(amx); }
+        catch (Exception ex)
+        {
+            WinFormsUtil.Error("Couldn't read the facility pools.", ex.Message);
+            return;
+        }
+        WinFormsUtil.ApplyTheme(ed); ed.ShowDialog();
     }
 
     // GARC Requests

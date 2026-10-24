@@ -62,5 +62,14 @@
   },
   "ItemNames": {
     "${itemId}": "Throat Spray"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Throat Sprays"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Throat Spray[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nIt raises Sp. Atk when the holder uses\na sound-based move."
   }
 }

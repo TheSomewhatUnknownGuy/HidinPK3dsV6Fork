@@ -12,8 +12,8 @@ public static class CodeSpaceBudget
     /// </summary>
     public const int LevelCapBytes = 216;
 
-    /// <summary>Bytes the TM expansion's routines occupy.</summary>
-    public const int TMExpansionBytes = 285;
+    /// <summary>Bytes the TM expansion needs at its maximum: its routines plus both 128-entry tables.</summary>
+    public const int TMExpansionBytes = TMExpansion.CodeBytes + 4 * TMExpansion.MaxCount;
 
     public sealed record Report(int Offset, int Free)
     {

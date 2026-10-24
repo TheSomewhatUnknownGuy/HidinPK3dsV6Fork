@@ -1,0 +1,40 @@
+# Uhuru v16.0.3 changed-byte regions: Vanilla (V) vs Expansion (E), generated 2026-10-11 by scripts/uhuru/regions.py
+# sources: Ultra Sun Vanilla | Ultra Sun Normal Expansion
+# format: file<TAB>startHex<TAB>endHexExclusive (file offsets; merge gap < 17; CRO bytes 0x00-0x7F skipped)
+code.bin	1d4c2c	1d4c2e
+code.bin	1df164	1df166
+code.bin	2083c8	2083cc
+code.bin	2084b0	2084b4
+code.bin	20c890	20c95b
+code.bin	21c948	21c94a
+code.bin	21c9cc	21c9ce
+code.bin	21cc10	21cc24
+code.bin	21cc34	21cc38
+code.bin	21ccb4	21ccd4
+code.bin	21d278	21d291
+code.bin	21e430	21e434
+code.bin	21eb40	21eb50
+code.bin	21eb74	21eb78
+code.bin	221774	221778
+code.bin	22339c	2233a0
+code.bin	22360c	223610
+code.bin	2259a4	2259a8
+code.bin	226680	226681
+code.bin	2267d4	2267d5
+code.bin	226b04	226b05
+code.bin	26b630	26b634
+code.bin	276b90	276b92
+code.bin	2be1c0	2be1c4
+code.bin	2d2b60	2d2b62
+code.bin	2d2c28	2d2c29
+code.bin	2d30bc	2d30be
+code.bin	2d5bd8	2d5bda
+code.bin	342e8c	342e8e
+code.bin	347c7c	347c80
+code.bin	347cac	347cb0
+code.bin	3ab278	3ab294
+code.bin	3abe60	3abe63
+code.bin	3ad02c	3ad030
+code.bin	3babfc	3babfe
+code.bin	4b9b40	4ba000
+code.bin	4bdb50	4bdd4e

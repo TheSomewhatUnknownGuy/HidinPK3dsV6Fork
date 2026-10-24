@@ -140,7 +140,7 @@ public class MartRandomizer
         Path.Combine(Path.GetDirectoryName(croPath) ?? "", "Shop.slotcounts.txt");
 
     /// <summary>Records the live counts beside Shop.cro so the editor reads the same file the same way.</summary>
-    private static void SaveCounts(string croPath, int[] regular, int[] bp)
+    public static void SaveCounts(string croPath, int[] regular, int[] bp)
     {
         try
         {
@@ -206,6 +206,7 @@ public class MartRandomizer
         if (Mode == 0) return;
         string croPath = Path.Combine(RomFSPath, "Shop.cro");
         if (!File.Exists(croPath)) return;
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(croPath) != null) return; // Uhuru: Shop.cro is not patched unchecked
 
         byte[] data = File.ReadAllBytes(croPath);
         uint segmentTableOffset = BitConverter.ToUInt32(data, 0xC8);
@@ -236,6 +237,11 @@ public class MartRandomizer
     {
         string croPath = Path.Combine(RomFSPath, "Shop.cro");
         if (!File.Exists(croPath)) return (null, null);
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(croPath) is { } uhuru)
+        {
+            ExpansionSkipped = uhuru + " The shops are unchanged.";
+            return (null, null);
+        }
 
         byte[] data = File.ReadAllBytes(croPath);
         var layout = MartLayout.Read(data);

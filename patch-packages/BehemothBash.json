@@ -1,0 +1,50 @@
+{
+  "Name": "Behemoth Bash",
+  "Description": "Behemoth Bash (Move 782). Zamazenta signature move. Calculates damage using Defense instead of Attack (timing 0x4A), deals doubled damage against Mega Evolved and Ultra Bursted targets (timing 0x5B), and ignores protection (timing 0x3B).",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 782,
+      "Name": "Behemoth Bash",
+      "Slots": [
+        {
+          "Timing": "0x4A",
+          "Code": "30402DE90150A0E10240A0E10300A0E3D01EFAEB040050E10A00001A0410A0E10500A0E19B48FAEB0040A0E11E00A0E3C81EFAEB8010A0E1061081E20400A0E13040BDE8FDF4FBEA3080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 74,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "MEAt6QFQoOECQKDhAwCg49Ae+usEAFDhCgAAGgQQoOEFAKDhm0j66wBAoOEeAKDjyB7664AQoOEGEIHiBACg4TBAvej99PvqMIC96A=="
+        },
+        {
+          "Timing": "0x5B",
+          "Code": "10402DE90040A0E10300A0E3D11EFAEB0010A0E10400A0E19E48FAEB1110A0E38049FAEBEF0050E3F20050130100A0030000A0131080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 91,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "EEAt6QBAoOEDAKDj0R766wAQoOEEAKDhnkj66xEQoOOASfrr7wBQ4/IAUBMBAKADAACgExCAveg="
+        },
+        {
+          "Timing": "0x3B",
+          "Code": "10402DE90240A0E10300A0E3D11EFAEB040050E10300001A1040BDE80110A0E35700A0E3460BFAEA1080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 59,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "EEAt6QJAoOEDAKDj0R766wQAUOEDAAAaEEC96AEQoONXAKDjRgv66hCAveg="
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

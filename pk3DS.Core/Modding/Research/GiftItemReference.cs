@@ -1,0 +1,320 @@
+using System.Collections.Generic;
+
+namespace pk3DS.Core.Modding.Research;
+
+/// <summary>
+/// One community-documented NPC item gift inside `amxscript` (a/0/9/2) - <see cref="File"/> is the
+/// xamx member index (e.g. 11 for "011.xamx"), <see cref="ItemId"/>/<see cref="Qty"/> are the two
+/// values a "give item" call pushes as arguments in that script's decompiled instruction stream.
+/// </summary>
+public sealed class GiftItemEntry
+{
+    public int File;
+    public int ItemId;
+    public int Qty;
+    public string Notes = "";
+
+    public GiftItemEntry(int file, int itemId, int qty, string notes)
+    {
+        File = file; ItemId = itemId; Qty = qty; Notes = notes;
+    }
+}
+
+/// <summary>
+/// The community's own hand-compiled list of NPC item gifts found across USUM's 759 real
+/// `amxscript` files - originally documented as a plain markdown table (file/item name/item
+/// id/quantity/location), built by mass-searching for a "give item" call pattern the author found
+/// empirically (confirmed independently this session - decoding these same files with
+/// <see cref="Scripts.ParseScript"/>/<see cref="ScriptEditing"/> shows the giveaway shape
+/// <c>PushConst(qty); PushConst(itemId); ...; CallFunc</c>, though the exact wrapper instructions
+/// around that pair vary from script to script since each xamx file is its own separate compiled
+/// unit). The original list has many duplicate rows (same file/item/qty found via more than one
+/// search pass, or genuinely two separate reward instances) - duplicates from the SAME real
+/// instance were removed here; entries that differ only in quantity are kept as separate real
+/// instances. One row (file 657, item 5000, qty -1, "Unknown Item") was dropped outright - item id
+/// 5000 doesn't exist and a negative quantity isn't a real gift, so it's almost certainly an
+/// unrelated false-positive match rather than a real reward.
+/// <para>
+/// This is reference data, NOT a verified byte-offset map - <see cref="GiftItemLocator"/> re-finds
+/// each entry's actual instruction position fresh, in the live ROM's own script data, every time
+/// it's used, rather than trusting a hardcoded offset. Several entries are themselves the original
+/// author's best guess at location only ("probably", "test yourself") - kept verbatim in
+/// <see cref="GiftItemEntry.Notes"/> so the editor can show that uncertainty instead of hiding it.
+/// </para>
+/// </summary>
+public static class GiftItemReference
+{
+    public static readonly List<GiftItemEntry> Entries =
+    [
+        // Batch 000-100
+        new(11, 1, 1, "Loto-ID center, Tourist Bureau, Hau'oli"),
+        new(11, 33, 1, "Loto-ID center, Tourist Bureau, Hau'oli"),
+        new(11, 50, 1, "Loto-ID center, Tourist Bureau, Hau'oli"),
+        new(11, 51, 1, "Loto-ID center, Tourist Bureau, Hau'oli"),
+        new(11, 53, 1, "Loto-ID center, Tourist Bureau, Hau'oli"),
+        new(16, 42, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 50, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 54, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 134, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 504, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 591, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 708, 1, "Pokemon Center cafe (random drink reward)"),
+        new(16, 709, 1, "Pokemon Center cafe (random drink reward)"),
+        new(60, 845, 1, "Story item (Sparkling Stone)"),
+        new(60, 24, 1, "Max Potion - possible false positive"),
+        new(69, 933, 1, "Story item (Z-Power Ring)"),
+        new(80, 155, 3, "3 Oran Berries from the preschooler in Trainer's School"),
+        new(80, 328, 1, "Story item - TM01 (Work Up)"),
+        new(34, 632, 1, "Shiny Charm, Heahea City"),
+        new(75, 24, 2, "Max Potion - possible false positive"),
+        new(79, 216, 1, "Story item - Exp. Share, Trainers school"),
+        new(81, 3, 5, "5 Great Balls, Teacher Emily after defeat"),
+        new(86, 17, 1, "Potion, boy in classroom (2nd floor)"),
+        new(89, 24, 2, "Max Potion - possible false positive"),
+        new(91, 28, 3, "3 Revives, Lillie in Hau'oli"),
+        new(96, 28, 3, "3 Revives, Hau on Route 2 (could be flipped with 91 - test)"),
+
+        // Batch 101-200
+        new(103, 807, 1, "Story item - Normalium Z"),
+        new(108, 813, 1, "Story item - Fightinium Z"),
+        new(182, 819, 1, "Story item - Rockium Z"),
+        new(191, 808, 1, "Firium Z - story item"),
+        new(104, 3, 10, "10 Great Balls, Ilima after beating Gumshoos"),
+        new(105, 24, 20, "Max Potion - possible false positive"),
+        new(109, 24, 27, "Max Potion - possible false positive"),
+        new(111, 381, 1, "TM54 (False Swipe), after beating Hala"),
+        new(117, 24, 14, "Max Potion - possible false positive"),
+        new(125, 24, 1, "Max Potion - possible false positive"),
+        new(156, 23, 1, "Full Restore"),
+        new(157, 56, 1, "Dire Hit"),
+        new(159, 28, 3, "3 Revives"),
+        new(166, 370, 1, "TM43"),
+        new(167, 394, 1, "TM67"),
+        new(176, 39, 1, "Max Ether"),
+        new(191, 15, 10, "10 Quick Balls"),
+        new(193, 24, 19, "Max Potion - possible false positive"),
+        new(194, 24, 12, "Max Potion - possible false positive"),
+        new(194, 24, 19, "Max Potion - possible false positive (second entry, same file)"),
+        new(195, 24, 1, "Max Potion - possible false positive"),
+
+        // Batch 201-300
+        new(203, 356, 1, "TM29 (Psychic), from Wicke after the Nihilego encounter"),
+        new(203, 24, 12, "Max Potion - possible false positive"),
+        new(215, 823, 1, "Story item - Steelium Z"),
+        new(240, 24, 1, "Max Potion - possible location: Route 13, Hau'oli City, or Konikoni City"),
+        new(245, 11, 5, "5 Luxury Balls, from Lillie on Route 15"),
+        new(257, 13, 10, "10 Dusk Balls, from Acerola after the ghost trial"),
+        new(257, 820, 1, "Story item - Ghostium Z"),
+        new(266, 50, 1, "Rare Candy - unsure zone, likely Aether house after beating Plumeria"),
+        new(281, 822, 1, "Story item - Darkinium Z"),
+        new(287, 29, 1, "Max Revive - likely Aether Paradise, from Hau"),
+        new(296, 24, 2, "Max Potion - possible false positive"),
+        new(299, 24, 1, "Max Potion - possible false positive"),
+
+        // Batch 301-400
+        new(302, 1, 1, "Story item - Master Ball"),
+        new(302, 24, 2, "Max Potion - possible false positive"),
+        new(312, 24, 1, "Max Potion - possible false positive"),
+        new(313, 24, 1, "Max Potion - possible false positive"),
+        new(317, 857, 1, "Story item - Sun Flute (3 duplicate hits in the original search, one real instance)"),
+        new(317, 858, 1, "Story item - Moon Flute"),
+        new(319, 814, 1, "Story item - Poisonium Z"),
+        new(321, 29, 1, "Max Revive - likely one of two given in Vast Poni Canyon"),
+        new(350, 53, 1, "PP Max - likely from Gladion at Mt. Lanakila (also possible: Mt. Hokulani)"),
+        new(377, 821, 1, "Story item - Dragonium Z"),
+        new(400, 41, 1, "Max Elixir - possibly from Hau after beating Mina, Hau'oli cemetery"),
+
+        // Batch 401-500
+        new(419, 30, 1, "Fresh Water - possible location: Hau'oli City, Route 13, or Big Wave Beach"),
+        new(432, 7, 10, "10 Dive Balls, story item - Lana after the water trial"),
+        new(432, 809, 1, "Story item - Waterium Z"),
+        new(432, 842, 1, "Story item - Fishing Rod"),
+        new(435, 83, 1, "Thunder Stone, Route 9, from Looker"),
+        new(436, 931, 1, "Story item - Lycanium Z"),
+        new(437, 843, 1, "Story item - Professor's Mask"),
+        new(442, 841, 1, "Story item - Forage Bag"),
+        new(451, 8, 10, "10 Nest Balls, story item - Mallow after the grass trial"),
+        new(451, 811, 1, "Story item - Grassium Z"),
+        new(454, 934, 1, "Story item - Pink Petal"),
+        new(456, 824, 1, "Story item - Fairium Z"),
+        new(460, 815, 1, "Story item - Groundium Z"),
+        new(480, 810, 1, "Story item - Electrium Z"),
+        new(488, 929, 1, "Story item - Ultranecrozium Z"),
+        new(488, 943, 1, "Story item - N-Solarizer"),
+        new(488, 944, 1, "Story item - N-Lunarizer"),
+        new(496, 547, 1, "Eject Button, from Sophocles in Festival Plaza during Episode RR"),
+        new(500, 852, 1, "Big Malasada - possibly from Wicke in Aether Paradise"),
+        new(424, 24, 5, "Max Potion - possible false positive"),
+        new(485, 851, 3, "3 Beast Balls"),
+        new(489, 24, 10, "Max Potion - possible false positive"),
+
+        // Batch 501-600
+        new(518, 935, 1, "Story item - Orange Petal"),
+        new(519, 936, 1, "Story item - Blue Petal"),
+        new(520, 937, 1, "Story item - Red Petal"),
+        new(521, 936, 1, "Story item - Blue Petal (second instance, different file)"),
+        new(521, 938, 1, "Story item - Green Petal"),
+        new(522, 939, 1, "Story item - Yellow Petal"),
+        new(523, 940, 1, "Story item - Purple Petal"),
+        new(524, 941, 1, "Story item - Rainbow Flower"),
+        new(563, 32, 1, "Lemonade, Heahea City Game Freak building"),
+        new(563, 492, 1, "Fast Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 493, 1, "Level Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 494, 1, "Lure Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 495, 1, "Heavy Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 496, 1, "Love Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 497, 1, "Friend Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 498, 1, "Moon Ball - Virtual Console reward (Apricorn ball)"),
+        new(563, 631, 1, "Oval Charm, after beating Morimoto at Game Freak"),
+        new(504, 24, 1, "Max Potion - possible false positive"),
+        new(504, 24, 2, "Max Potion - possible false positive (second entry, same file)"),
+        new(517, 581, 55, "55 Big Nuggets"),
+        new(532, 286, 1, "Grip Claw"),
+        new(536, 852, 1, "Big Malasada"),
+        new(537, 20, 3, "3 Ice Heals"),
+        new(537, 20, 4, "4 Ice Heals (second entry, same file)"),
+        new(537, 851, 5, "5 Beast Balls"),
+        new(538, 243, 1, "Mystic Water"),
+        new(540, 229, 1, "Everstone"),
+        new(543, 2, 10, "10 Ultra Balls"),
+        new(544, 5, 1, "Safari Ball"),
+        new(545, 3, 5, "5 Great Balls"),
+        new(546, 375, 1, "TM48"),
+        new(549, 541, 1, "Air Balloon"),
+        new(553, 282, 1, "Icy Rock"),
+        new(553, 283, 1, "Smooth Rock"),
+        new(553, 284, 1, "Heat Rock"),
+        new(553, 285, 1, "Damp Rock"),
+        new(555, 466, 1, "Gracidea"),
+        new(556, 833, 1, "Eevium Z"),
+        new(557, 221, 1, "King's Rock"),
+        new(558, 583, 1, "Comet Shard"),
+        new(559, 638, 1, "Reveal Glass"),
+        new(566, 339, 1, "TM12"),
+        new(570, 116, 1, "Douse Drive"),
+        new(570, 117, 1, "Shock Drive"),
+        new(570, 118, 1, "Burn Drive"),
+        new(570, 119, 1, "Chill Drive"),
+        new(571, 225, 1, "Soul Dew"),
+        new(571, 628, 1, "DNA Splicers"),
+        new(571, 765, 1, "Prison Bottle"),
+        new(572, 324, 1, "Dubious Disc"),
+        new(573, 646, 1, "Whipped Dream"),
+        new(573, 647, 1, "Sachet"),
+        new(574, 354, 1, "TM27"),
+        new(576, 619, 1, "TM94"),
+        new(576, 692, 1, "TM98"),
+        new(588, 322, 1, "Electirizer"),
+        new(588, 323, 1, "Magmarizer"),
+        new(589, 252, 1, "Up-Grade"),
+        new(590, 390, 1, "TM63"),
+        new(591, 248, 1, "Twisted Spoon"),
+        new(592, 231, 1, "Lucky Egg"),
+        new(596, 232, 1, "Scope Lens"),
+        new(597, 648, 1, "Luminous Moss"),
+        new(599, 419, 1, "TM92"),
+
+        // Batch 601-700
+        new(628, 927, 1, "Story item - Solganium Z"),
+        new(628, 928, 1, "Story item - Lunalium Z"),
+        new(600, 277, 1, "Metronome"),
+        new(601, 226, 1, "Deep Sea Tooth"),
+        new(601, 227, 1, "Deep Sea Scale"),
+        new(604, 414, 1, "TM87"),
+        new(605, 581, 1, "Big Nugget"),
+        new(606, 92, 1, "Nugget"),
+        new(610, 852, 1, "Big Malasada"),
+        new(614, 679, 1, "Alakazite"),
+        new(614, 773, 1, "Key Stone"),
+        new(618, 659, 1, "Venusaurite"),
+        new(618, 660, 1, "Charizardite X"),
+        new(618, 661, 1, "Blastoisinite"),
+        new(618, 678, 1, "Charizardite Y"),
+        new(621, 325, 1, "Reaper Cloth"),
+        new(629, 80, 1, "Sun Stone"),
+        new(629, 81, 1, "Moon Stone"),
+        new(631, 297, 1, "Choice Specs"),
+        new(632, 326, 1, "Razor Claw"),
+        new(633, 947, 1, "Ilima's Normalium Z"),
+        new(635, 30, 1, "Fresh Water"),
+        new(635, 846, 1, "Adrenaline Orb"),
+        new(636, 20, 18, "18 Ice Heals"),
+        new(637, 93, 1, "Heart Scale"),
+        new(638, 846, 5, "5 Adrenaline Orbs"),
+        new(640, 276, 1, "Zoom Lens"),
+        new(641, 33, 1, "Moomoo Milk"),
+        new(642, 20, 1, "Ice Heal"),
+        new(643, 704, 1, "Strange Souvenir"),
+        new(645, 20, 2, "2 Ice Heals"),
+        new(645, 30, 1, "Fresh Water"),
+        new(646, 219, 1, "Mental Herb"),
+        new(646, 948, 1, "Left Poke Ball"),
+        new(648, 20, 11, "11 Ice Heals"),
+        new(648, 92, 1, "Nugget"),
+        new(649, 393, 1, "TM66"),
+        new(650, 50, 1, "Rare Candy"),
+        new(651, 12, 1, "Premier Ball"),
+        new(659, 30, 10, "10 Fresh Waters"),
+        new(660, 92, 1, "Nugget"),
+        new(663, 157, 1, "Lum Berry"),
+        new(665, 37, 1, "Revival Herb"),
+        new(666, 109, 1, "Dawn Stone"),
+        new(667, 77, 5, "5 Max Repels"),
+        new(668, 90, 1, "Stardust"),
+        new(669, 56, 1, "Dire Hit"),
+        new(670, 237, 1, "Soft Sand"),
+        new(671, 27, 5, "5 Full Heals"),
+        new(672, 2, 1, "Ultra Ball"),
+        new(672, 33, 1, "Moomoo Milk"),
+        new(673, 24, 1, "Max Potion - possible false positive"),
+        new(674, 6, 5, "5 Net Balls"),
+        new(678, 581, 1, "Big Nugget"),
+        new(684, 583, 1, "Comet Shard"),
+        new(685, 318, 1, "Rose Incense"),
+        new(687, 134, 1, "Sweet Heart"),
+        new(688, 46, 1, "Protein"),
+        new(688, 47, 1, "Iron"),
+        new(689, 33, 1, "Moomoo Milk"),
+        new(691, 581, 1, "Big Nugget"),
+        new(693, 24, 3, "Max Potion - possible false positive"),
+        new(693, 24, 4, "Max Potion - possible false positive (second entry, same file)"),
+        new(694, 852, 1, "Big Malasada"),
+        new(695, 20, 9, "9 Ice Heals"),
+        new(696, 57, 1, "X Attack"),
+        new(696, 59, 1, "X Speed"),
+        new(696, 61, 1, "X Sp. Atk"),
+        new(698, 23, 1, "Full Restore"),
+        new(699, 90, 1, "Stardust"),
+
+        // Batch 700-757
+        new(709, 31, 10, "10 Soda Pop - Kantonian Gym reward"),
+        new(709, 942, 1, "Surge Badge, after beating the Kantonian Gym in Malie City"),
+        new(709, 31, 1, "Soda Pop (second entry, same file)"),
+        new(745, 155, 1, "Oran Berry - either Tide Song Hotel or Berry Fields"),
+        new(700, 795, 1, "Bottle Cap"),
+        new(701, 93, 1, "Heart Scale"),
+        new(704, 53, 1, "PP Max"),
+        new(705, 402, 1, "TM75"),
+        new(708, 249, 1, "Charcoal"),
+        new(710, 25, 1, "Hyper Potion"),
+        new(710, 267, 1, "Wise Glasses"),
+        new(717, 582, 1, "Pearl String"),
+        new(718, 884, 1, "Grassy Seed"),
+        new(724, 89, 1, "Big Pearl"),
+        new(726, 270, 1, "Life Orb"),
+        new(729, 29, 1, "Max Revive"),
+        new(731, 90, 1, "Stardust"),
+        new(732, 280, 1, "Destiny Knot"),
+        new(733, 825, 1, "Pikanium Z"),
+        new(741, 764, 1, "Diancite"),
+        new(742, 847, 1, "Zygarde Cube"),
+        new(744, 830, 1, "Marshadium Z"),
+        new(744, 832, 1, "Snorlium Z"),
+        new(744, 834, 1, "Mewnium Z"),
+        new(752, 826, 1, "Decidium Z"),
+        new(752, 827, 1, "Incinium Z"),
+        new(753, 927, 1, "Story item - Solganium Z (duplicate file for Solganium Z, see 628)"),
+        new(753, 928, 1, "Story item - Lunalium Z (duplicate file for Lunalium Z, see 628)"),
+        new(754, 542, 1, "Red Card"),
+    ];
+}

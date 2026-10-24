@@ -1,4 +1,4 @@
-﻿namespace pk3DS.Core.Randomizers;
+namespace pk3DS.Core.Randomizers;
 
 /// <summary> Cyclical Shuffled Randomizer </summary>
 /// <remarks>
@@ -11,17 +11,21 @@ public class GenericRandomizer(int[] randomValues)
 
     public void Reset()
     {
-            ctr = 0;
+        ctr = 0;
+        if (randomValues != null && randomValues.Length > 0)
             Util.Shuffle(randomValues);
-        }
+    }
 
     public int Next()
     {
-            if (ctr == 0)
-                Util.Shuffle(randomValues);
+        if (randomValues == null || randomValues.Length == 0)
+            return 0;
 
-            int value = randomValues[ctr++];
-            ctr %= randomValues.Length;
-            return value;
-        }
+        if (ctr == 0)
+            Util.Shuffle(randomValues);
+
+        int value = randomValues[ctr++];
+        ctr %= randomValues.Length;
+        return value;
+    }
 }

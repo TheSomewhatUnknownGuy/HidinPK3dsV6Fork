@@ -57,5 +57,14 @@
   },
   "ItemNames": {
     "${itemId}": "Mirror Herb"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Mirror Herbs"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Mirror Herb[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis herb lets the holder copy an\nopponent's stat boosts, once."
   }
 }

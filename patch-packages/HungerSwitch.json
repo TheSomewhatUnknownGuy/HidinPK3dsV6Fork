@@ -1,0 +1,34 @@
+{
+  "Name": "Hunger Switch",
+  "Description": "Hunger Switch (Ability 258). The Pok\u00E9mon changes its form between Full Belly Mode and Hangry Mode at the end of each turn (timing 0xD8).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 258,
+      "Name": "Hunger Switch",
+      "Slots": [
+        {
+          "Timing": "0xD8",
+          "Code": "70402DE90240A0E10150A0E10500A0E10410A0E19F48FAEB0060A0E1BC00D6E1030C40E26D0050E20600001A3902D6E5010020E23902C6E50500A0E10110A0E30420A0E17727FAEB7080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 216,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QJAoOEBUKDhBQCg4QQQoOGfSPrrAGCg4bwA1uEDDEDibQBQ4gYAABo5AtblAQAg4jkCxuUFAKDhARCg4wQgoOF3J/rrcIC96A=="
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

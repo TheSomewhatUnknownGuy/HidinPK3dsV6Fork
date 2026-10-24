@@ -137,16 +137,27 @@ public partial class MartEditor7 : Form
 
     private void B_Save_Click(object sender, EventArgs e)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(CROPath) is { } uhuru) { WinFormsUtil.Alert(uhuru); Close(); return; }
         if (entry > -1) SetList();
         if (entryBP > -1) SetListBP();
         CROUtil.UpdateHashes(data);
         File.WriteAllBytes(CROPath, data);
+        // Add/Delete resize Shop.cro; without a matching counts note the next open reads every
+        // later shop from a shifted position (the note is keyed to the file's size).
+        pk3DS.Core.Randomizers.MartRandomizer.SaveCounts(CROPath, entries, entriesBP);
         SyncMartsToCodeBin();
         Close();
     }
 
     private void SyncMartsToCodeBin()
     {
+        // Shop.cro only needs the RomFS, so this editor opens without an ExeFS; Path.Combine(null)
+        // used to throw here after Shop.cro was already written, leaving the form stuck open.
+        if (string.IsNullOrEmpty(Main.ExeFSPath))
+        {
+            WinFormsUtil.Alert("Shops saved to Shop.cro.", "No ExeFS is loaded, so the shop size limits in code.bin were not updated. Open the ExeFS and save again if you changed how many items a shop holds.");
+            return;
+        }
         string binName = File.Exists(Path.Combine(Main.ExeFSPath, ".code.bin")) ? ".code.bin" : "code.bin";
         string fullCodePath = Path.Combine(Main.ExeFSPath, binName);
         if (!File.Exists(fullCodePath)) return;
@@ -367,6 +378,7 @@ public partial class MartEditor7 : Form
         {
             // Persist any pending manual edits first — ExecuteCompetitive re-reads Shop.cro fresh
             // from disk, so in-memory-only changes here would otherwise be silently discarded.
+            if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(CROPath) is { } uhuru) { WinFormsUtil.Alert(uhuru); return; }
             if (entry > -1) SetList();
             if (entryBP > -1) SetListBP();
             CROUtil.UpdateHashes(data);

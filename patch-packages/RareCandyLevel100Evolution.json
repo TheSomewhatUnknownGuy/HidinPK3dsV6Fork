@@ -1,0 +1,41 @@
+{
+  "Name": "Rare Candy Level 100 Evolution",
+  "Description": "Allows using a Rare Candy on a Level 100 Pokemon to trigger pending trade or level-up evolutions (Gen 8\u002B behavior).",
+  "Category": "Quality of Life",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {
+    "Bag.cro": {
+      "Blocks": [
+        {
+          "Name": "bag-rarecandy-evolution",
+          "Code": "320055E347D0FF0AB5D1FFEA",
+          "SourceBase": "0x018200",
+          "CodeBytes": "MgBV40fQ/wq10f/q",
+          "SourceBaseValue": 98816
+        }
+      ],
+      "SitePatches": [
+        {
+          "Offset": "0x00C324",
+          "Original": "6E01000A",
+          "Patched": "000000EA",
+          "IsHook": true,
+          "HookTarget": "bag-rarecandy-evolution",
+          "OffsetValue": 49956,
+          "OriginalBytes": "bgEACg==",
+          "PatchedBytes": "AAAA6g=="
+        }
+      ]
+    }
+  },
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

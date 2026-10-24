@@ -1,0 +1,24 @@
+{
+  "Name": "Perish Body Fix",
+  "Description": "Perish Body's counter is packed at bit 8 of the status word set on contact. Verified live in the Expansion build: Battle.cro offset 0x1117F0 holds 03 AC 8A E3, which decodes as ORR R10, R10, #0x300 - packing counter value 3 instead of the correct 4 (Perish Song / Perish Body should always start the countdown at 4 turns until fainting on the 0 turn). Flips the single immediate byte so the instruction becomes ORR R10, R10, #0x400 (04 AC 8A E3). Byte-for-byte read and confirmed from the actual RomFS Battle.cro before authoring this patch; not a guess.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [
+    {
+      "Offset": "0x1117F0",
+      "Original": "03AC8AE3",
+      "Patched": "04AC8AE3",
+      "IsHook": false,
+      "HookTarget": "",
+      "OffsetValue": 1120240,
+      "OriginalBytes": "A6yK4w==",
+      "PatchedBytes": "BKyK4w=="
+    }
+  ],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

@@ -1,0 +1,36 @@
+{
+  "Name": "Tar Shot",
+  "Description": "Applies Tar Shot status: reduces target Speed by 1 stage at timing 0x9E, and doubles damage taken from Fire-type moves at timing 0x47. Authored from ARM Functions/Move Edits/Tar Shot.xlsx.",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 749,
+      "Name": "Tar Shot",
+      "Slots": [
+        {
+          "Timing": "0x01",
+          "Code": "30402DE90040A0E10150A0E11C1094E50500A0E1AF32FEEB040050E30000A02320008425340084253080BDE8",
+          "SourceBase": "0x000DE274"
+        },
+        {
+          "Timing": "0x9E",
+          "Code": "F0402DE90150A0E10240A0E10070A0E10300A0E39209FEEB040050E11700001A0600A0E38E09FEEB0060A0E11C0087E50100A0E3200087E5340087E50500A0E10D10A0E30420A0E16D08FEEB0010A0E10520A0E30420C1E50C60C1E50100A0E31000C1E50000E0E31100C1E50600A0E31200C1E50500A0E1F040BDE8DFDDFDEAF080BDE8",
+          "SourceBase": "0x001054F4"
+        },
+        {
+          "Timing": "0x47",
+          "Code": "30402DE90150A0E10040A0E1200094E5000050E30C00000A0400A0E36F09FEEB1C1094E5010050E10700001A1900A0E36A09FEEB090050E30300001A021AA0E33500A0E33040BDE8D0F6FDEA3080BDE8",
+          "SourceBase": "0x00105578"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

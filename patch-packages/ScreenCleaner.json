@@ -1,0 +1,42 @@
+{
+  "Name": "Screen Cleaner",
+  "Description": "Removes Reflect, Light Screen, and Aurora Veil from the field upon entry, and clears hazards on user side. Authored from ARM Functions/Ability Edits/Screen Cleaner.xlsx with dual timing hooks 0x6D and 0xA7. SitePatch at 0x100938 NOPs the hardcoded Sand Stream (0x2D) alias in the expansion ability router so Screen Cleaner (251) cleanly dispatches its own timing slots.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 251,
+      "Name": "Screen Cleaner",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "70402DE90160A0E10250A0E10200A0E33309FEEB050050E11C00001A0600A0E10110A0E30520A0E1E111FEEB0520A0E11D10A0E30600A0E11108FEEB0040A0E10400A0E30400C4E50300A0E30500C4E50000A0E30600C4E50200A0E30700C4E50500A0E30800C4E50600A0E10410A0E182DDFDEBF0812DE9F710FFEB0500A0E10210A0E30420A0E17040BDE8C811FEEA7080BDE8",
+          "SourceBase": "0x00105674"
+        },
+        {
+          "Timing": "0xA7",
+          "Code": "70402DE90160A0E10250A0E10200A0E33309FEEB050050E11C00001A0600A0E10110A0E30520A0E1E111FEEB0520A0E11D10A0E30600A0E11108FEEB0040A0E10400A0E30400C4E50300A0E30500C4E50000A0E30600C4E50200A0E30700C4E50500A0E30800C4E50600A0E10410A0E182DDFDEBF0812DE9F710FFEB0500A0E10210A0E30420A0E17040BDE8C811FEEA7080BDE8",
+          "SourceBase": "0x00105674"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [
+    {
+      "Offset": "0x100938",
+      "Original": "FB0055E32D005003F00FFE0A",
+      "Patched": "0000A0E10000A0E10000A0E1",
+      "IsHook": false,
+      "HookTarget": "",
+      "OffsetValue": 1050936,
+      "OriginalBytes": "+wBV4y0AUAPwD/4K",
+      "PatchedBytes": "AACg4QAAoOEAAKDh"
+    }
+  ],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

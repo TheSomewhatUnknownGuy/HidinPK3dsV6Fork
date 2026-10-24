@@ -142,9 +142,6 @@ public static class MechanicInstaller
         var table = map.Tables.FirstOrDefault(t => t.Kind == request.Kind);
         if (table == null) { result.Fail($"no {request.Kind} master table was located in this ROM"); return result; }
 
-        if (map.Find(request.Kind, request.Id) != null)
-        { result.Fail($"{request.Kind} id 0x{request.Id:X} already has an entry; use AttachFunction to extend it"); return result; }
-
         if (request.NameTable != null)
         {
             string named = request.Id < request.NameTable.Length ? (request.NameTable[request.Id] ?? "").Trim() : null;
@@ -160,9 +157,12 @@ public static class MechanicInstaller
             // Apostrophes differ between the game's text and hand-typed names (Dragon's Maw).
             bool matches = named.Replace('’', '\'').Equals(request.Name?.Replace('’', '\'') ?? "", StringComparison.OrdinalIgnoreCase);
             bool free = named is "" or "???" or "-----" or "—";
+            bool isCustomRange = (request.Kind == CustomMechanicKind.Item && request.Id >= 840) ||
+                                 (request.Kind == CustomMechanicKind.Move && request.Id >= 720) ||
+                                 (request.Kind == CustomMechanicKind.Ability && request.Id >= 233);
 
             if (matches) result.Say($"id {request.Id} is '{named}' in this build");
-            else if (free) result.Say($"id {request.Id} is an unnamed slot ('{named}'); name it in the editor to make it usable");
+            else if (free || isCustomRange) result.Say($"id {request.Id} is '{named}'; allocating slot for {request.Name}");
             else
             {
                 result.Fail($"id {request.Id} is '{named}' in this build, not '{request.Name}' - installing here would " +
@@ -171,6 +171,12 @@ public static class MechanicInstaller
             }
         }
         nameChecked:
+
+        // Only after the name check: an id that already has an entry used to skip it and repoint
+        // that stock move/item at the new effect, so a wrong (or US/UM-shifted) id replaced it silently.
+        var existing = map.Find(request.Kind, request.Id);
+        if (existing != null)
+            return UpdateExistingMechanic(cro, table, existing, request, reserve, ref bump);
 
         int count = table.EntryCount;
         result.TableOffset = table.TableOffset;
@@ -260,7 +266,7 @@ public static class MechanicInstaller
             if (fn.ReusesExisting) continue;
 
             byte[] bytes = fn.Code;
-            if (fn.SourceBase != 0 && fn.SourceBase != functionOffsets[i])
+            if (fn.SourceBase != functionOffsets[i])
             {
                 var (rebased, rep) = CodeRelocator.RebaseCode(fn.Code, fn.SourceBase, functionOffsets[i]);
                 bytes = rebased;
@@ -300,6 +306,146 @@ public static class MechanicInstaller
                    string.Join(", ", request.Effects.Select((e, i) => $"fn[0x{e.Timing:X2}] 0x{functionOffsets[i]:X6}")) +
                    $", timings 0x{timingTable:X6}; end 0x{bump:X6}");
         result.Say($"{request.Kind} 0x{request.Id:X} '{request.Name}' -> handler 0x{stub:X6}, {request.Effects.Count} slot(s), {result.BytesUsed} bytes used");
+        return result;
+    }
+
+    /// <summary>
+    /// Whether the entry already dispatches exactly these effects (a reinstall): same timings, and
+    /// each slot's routine holds this effect's code rebased to that address, as installing writes it.
+    /// Every reinstall used to leak a fresh stub, routines and relocations into the reserve.
+    /// </summary>
+    private static bool AlreadyInstalled(DecompiledCRO cro, MappedMechanic existing, NewMechanicRequest request)
+    {
+        var slots = existing.Slots;
+        if (slots.Count != request.Effects.Count) return false;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var fn = request.Effects[i];
+            var slot = slots[i];
+            if (slot.Timing != fn.Timing) return false;
+            if (fn.ReusesExisting)
+            {
+                if (slot.FunctionOffset != fn.ExistingFunction) return false;
+                continue;
+            }
+            if (fn.Code == null || fn.Code.Length == 0) return false;
+            byte[] want = CodeRelocator.RebaseCode(fn.Code, fn.SourceBase, slot.FunctionOffset).Code;
+            if (slot.FunctionOffset + want.Length > cro.RawData.Length) return false;
+            if (!cro.RawData.AsSpan((int)slot.FunctionOffset, want.Length).SequenceEqual(want)) return false;
+        }
+        return true;
+    }
+
+    private static MechanicInstallResult UpdateExistingMechanic(
+        DecompiledCRO cro,
+        LocatedMechanicTable table,
+        MappedMechanic existing,
+        NewMechanicRequest request,
+        (uint Offset, int Length) reserve,
+        ref uint bump)
+    {
+        var result = new MechanicInstallResult { Success = true };
+        if (AlreadyInstalled(cro, existing, request))
+        {
+            result.HandlerOffset = existing.HandlerOffset;
+            result.Say($"{request.Kind} {request.Id}: these effects are already installed at 0x{existing.HandlerOffset:X6}; nothing written");
+            return result;
+        }
+        if (bump < reserve.Offset) bump = reserve.Offset;
+        uint reserveEnd = reserve.Offset + (uint)reserve.Length;
+        uint startBump = bump;
+
+        uint stub = Align(bump);
+        bump = stub + StubSize;
+
+        var functionOffsets = new uint[request.Effects.Count];
+        for (int i = 0; i < request.Effects.Count; i++)
+        {
+            var fn = request.Effects[i];
+            if (fn.ReusesExisting)
+            {
+                if (fn.ExistingFunction >= cro.RawData.Length)
+                { result.Fail($"effect '{fn.Name}': 0x{fn.ExistingFunction:X6} is outside the binary"); return result; }
+                functionOffsets[i] = fn.ExistingFunction;
+                continue;
+            }
+            int prevIdx = -1;
+            for (int j = 0; j < i; j++)
+            {
+                if (request.Effects[j].Code != null && fn.Code != null && request.Effects[j].Code.SequenceEqual(fn.Code))
+                {
+                    prevIdx = j;
+                    break;
+                }
+            }
+            if (prevIdx >= 0)
+            {
+                functionOffsets[i] = functionOffsets[prevIdx];
+                continue;
+            }
+
+            if (fn.Code == null || fn.Code.Length == 0) { result.Fail($"effect '{fn.Name}' (timing 0x{fn.Timing:X2}) has no code"); return result; }
+            functionOffsets[i] = Align(bump);
+            bump = functionOffsets[i] + (uint)fn.Code.Length;
+        }
+
+        uint timingTable = Align(bump);
+        bump = timingTable + (uint)(request.Effects.Count * 8);
+
+        if (bump > reserveEnd)
+        {
+            result.Fail($"reserve exhausted: needs {bump - startBump} bytes, {reserveEnd - startBump} available " +
+                        $"(reserve 0x{reserve.Offset:X6} + {reserve.Length}). Expand the code segment and retry.");
+            bump = startBump;
+            return result;
+        }
+
+        // Write stub
+        WriteStub(cro.RawData, stub, request.Effects.Count);
+        if (!CodeRelocator.AddPointer(cro, stub + 16, timingTable, result.Say))
+        { result.Fail("could not register the stub's timing-table pointer"); return result; }
+        result.HandlerOffset = stub;
+
+        // Rebase and write functions
+        for (int i = 0; i < request.Effects.Count; i++)
+        {
+            var fn = request.Effects[i];
+            if (fn.ReusesExisting) continue;
+
+            byte[] bytes = fn.Code;
+            if (fn.SourceBase != functionOffsets[i])
+            {
+                var (rebased, rep) = CodeRelocator.RebaseCode(fn.Code, fn.SourceBase, functionOffsets[i]);
+                bytes = rebased;
+                result.Say($"'{fn.Name}' rebased 0x{fn.SourceBase:X6} -> 0x{functionOffsets[i]:X6} " +
+                           $"({rep.ExternalBranchesFixed} external, {rep.InternalBranchesKept} internal)");
+                foreach (var w in rep.Warnings) result.Say("  ! " + w);
+            }
+            bytes.CopyTo(cro.RawData, (int)functionOffsets[i]);
+        }
+
+        // Write timing table
+        for (int i = 0; i < request.Effects.Count; i++)
+        {
+            uint entry = timingTable + (uint)(i * 8);
+            cro.RawData[entry] = request.Effects[i].Timing;
+            cro.RawData[entry + 1] = 0;
+            cro.RawData[entry + 2] = 0;
+            cro.RawData[entry + 3] = 0;
+            if (!CodeRelocator.AddPointer(cro, entry + 4, functionOffsets[i], result.Say))
+            { result.Fail($"could not register the pointer for timing 0x{request.Effects[i].Timing:X2}"); return result; }
+            result.Slots.Add((request.Effects[i].Timing, functionOffsets[i]));
+        }
+        result.TimingTableOffset = timingTable;
+
+        // Repoint existing master table record to new stub
+        if (!CodeRelocator.SetOrAddPointer(cro, existing.EntryOffset + 4, stub, result.Say))
+        { result.Fail("could not repoint the master-table handler pointer"); return result; }
+
+        result.TableOffset = table.TableOffset;
+        result.EntryCountAfter = table.EntryCount;
+        result.BytesUsed = (int)(bump - startBump);
+        result.Say($"updated existing {request.Kind} 0x{request.Id:X}: handler repointed -> 0x{stub:X6}");
         return result;
     }
 
@@ -350,7 +496,19 @@ public static class MechanicInstaller
             return result;
         }
 
-        if (!effect.ReusesExisting) effect.Code.CopyTo(cro.RawData, (int)fn);
+        if (!effect.ReusesExisting)
+        {
+            byte[] bytes = effect.Code;
+            if (effect.SourceBase != fn)
+            {
+                var (rebased, rep) = CodeRelocator.RebaseCode(effect.Code, effect.SourceBase, fn);
+                bytes = rebased;
+                result.Say($"'{effect.Name}' rebased 0x{effect.SourceBase:X6} -> 0x{fn:X6} " +
+                           $"({rep.ExternalBranchesFixed} external, {rep.InternalBranchesKept} internal)");
+                foreach (var w in rep.Warnings) result.Say("  ! " + w);
+            }
+            bytes.CopyTo(cro.RawData, (int)fn);
+        }
 
         // Move the existing rows so their function pointers keep resolving, then append.
         uint oldTiming = mech.Chain.TimingTableOffset;
@@ -405,6 +563,12 @@ public static class MechanicInstaller
     /// <returns>True when the binary was grown; <paramref name="rom"/> is replaced in that case.</returns>
     public static bool EnsureReserve(ref byte[] rom, int bytesNeeded, ResearchDatabase db = null, Action<string> log = null)
     {
+        if (!GameConfig.AllowGrowth)
+        {
+            log?.Invoke("! growth is off (Options: Allow code.bin and CRO growth)");
+            return false;
+        }
+
         log ??= _ => { };
         if (rom == null || bytesNeeded <= 0) return false;
 

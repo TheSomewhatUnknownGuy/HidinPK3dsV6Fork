@@ -1,0 +1,35 @@
+{
+  "Name": "Guard Dog",
+  "Description": "Guard Dog (Ability 275). Reverses Intimidate's Attack drop into an Attack boost (timing 0x71 via Contrary helper 0xD61D8) and prevents the Pokémon from being forced to switch out (timing 0xA8, reusing Suction Cups stock routine).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 275,
+      "Name": "Guard Dog",
+      "Slots": [
+        {
+          "Timing": "0xA8",
+          "Reuse": {
+            "Kind": "Ability",
+            "Id": 21,
+            "Timing": "0xA8",
+            "Name": "Suction Cups"
+          }
+        },
+        {
+          "Timing": "0x71",
+          "Code": "18402DE90240A0E10200A0E3D11EFAEB040050E10500001A6500A0E3CD1EFAEB010050E30100001A1840BDE86958FBEA1880BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

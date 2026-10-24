@@ -353,7 +353,8 @@ public static class GARC
                 if (!SubEntry.Exists) continue;
 
                 // Seek to Offset
-                br.BaseStream.Position = SubEntry.Start + garc.DataOffset;
+                long offset = (long)SubEntry.Start + garc.DataOffset;
+                br.BaseStream.Position = offset;
 
                 // Check if Compressed
                 bool compressed = false;
@@ -368,7 +369,7 @@ public static class GARC
                 using (var bw = new BinaryWriter(File.OpenWrite(fileOut)))
                 {
                     // Write out the data for the file
-                    br.BaseStream.Position = SubEntry.Start + garc.DataOffset;
+                    br.BaseStream.Position = offset;
                     bw.Write(br.ReadBytes((int)SubEntry.Length));
                     filectr++;
                 }
@@ -491,14 +492,17 @@ public static class GARC
 
     public static void PackGARC(IGARCFileProvider provider, string garcPath, int version, int contentpadnearest)
     {
+        if (provider == null) throw new ArgumentNullException(nameof(provider));
         if (contentpadnearest < 0) contentpadnearest = 4;
+        if (version == VER_6) contentpadnearest = 4;
+        GarcLayout layout = GarcRepack.Plan(provider, version, contentpadnearest);
         var garc = new GARCFile
         {
-            ContentPadToNearest = (uint)contentpadnearest,
+            ContentPadToNearest = checked((uint)contentpadnearest),
             fato =
             {
                 Entries = new FATO_Entry[provider.FileCount],
-                EntryCount = (ushort)provider.FileCount,
+                EntryCount = checked((ushort)provider.FileCount),
                 HeaderSize = 0xC + (provider.FileCount * 4),
                 Padding = 0xFFFF,
             },
@@ -509,33 +513,29 @@ public static class GARC
             },
         };
 
-        if (version == VER_6) garc.ContentPadToNearest = 4;
-
-        uint op = 0;
-        long od = 0;
+        long op = 0;
         for (int i = 0; i < garc.fatb.Entries.Length; i++)
         {
-            garc.fato.Entries[i].Offset = (uint)op; // FATO offset
+            garc.fato.Entries[i].Offset = checked((uint)op); // FATO offset
             garc.fatb.Entries[i].SubEntries = new FATB_SubEntry[32];
             op += 4; // Vector
             garc.fatb.Entries[i].IsFolder = false;
             garc.fatb.Entries[i].SubEntries[0].Exists = true;
 
             // Assemble Entry
-            int entryLength = provider.GetFileLength(i);
-            var paddingRequired = (uint)entryLength % garc.ContentPadToNearest;
-            if (paddingRequired != 0) paddingRequired = garc.ContentPadToNearest - paddingRequired;
+            int entryLength = layout.Lengths[i];
+            long paddingRequired = layout.Paddings[i];
             long actualLength = entryLength + paddingRequired;
-            garc.fatb.Entries[i].SubEntries[0].Start = (uint)od;
-            garc.fatb.Entries[i].SubEntries[0].End = (uint)(actualLength + od);
-            garc.fatb.Entries[i].SubEntries[0].Length = (uint)entryLength;
-            garc.fatb.Entries[i].SubEntries[0].Padding = (uint)paddingRequired;
-            od += actualLength;
+            long start = layout.Starts[i];
+            garc.fatb.Entries[i].SubEntries[0].Start = checked((uint)start);
+            garc.fatb.Entries[i].SubEntries[0].End = checked((uint)(start + actualLength));
+            garc.fatb.Entries[i].SubEntries[0].Length = checked((uint)entryLength);
+            garc.fatb.Entries[i].SubEntries[0].Padding = checked((uint)paddingRequired);
 
             op += 12;
             garc.fatb.Entries[i].Vector = 1;
         }
-        garc.fatb.HeaderSize = (uint)(0xC + op);
+        garc.fatb.HeaderSize = checked((uint)(0xC + op));
 
         using var newGARC = new FileStream(garcPath, FileMode.Create);
         using var gw = new BinaryWriter(newGARC);
@@ -572,11 +572,11 @@ public static class GARC
 
         gw.Write((uint)0x46494D42);
         gw.Write((uint)0x0000000C);
-        var dataLenOfs = gw.BaseStream.Position;
+        long dataLenOfs = gw.BaseStream.Position;
         gw.Write((uint)0); // Data Length - TEMP
 
         gw.Seek(0x10, SeekOrigin.Begin);
-        var hdrLenOfs = gw.BaseStream.Position;
+        long hdrLenOfs = gw.BaseStream.Position;
         gw.Write((uint)0); // Data Offset - TEMP
         gw.Write((uint)0); // Total Length - TEMP
 
@@ -591,7 +591,7 @@ public static class GARC
 
         for (int i = 0; i < provider.FileCount; i++)
         {
-            int len = provider.GetFileLength(i);
+            int len = layout.Lengths[i];
             uint padding = garc.fatb.Entries[i].SubEntries[0].Padding;
             if (len > largestSize) { largestSize = len; largestPadded = len + padding; }
             provider.WriteFile(i, gw);
@@ -599,14 +599,14 @@ public static class GARC
         }
 
         var gdLength = newGARC.Length - ghLength;
-        gw.Seek((int)dataLenOfs, SeekOrigin.Begin);
-        gw.Write((uint)gdLength);
-        gw.Seek((int)hdrLenOfs, SeekOrigin.Begin);
-        gw.Write((uint)ghLength);
-        gw.Write((uint)newGARC.Length);
+        gw.BaseStream.Position = dataLenOfs;
+        gw.Write(checked((uint)gdLength));
+        gw.BaseStream.Position = hdrLenOfs;
+        gw.Write(checked((uint)ghLength));
+        gw.Write(checked((uint)newGARC.Length));
 
-        if (version == VER_4) gw.Write((uint)largestSize);
-        else { gw.Write((uint)largestPadded); gw.Write((uint)largestSize); gw.Write(garc.ContentPadToNearest); }
+        if (version == VER_4) gw.Write(checked((uint)largestSize));
+        else { gw.Write(checked((uint)largestPadded)); gw.Write(checked((uint)largestSize)); gw.Write(garc.ContentPadToNearest); }
     }
 
     public class ArrayGARCFileProvider : IGARCFileProvider
@@ -663,7 +663,7 @@ public static class GARC
             var SubEntry = Entry.SubEntries[subfile];
             if (!SubEntry.Exists)
                 throw new ArgumentException("SubFile does not exist.");
-            var offset = SubEntry.Start + garc.DataOffset;
+            long offset = (long)SubEntry.Start + garc.DataOffset;
             byte[] data = new byte[SubEntry.Length];
             if (Data != null)
             {
@@ -673,7 +673,7 @@ public static class GARC
             {
                 using var fs = File.OpenRead(FilePath);
                 fs.Seek(offset, SeekOrigin.Begin);
-                fs.Read(data, 0, data.Length);
+                fs.ReadExactly(data, 0, data.Length);
             }
             return data;
         }
@@ -699,10 +699,10 @@ public static class GARC
                         var SubEntry = Entry.SubEntries[0];
                         if (!SubEntry.Exists)
                             throw new ArgumentException("SubFile does not exist.");
-                        var offset = SubEntry.Start + garc.DataOffset;
+                        long offset = (long)SubEntry.Start + garc.DataOffset;
                         _files[i] = new byte[SubEntry.Length];
                         fs.Seek(offset, SeekOrigin.Begin);
-                        fs.Read(_files[i], 0, _files[i].Length);
+                        fs.ReadExactly(_files[i], 0, _files[i].Length);
                     }
                 }
                 return _files;
@@ -719,6 +719,16 @@ public static class GARC
                 _files = value;
             }
         }
+
+        /// <summary>
+        /// Caches a new array WITHOUT packing it - callers doing `garc.Files[i] = ...` (mutating one
+        /// element of the array the getter already returned, a common pattern throughout this
+        /// codebase) never go through the setter above at all, so packing on every such mutation
+        /// would be both wrong to assume happened and wasteful to actually do eagerly. The real pack
+        /// happens once, in <see cref="GARCFile"/>'s own `Save()`, which reads whatever `Files`
+        /// currently holds - reflecting any in-place element mutations - right before writing.
+        /// </summary>
+        public void SetFilesCached(byte[][] value) => _files = value;
     }
 
     /// <summary>
@@ -794,7 +804,7 @@ public static class GARC
             var SubEntry = Entry.SubEntries[subfile];
             if (!SubEntry.Exists)
                 throw new ArgumentException("SubFile does not exist.");
-            var offset = SubEntry.Start + garc.DataOffset;
+            long offset = (long)SubEntry.Start + garc.DataOffset;
             byte[] data = new byte[SubEntry.Length];
             if (Data != null)
             {
@@ -804,7 +814,7 @@ public static class GARC
             {
                 using var fs = File.OpenRead(FilePath);
                 fs.Seek(offset, SeekOrigin.Begin);
-                fs.Read(data, 0, data.Length);
+                fs.ReadExactly(data, 0, data.Length);
             }
             return data;
         }
@@ -845,10 +855,10 @@ public static class GARC
                         var Entry = garc.fatb.Entries[i];
                         var SubEntry = Entry.SubEntries[0];
                         if (!SubEntry.Exists) throw new ArgumentException("SubFile does not exist.");
-                        var offset = SubEntry.Start + garc.DataOffset;
+                        long offset = (long)SubEntry.Start + garc.DataOffset;
                         rawData[i] = new byte[SubEntry.Length];
                         fs.Seek(offset, SeekOrigin.Begin);
-                        fs.Read(rawData[i], 0, rawData[i].Length);
+                        fs.ReadExactly(rawData[i], 0, rawData[i].Length);
                     }
                 }
                 
@@ -950,18 +960,18 @@ public static class GARC
 
                 if (_fs != null)
                 {
-                    var offset = subEntry.Start + _lazyGarc.garc.DataOffset;
+                    long offset = (long)subEntry.Start + _lazyGarc.garc.DataOffset;
                     byte[] buffer = new byte[length];
                     lock (_fsLock)
                     {
                         _fs.Seek(offset, SeekOrigin.Begin);
-                        _fs.Read(buffer, 0, length);
+                        _fs.ReadExactly(buffer, 0, length);
                     }
                     gw.Write(buffer);
                     return;
                 }
 
-                var dataOffset = subEntry.Start + _lazyGarc.garc.DataOffset;
+                long dataOffset = (long)subEntry.Start + _lazyGarc.garc.DataOffset;
                 gw.Write(_lazyGarc.Data, (int)dataOffset, length);
             }
 

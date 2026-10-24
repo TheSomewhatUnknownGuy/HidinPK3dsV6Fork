@@ -1,0 +1,26 @@
+{
+  "Name": "Ripen",
+  "Description": "Ripen (Ability 247): Consumed berries (excluding damage-reduction berries) are immediately used a second time upon consumption. Hooked on timing 0xAE (item consumption timing) as a master-table ability entry. Excludes damage-reduction berries (IDs 184-200 and 686). Includes a 4-battler re-entrancy guard table to prevent infinite consumption loops.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 247,
+      "Name": "Ripen",
+      "Slots": [
+        {
+          "Timing": "0xAE",
+          "Code": "F0412DE90240A0E10150A0E10200A0E37209FEEB040050E12600001A5600A0E36E09FEEB000050E32200000A3100A0E36A09FEEB7000FFE60060A0E175EBFBEB000050E31B00000AB80046E2100050E31800009AAE0200E3000056E11500000A54008FE2848080E0B070D8E1060057E10200001A0000A0E3B000C8E10D0000EAB060C8E10500A0E10110A0E30420A0E10612FEEB0500A0E10410A0E10420A0E10630A0E1C23600EB0500A0E10210A0E30420A0E1FD11FEEBF081BDE80000000000000000",
+          "SourceBase": "0x105578"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

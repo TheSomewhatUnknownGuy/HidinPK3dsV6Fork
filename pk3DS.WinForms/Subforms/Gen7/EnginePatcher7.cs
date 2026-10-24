@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using pk3DS.Core;
 using pk3DS.Core.CTR;
+using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms
 {
@@ -17,62 +18,46 @@ namespace pk3DS.WinForms
             string battlePath = Path.Combine(Main.RomFSPath, "battle", "battle.cro");
 
             if (!File.Exists(codePath)) return;
-
             byte[] codeBin = File.ReadAllBytes(codePath);
-            byte[] battleCro = File.Exists(battlePath) ? File.ReadAllBytes(battlePath) : null;
-            bool needsSaveCode = false;
-            bool needsSaveBattle = false;
-
-            // 1. Patch Move ID Limits (CMP instructions)
-            // Inclusive limits: we check for multiple vanilla variants
-            int[] oldLimits = { 700, 716, 720, 721, 728, 737, 744, 800, 802, 805 };
-            int[] regs = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 }; 
-            
-            // Round moveCount to a valid ARM immediate if possible, or use closest lower valid
+            if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(codePath) is { } uhuru)
+            {
+                // Uhuru: never write. Dry-run on copies and only complain when the move count really needs an engine change,
+                // so opening the editor and ordinary move edits stay quiet.
+                var dryCode = (byte[])codeBin.Clone();
+                bool codeNeeds = MoveCeilingPatcher.Raise(dryCode, moveCount).PatchedCount > 0;
+                bool croNeeds = false;
+                if (File.Exists(battlePath))
+                {
+                    byte[] dryCro = File.ReadAllBytes(battlePath);
+                    croNeeds = ExpandMoveJumpTable(ref dryCro, moveCount);
+                }
+                if (codeNeeds || croNeeds) WinFormsUtil.Alert(uhuru);
+                return;
+            }
             int targetLimit = moveCount;
-            
-            foreach (int oldLimit in oldLimits)
+
+            var patchResult = MoveCeilingPatcher.Raise(codeBin, targetLimit);
+            if (patchResult.PatchedCount > 0)
             {
-                if (oldLimit == targetLimit) continue;
-                foreach (int r in regs)
-                {
-                    byte[] pattern = GetCmpInstruction(r, oldLimit);
-                    byte[] patch = GetCmpInstruction(r, targetLimit);
-                    if (pattern != null && patch != null)
-                    {
-                        if (ScanAndPatch(codeBin, pattern, patch)) {
-                            needsSaveCode = true;
-                        }
-                        if (battleCro != null && ScanAndPatch(battleCro, pattern, patch)) {
-                            needsSaveBattle = true;
-                        }
-                    }
-                }
+                string bakPath = codePath + ".bak";
+                if (!File.Exists(bakPath))
+                    File.Copy(codePath, bakPath, false);
+
+                File.WriteAllBytes(codePath, codeBin);
             }
 
-            // 2. Safe Literal Patching (ONLY for the specific 728 limit, and only if 4-byte aligned)
-            // This is safer than patching common numbers like 700.
-            byte[] litPattern = BitConverter.GetBytes(728);
-            byte[] litPatch = BitConverter.GetBytes(targetLimit);
-            for (int i = 0x100000; i < codeBin.Length - 4; i += 4) // Skip first 1MB of code.bin for safety
-            {
-                if (codeBin[i] == litPattern[0] && codeBin[i+1] == litPattern[1] && codeBin[i+2] == litPattern[2] && codeBin[i+3] == litPattern[3])
-                {
-                    litPatch.CopyTo(codeBin, i);
-                    needsSaveCode = true;
-                }
-            }
-
+            byte[] battleCro = File.Exists(battlePath) ? File.ReadAllBytes(battlePath) : null;
             if (battleCro != null)
             {
                 if (ExpandMoveJumpTable(ref battleCro, targetLimit))
                 {
-                    needsSaveBattle = true;
+                    string battleBak = battlePath + ".bak";
+                    if (!File.Exists(battleBak))
+                        File.Copy(battlePath, battleBak, false);
+
+                    File.WriteAllBytes(battlePath, battleCro);
                 }
             }
-
-            if (needsSaveCode) File.WriteAllBytes(codePath, codeBin);
-            if (needsSaveBattle && battleCro != null) File.WriteAllBytes(battlePath, battleCro);
         }
 
         public static bool ExpandMoveJumpTable(ref byte[] data, int newCount)

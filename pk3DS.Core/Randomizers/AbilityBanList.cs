@@ -21,7 +21,7 @@ public sealed class AbilityBanList
     public static readonly string[] NegativeAbilities =
     [
         "Truant", "Slow Start", "Defeatist", "Stall", "Normalize",
-        "Klutz", "Slow Start", "Comatose",
+        "Klutz", "Comatose",
     ];
 
     /// <summary>Abilities that mostly do nothing, without actively hurting.</summary>
@@ -46,7 +46,7 @@ public sealed class AbilityBanList
     public bool IsBanned(string? name) =>
         !string.IsNullOrEmpty(name) && _names.Contains(name);
 
-    private readonly HashSet<string> _names = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _names = new(Competitive.GameNameComparer.Instance);
 
     /// <summary>
     /// Resolves the ban list for a loaded ROM.
@@ -63,7 +63,7 @@ public sealed class AbilityBanList
             {
                 if (string.IsNullOrWhiteSpace(n)) continue;
                 _names.Add(n);
-                int id = Array.FindIndex(abilityNames, a => string.Equals(a, n, StringComparison.OrdinalIgnoreCase));
+                int id = Array.FindIndex(abilityNames, a => a != null && Competitive.GameNameComparer.Instance.Equals(a, n));
                 if (id > 0) _banned.Add(id);
             }
         }

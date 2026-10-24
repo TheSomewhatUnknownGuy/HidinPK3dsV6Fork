@@ -57,5 +57,14 @@
   },
   "ItemNames": {
     "${itemId}": "Clear Amulet"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Clear Amulets"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Clear Amulet[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis clear, curved charm prevents other\nPokémon from lowering the holder's stats."
   }
 }

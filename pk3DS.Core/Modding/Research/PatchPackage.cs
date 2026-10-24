@@ -65,8 +65,61 @@ public sealed class PatchItemData
     public string Name { get; set; }
     /// <summary>Held-effect selector. Omit to leave the clone's value; 0 means "no code.bin behaviour".</summary>
     public string HeldEffect { get; set; }
+    /// <summary>
+    /// Parameter a HeldEffect routine reads back for this item (<c>Item.HeldArgument</c>), e.g. a
+    /// type index for a Plate-shaped item. Confirmed live: Charcoal/Flame Plate's own damage-calc
+    /// handler reads this field back via a dedicated accessor (0x00061324 in Battle.cro) rather
+    /// than hardcoding its boost per item, which is why a whole family of type-keyed items can
+    /// share one HeldEffect and differ only by this byte.
+    /// </summary>
+    public string HeldArgument { get; set; }
     public string FlingPower { get; set; }
     public string Price { get; set; }
+    /// <summary>
+    /// Which Bag pocket the item is filed under. This is NOT <c>Item.PocketField</c> - the Bag UI
+    /// reads a separate nibble-packed table in RomFS <c>a/1/0/3</c> (file[0], base offset 0, 512 bytes
+    /// covering ids 0-1023: byte = id/2, EVEN ids in the HIGH nibble, odd ids in the low one).
+    /// A cloned item inherits its template's nibble, which is why every item cloned from Ability
+    /// Capsule previously landed in the wrong pocket. Values:
+    /// 0=General, 1=Medicine, 2=TM/HM, 3=Berry, 4=Key, 5=Z-Crystal(Bag), 6=RotoPower, 7=Z-Crystal(Hold).
+    /// Omit to leave the cloned value alone.
+    /// </summary>
+    public string Pocket { get; set; }
+
+    /// <summary>
+    /// Item kind discriminator - <c>Item.Unk_0xC</c>, at ITEM_DATA offset 0xC. This is the gate on
+    /// the ENTIRE bag-use effect system: <c>item::ITEM_UTIL_GetHealingItemType</c> reads this byte
+    /// first (as field index 0xF) and, unless it is exactly 1, returns 0x1C - which the 28-entry
+    /// effect jump table in Bag.cro treats as "no handler", so the item silently does nothing.
+    /// Potion, Max Potion and Rare Candy all carry 1; Ability Capsule carries 0, because it is not
+    /// a healing item at all and is special-cased through its own state machine instead.
+    /// Omit to leave the cloned value alone.
+    /// </summary>
+    public string ItemKind { get; set; }
+
+    /// <summary>
+    /// <c>Item.EffectField</c> - the field-use routine selector (0 = unusable outside battle).
+    /// Omit to leave the cloned value alone.
+    /// </summary>
+    public string EffectField { get; set; }
+
+    /// <summary>
+    /// Arbitrary <c>pk3DS.Core.Structures.Item</c> properties to set after cloning, keyed by the
+    /// property name exactly as that struct declares it - so the full field-effect vocabulary is
+    /// reachable without a bespoke field here for each one.
+    /// <para>
+    /// This is how a bag-use effect is actually built. Confirmed in game: an item's effect comes
+    /// entirely from its own ITEM_DATA record, so cloning a vanilla item and adjusting these
+    /// reproduces that item's behaviour with no injected code at all. Useful ones:
+    /// <c>LevelUp</c> (Rare Candy), <c>Revive</c>/<c>ReviveAll</c> (Sacred Ash - whole party),
+    /// <c>HealAmount</c>, <c>PPGain</c>, <c>FunctionFlags0</c> (RestoreHP/RestorePP/RestorePPAll/
+    /// AddEV*), <c>FunctionFlags1</c>, <c>CureInflict</c>, <c>EVHP</c>..<c>EVSPD</c> (signed, so
+    /// negative values reduce EVs), and <c>UseKeep</c> - the flutes' own "not consumed on use"
+    /// flag, which is what makes an unlimited-use item unlimited.
+    /// </para>
+    /// Values parse as bool, integer, or comma-separated enum flag names.
+    /// </summary>
+    public Dictionary<string, string> Fields { get; set; } = [];
 }
 
 /// <summary>
@@ -108,11 +161,22 @@ public sealed class PatchPackage
     public Dictionary<string, PatchItemData> ItemData { get; set; } = [];
     /// <summary>Names to write into every language, keyed by id.</summary>
     public Dictionary<string, string> ItemNames { get; set; } = [];
+    /// <summary>Plural names to write into every language, keyed by id.</summary>
+    public Dictionary<string, string> ItemNamesPlural { get; set; } = [];
+    /// <summary>Plural alt names to write into every language, keyed by id.</summary>
+    public Dictionary<string, string> ItemNamesPluralAlt { get; set; } = [];
 
     /// <summary>
     /// Bag descriptions to write into every language, keyed by id.
     /// </summary>
     public Dictionary<string, string> ItemDescriptions { get; set; } = [];
+
+    /// <summary>
+    /// Lines to write into a game text file, in every language: file index (inside the gametext
+    /// GARC) to line index to text. The file grows if the line is past its end. Used for the bag's
+    /// use-result messages (file 1, stock lines 0-158) that custom bag-use effects display.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>> GameTextLines { get; set; } = [];
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -278,6 +342,23 @@ public static class PatchParameters
             p.HookTarget = Expand(p.HookTarget, values, problems);
         }
 
+        foreach (var (croName, croPort) in copy.OtherCros ?? [])
+        {
+            foreach (var b in croPort.Blocks ?? [])
+            {
+                b.Name = Expand(b.Name, values, problems);
+                b.SourceBase = Expand(b.SourceBase, values, problems);
+                b.Code = Expand(b.Code, values, problems);
+            }
+            foreach (var p in croPort.SitePatches ?? [])
+            {
+                p.Offset = Expand(p.Offset, values, problems);
+                p.Original = Expand(p.Original, values, problems);
+                p.Patched = Expand(p.Patched, values, problems);
+                p.HookTarget = Expand(p.HookTarget, values, problems);
+            }
+        }
+
         foreach (var t in copy.DataTables ?? [])
         {
             t.Block = Expand(t.Block, values, problems);
@@ -286,6 +367,10 @@ public static class PatchParameters
         }
 
         copy.ItemNames = (copy.ItemNames ?? []).ToDictionary(
+            kv => Expand(kv.Key, values, problems), kv => Expand(kv.Value, values, problems));
+        copy.ItemNamesPlural = (copy.ItemNamesPlural ?? []).ToDictionary(
+            kv => Expand(kv.Key, values, problems), kv => Expand(kv.Value, values, problems));
+        copy.ItemNamesPluralAlt = (copy.ItemNamesPluralAlt ?? []).ToDictionary(
             kv => Expand(kv.Key, values, problems), kv => Expand(kv.Value, values, problems));
         copy.ItemDescriptions = (copy.ItemDescriptions ?? []).ToDictionary(
             kv => Expand(kv.Key, values, problems), kv => Expand(kv.Value, values, problems));
@@ -296,8 +381,14 @@ public static class PatchParameters
                 CloneFrom = Expand(kv.Value.CloneFrom, values, problems),
                 Name = Expand(kv.Value.Name, values, problems),
                 HeldEffect = Expand(kv.Value.HeldEffect, values, problems),
+                HeldArgument = Expand(kv.Value.HeldArgument, values, problems),
                 FlingPower = Expand(kv.Value.FlingPower, values, problems),
                 Price = Expand(kv.Value.Price, values, problems),
+                Pocket = Expand(kv.Value.Pocket, values, problems),
+                ItemKind = Expand(kv.Value.ItemKind, values, problems),
+                EffectField = Expand(kv.Value.EffectField, values, problems),
+                Fields = (kv.Value.Fields ?? []).ToDictionary(
+                    f => f.Key, f => Expand(f.Value, values, problems)),
             });
 
         return copy;

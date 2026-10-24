@@ -1,0 +1,26 @@
+{
+  "Name": "Corrosive Gas",
+  "Description": "Removes target held item at timing 0xBF, guarded by 0x603dc so unremovable items (Mega Stones, Z-Crystals, Griseous Orb, etc.) are never deleted. Fully verified from ARM Functions/Move Edits/Corrosive Gas.xlsx.",
+  "Category": "Move",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 810,
+      "Name": "Corrosive Gas",
+      "Slots": [
+        {
+          "Timing": "0xBF",
+          "Code": "F0412DE90260A0E10180A0E10300A0E36720FEEB060050E12700001A0600A0E36320FEEBFF5000E20520A0E10610A0E10800A0E17F82FDEB000050E31E00001A0510A0E10800A0E1294AFEEBB201D0E10070B0E11800000A0620A0E12410A0E30800A0E13A1FFEEB0040A0E10000A0E30650C4E5B400C4E140209FE50210A0E30C0084E28F28FEEB0610A0E10C0084E272FFFDEB0510A0E10C0084E26FFFFDEB0710A0E10C0084E26CFFFDEB0410A0E10800A0E1F041BDE8A4F4FDEAF081BDE8B6070000",
+          "SourceBase": "0x000FF9A4"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

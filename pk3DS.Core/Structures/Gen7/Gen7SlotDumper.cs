@@ -28,7 +28,7 @@ public static class Gen7SlotDumper
             for (var zoneIndex = 0; zoneIndex < area.Zones.Length; zoneIndex++)
             {
                 var z = area.Zones[zoneIndex];
-                int loc = z.ParentMap;
+                int loc = z.PlaceNameId;
 
                 var ignore = ignored.TryGetValue(z.Index, out var skip) ? skip : [];
                 if (!dict.ContainsKey(loc))
@@ -82,7 +82,7 @@ public static class Gen7SlotDumper
             for (var zoneIndex = 0; zoneIndex < area.Zones.Length; zoneIndex++)
             {
                 var z = area.Zones[zoneIndex];
-                int loc = z.ParentMap;
+                int loc = z.PlaceNameId;
 
                 var ignore = ignored.TryGetValue(z.Index, out var skip) ? skip : [];
                 for (var index = 0; index < area.Tables.Count; index++)

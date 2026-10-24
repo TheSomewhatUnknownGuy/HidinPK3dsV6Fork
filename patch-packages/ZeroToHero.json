@@ -1,0 +1,34 @@
+{
+  "Name": "Zero to Hero",
+  "Description": "Zero to Hero (Ability 278). The Pok\u00E9mon transforms from its Zero Form into its Hero Form when it switches out (timing 0x6A).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 278,
+      "Name": "Zero to Hero",
+      "Slots": [
+        {
+          "Timing": "0x6A",
+          "Code": "70402DE90240A0E10150A0E10200A0E3D01EFAEB040050E10C00001A0500A0E10410A0E19B48FAEB0060A0E1BC00D6E1030C40E2C40050E20400001A3902D6E5000050E30100001A0100A0E33902C6E57080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 106,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QJAoOEBUKDhAgCg49Ae+usEAFDhDAAAGgUAoOEEEKDhm0j66wBgoOG8ANbhAwxA4sQAUOIEAAAaOQLW5QAAUOMBAAAaAQCg4zkCxuVwgL3o"
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

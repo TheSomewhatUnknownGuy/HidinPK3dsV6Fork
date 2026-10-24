@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace pk3DS.Core.Modding.Research;
 
@@ -26,17 +27,19 @@ public static class ResearchVersion
         // Sun/Moon are a different generation of the corpus entirely.
         if (cfg?.SM == true) return "SM";
 
+        // The loader already told the two apart; only the ambiguous USUM case falls to the path.
+        if (cfg?.Version == GameVersion.UM) return "UM";
+        if (cfg?.Version == GameVersion.US) return "US";
+
         string hint = (romfsPath ?? "") + " " + (cfg?.RomFS ?? "");
         if (hint.Length > 0)
         {
             // Check Moon first: "Ultra Sun" and "Ultra Moon" both contain "U", and a path holding
             // both words is more likely a parent folder than a ROM, so the more specific token wins.
-            if (Contains(hint, "ultramoon") || Contains(hint, "ultra moon")
-                || Contains(hint, "_um") || Contains(hint, "-um") || Contains(hint, "\\um"))
+            if (Contains(hint, "ultramoon") || Contains(hint, "ultra moon") || HasToken(hint, "um"))
                 return "UM";
 
-            if (Contains(hint, "ultrasun") || Contains(hint, "ultra sun")
-                || Contains(hint, "_us") || Contains(hint, "-us") || Contains(hint, "\\us"))
+            if (Contains(hint, "ultrasun") || Contains(hint, "ultra sun") || HasToken(hint, "us"))
                 return "US";
         }
 
@@ -56,4 +59,11 @@ public static class ResearchVersion
 
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// "us"/"um" as a whole token ("_um", "\UM\", "rom-us"), never inside a word: a plain substring
+    /// test for "\us" matched every C:\Users path and sent Ultra Moon ROMs the Ultra Sun patches.
+    /// </summary>
+    internal static bool HasToken(string haystack, string token) =>
+        Regex.IsMatch(haystack, $"(?<![a-z0-9]){token}(?![a-z0-9])", RegexOptions.IgnoreCase);
 }

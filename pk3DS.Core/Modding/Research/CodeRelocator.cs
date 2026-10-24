@@ -343,6 +343,32 @@ public static class CodeRelocator
     }
 
     /// <summary>
+    /// Sets an existing relocation patch targeting <paramref name="slot"/> or appends a new one.
+    /// </summary>
+    public static bool SetOrAddPointer(DecompiledCRO cro, uint slot, uint target, Action<string> log = null)
+    {
+        uint[] segs = cro.SegmentStarts;
+        int slotSeg = CROUtil.GetSegmentForAddress(slot, cro.RawData);
+        int tgtSeg = CROUtil.GetSegmentForAddress(target, cro.RawData);
+
+        if (slotSeg < 0 || tgtSeg < 0 || slotSeg >= segs.Length || tgtSeg >= segs.Length)
+        {
+            log?.Invoke($"cannot set pointer 0x{slot:X6} -> 0x{target:X6}: outside the segment map");
+            return false;
+        }
+
+        var existing = cro.Relocations.FirstOrDefault(r => r.AbsoluteWriteTo(segs) == slot);
+        if (existing != null)
+        {
+            existing.RawWord1 = (existing.RawWord1 & ~0xFF00u) | ((uint)(tgtSeg & 0xFF) << 8);
+            existing.RawWord2 = target - segs[tgtSeg];
+            BitConverter.GetBytes(0u).CopyTo(cro.RawData, (int)slot);
+            return true;
+        }
+        return AddPointer(cro, slot, target, log);
+    }
+
+    /// <summary>
     /// True when nothing in <paramref name="cro"/> refers to the range and the bytes are blank —
     /// the test for whether a table can simply grow in place instead of being relocated.
     /// </summary>
@@ -381,40 +407,72 @@ public static class CodeRelocator
     /// </summary>
     public static (uint Offset, int Length) FindReserve(DecompiledCRO cro, int minimum = 0x40)
     {
-        uint start = cro.Header.CodeStart;
-        uint end = Math.Min(cro.CodeEnd, (uint)cro.RawData.Length);
-        if (end <= start) return (0, 0);
-
         byte[] rom = cro.RawData;
         uint[] segs = cro.SegmentStarts;
 
-        // Addresses anything refers to, so occupied-but-blank regions are not handed out.
+        // A relocation's write slot is BLANK ON DISK BY DESIGN - AddPointer explicitly zeroes it
+        // ("the slot is blank on disk; the loader writes it"), and the loader fills it only once the
+        // CRO is actually loaded. Requiring the byte to be non-blank before protecting it therefore
+        // excluded exactly the addresses this set exists to protect: every legitimately-registered
+        // but not-yet-resolved pointer slot in the whole file read as 0x00 and so was never added
+        // here, leaving it free for a later FindReserve call to hand out and overwrite. That is
+        // exactly what happened to Avoid Crash Missing Animation's install: its block landed on top
+        // of an earlier recipe's still-live timing-table pointer slot, whose relocation entry then
+        // had the loader overwrite the guard's first instruction with an unrelated resolved pointer
+        // at CRO-load time - Citra's dynarmic then tried to execute that pointer value as an ARM
+        // instruction and asserted. Every write slot and target a relocation names is claimed
+        // regardless of its current byte value; only bytes with NO relocation touching them at all
+        // are actually free.
         var referenced = new SortedSet<uint>();
         foreach (var r in cro.Relocations)
         {
-            referenced.Add(r.AbsoluteWriteTo(segs));
-            referenced.Add(r.AbsoluteTarget(segs));
+            uint wTo = r.AbsoluteWriteTo(segs);
+            uint tgt = r.AbsoluteTarget(segs);
+            if (wTo < rom.Length) referenced.Add(wTo);
+            if (tgt < rom.Length) referenced.Add(tgt);
         }
 
         (uint Offset, int Length) best = (0, 0);
-        uint runStart = start;
-        bool inRun = false;
 
-        for (uint p = start; p <= end; p++)
-        {
-            bool blank = p < end && (rom[p] == 0x00 || rom[p] == 0xCC);
-            if (blank)
-            {
-                if (!inRun) { runStart = p; inRun = true; }
-                continue;
-            }
-            if (!inRun) continue;
-
-            Consider(runStart, p);
-            inRun = false;
-        }
+        // Segment 0 (.text) and segment 1 (.rodata) are scanned as two SEPARATE windows, never as
+        // one merged [CodeStart, CodeEnd) range. There is a real, structural gap between where
+        // segment 0's declared bounds end and segment 1's declared bounds start (0x68C blank-but-
+        // unowned bytes on stock USUM Battle.cro, alignment padding between .text and .rodata that
+        // belongs to neither segment's declared size) - a scan that treats the whole span as one
+        // contiguous "code segment" can return a run straddling that gap, and any address inside it
+        // is legitimately outside every segment (GetSegmentForAddress correctly returns -1 there).
+        // That produced exactly "could not register the stub's timing-table pointer" for a real
+        // chunk of patch-packages: the reserve handed out was, in part, unowned padding no relocation
+        // can legally target. Scanning each real segment on its own means a returned reserve is
+        // always entirely inside one segment's declared bounds.
+        ScanWindow(cro.Segments != null && cro.Segments.Length > 0 ? cro.Segments[0] : null);
+        ScanWindow(cro.Segments != null && cro.Segments.Length > 1 ? cro.Segments[1] : null);
 
         return best.Length >= minimum ? best : (0, 0);
+
+        void ScanWindow(CROSegmentEntry seg)
+        {
+            if (seg == null || seg.Start == 0 || seg.Size == 0) return;
+            uint start = seg.Start;
+            uint end = Math.Min(seg.Start + seg.Size, (uint)rom.Length);
+            if (end <= start) return;
+
+            uint runStart = start;
+            bool inRun = false;
+            for (uint p = start; p <= end; p++)
+            {
+                bool blank = p < end && (rom[p] == 0x00 || rom[p] == 0xCC);
+                if (blank)
+                {
+                    if (!inRun) { runStart = p; inRun = true; }
+                    continue;
+                }
+                if (!inRun) continue;
+
+                Consider(runStart, p);
+                inRun = false;
+            }
+        }
 
         void Consider(uint from, uint to)
         {
@@ -474,13 +532,16 @@ public static class CodeRelocator
             return false;
         }
 
-        // Slide far enough, rounded up, and only if it still fits inside the existing file.
+        // Slide far enough, rounded up, resizing the binary if needed.
         uint shift = ((need - dataStart) + 0x1F) & ~0x1Fu;
         uint newStart = dataStart + shift;
         if (newStart + dataSize > rom.Length)
         {
-            log($"cannot make room: .data would need to end at 0x{newStart + dataSize:X6}, past the file (0x{rom.Length:X6})");
-            return false;
+            int newLen = (int)((newStart + dataSize + 0xFFFu) & ~0xFFFu);
+            Array.Resize(ref cro.RawData, newLen);
+            rom = cro.RawData;
+            cro.Header.FileSize = (uint)newLen;
+            log($"expanded CRO buffer to 0x{newLen:X6} to accommodate relocation table headroom");
         }
 
         var data = new byte[dataSize];
@@ -503,15 +564,27 @@ public static class CodeRelocator
     /// <summary>Blank run at the very end of the code segment. Kept for callers that want only that.</summary>
     public static (uint Offset, int Length) FindTailReserve(DecompiledCRO cro, int minimum = 0x40)
     {
-        uint start = cro.Header.CodeStart;
-        uint end = Math.Min(cro.CodeEnd, (uint)cro.RawData.Length);
-        if (end <= start) return (0, 0);
+        // Segment 1's own tail first, then segment 0's - never scanning across the real gap
+        // between them (see FindReserve's comment: that gap is blank-but-unowned padding, not
+        // part of either segment's declared size, and a run can legally include none of it).
+        var fromSeg1 = TailOf(cro.Segments != null && cro.Segments.Length > 1 ? cro.Segments[1] : null);
+        if (fromSeg1.Length >= minimum) return fromSeg1;
 
-        uint p = end;
-        while (p > start && (cro.RawData[p - 1] == 0x00 || cro.RawData[p - 1] == 0xCC)) p--;
+        var fromSeg0 = TailOf(cro.Segments != null && cro.Segments.Length > 0 ? cro.Segments[0] : null);
+        return fromSeg0.Length >= minimum ? fromSeg0 : (0, 0);
 
-        uint reserve = (p + 3u) & ~3u;
-        int length = (int)(end - reserve);
-        return length >= minimum ? (reserve, length) : (0, 0);
+        (uint Offset, int Length) TailOf(CROSegmentEntry seg)
+        {
+            if (seg == null || seg.Start == 0 || seg.Size == 0) return (0, 0);
+            uint start = seg.Start;
+            uint end = Math.Min(seg.Start + seg.Size, (uint)cro.RawData.Length);
+            if (end <= start) return (0, 0);
+
+            uint p = end;
+            while (p > start && (cro.RawData[p - 1] == 0x00 || cro.RawData[p - 1] == 0xCC)) p--;
+
+            uint reserve = (p + 3u) & ~3u;
+            return (reserve, (int)(end - reserve));
+        }
     }
 }

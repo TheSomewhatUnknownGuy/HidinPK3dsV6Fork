@@ -10,6 +10,8 @@ namespace pk3DS.Core.Modding
         public static bool ApplyPokemonPlusPatch(string romfsPath, string exefsPath, string patchSourceDir, string xdeltaPatchPath, out string statusMessage)
         {
             statusMessage = "";
+            // It copies whole code.bin/CROs over the ROM, which would replace Uhuru's code.
+            if (UhuruGuard.Active) { statusMessage = UhuruGuard.RefusalFor("code.bin")!; return false; }
             if (!Directory.Exists(patchSourceDir))
             {
                 statusMessage = $"Pokemon+ source directory not found: {patchSourceDir}";
@@ -146,35 +148,18 @@ namespace pk3DS.Core.Modding
             }
         }
 
-        public static bool ExportLayeredFSModPackage(string romfsPath, string exefsPath, string outputDir, out string statusMessage)
+        /// <summary>
+        /// Exports a LayeredFS mod folder (see <see cref="ModExport"/>): exheader.bin, code.bin, the files pk3DS changed
+        /// (ProjectState.ModifiedFiles, files pasted into the US/UM patch folders, the root CROs) and, on Uhuru,
+        /// every file Uhuru changes, so the folder works over a vanilla ROM. Nothing is written if any file is missing or too big.
+        /// </summary>
+        public static bool ExportLayeredFSModPackage(string romfsPath, string exefsPath, string exheaderPath, string outputDir,
+            ModExport.Layout layout, bool uhuru, out string statusMessage)
         {
             statusMessage = "";
             try
             {
-                // Detect Game Title ID (Ultra Sun = 00040000001B5000, Ultra Moon = 00040000001B5100)
-                string titleId = "00040000001B5000";
-                if (!string.IsNullOrEmpty(romfsPath) && (romfsPath.Contains("UM", StringComparison.OrdinalIgnoreCase) || romfsPath.Contains("Moon", StringComparison.OrdinalIgnoreCase)))
-                {
-                    titleId = "00040000001B5100";
-                }
-
-                string lumaTarget = Path.Combine(outputDir, "luma", "titles", titleId);
-                string outRomfs = Path.Combine(lumaTarget, "romfs");
-                string outExefs = Path.Combine(lumaTarget, "exefs");
-
-                Directory.CreateDirectory(outRomfs);
-                Directory.CreateDirectory(outExefs);
-
-                int copiedFiles = 0;
-                long totalBytes = 0;
-
-                HashSet<string> filesToExport = new(StringComparer.OrdinalIgnoreCase);
-
-                // 1. Gather all files explicitly tracked in ProjectState
-                foreach (string file in ProjectState.Instance.ModifiedFiles)
-                {
-                    filesToExport.Add(file);
-                }
+                HashSet<string> filesToExport = new(ProjectState.Instance.ModifiedFiles, StringComparer.OrdinalIgnoreCase);
 
                 // 2. Scan US/UM patch directories for any files pasted by user
                 string[] patchFolders = ["US", "UM"];
@@ -227,11 +212,6 @@ namespace pk3DS.Core.Modding
                     }
                 }
 
-                // 3. Always include code.bin if present in exefsPath and patches were applied
-                if (Directory.Exists(exefsPath) && File.Exists(pk3DS.Core.CTR.ExeFS.ResolveCodeBin(exefsPath)))
-                {
-                    filesToExport.Add("exefs/code.bin");
-                }
 
                 // 4. Always include any CRO files present in romfsPath
                 if (Directory.Exists(romfsPath))
@@ -242,45 +222,24 @@ namespace pk3DS.Core.Modding
                     }
                 }
 
-                // Copy only the modified / pasted files
-                foreach (string relFile in filesToExport)
+
+                var r = ModExport.Build(romfsPath, exefsPath, exheaderPath, outputDir, layout, filesToExport, uhuru, dryRun: false);
+                if (r.Errors.Count > 0)
                 {
-                    string normalized = relFile.Replace('\\', '/').TrimStart('/');
-                    if (normalized.StartsWith("exefs/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string sub = normalized.Substring("exefs/".Length);
-                        string src = Path.Combine(exefsPath ?? "", sub.Replace('/', Path.DirectorySeparatorChar));
-                        if (File.Exists(src))
-                        {
-                            string dest = Path.Combine(outExefs, sub.Replace('/', Path.DirectorySeparatorChar));
-                            Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                            File.Copy(src, dest, true);
-                            copiedFiles++;
-                            totalBytes += new FileInfo(dest).Length;
-                        }
-                    }
-                    else if (normalized.StartsWith("romfs/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string sub = normalized.Substring("romfs/".Length);
-                        string src = Path.Combine(romfsPath ?? "", sub.Replace('/', Path.DirectorySeparatorChar));
-                        if (File.Exists(src))
-                        {
-                            string dest = Path.Combine(outRomfs, sub.Replace('/', Path.DirectorySeparatorChar));
-                            Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                            File.Copy(src, dest, true);
-                            copiedFiles++;
-                            totalBytes += new FileInfo(dest).Length;
-                        }
-                    }
+                    statusMessage = "Nothing was exported:\n" + string.Join("\n", r.Errors);
+                    return false;
                 }
 
-                double mb = (double)totalBytes / (1024 * 1024);
-                statusMessage = $"Exported compact Luma3DS / LayeredFS mod package ({copiedFiles} files, {mb:F1} MB) to:\n{lumaTarget}\n\nCopy the 'luma' folder directly to your 3DS SD card or Citra load/mods folder!";
+                string howTo = layout == ModExport.Layout.Azahar
+                    ? "Azahar: copy the title-ID folder into Azahar's load/mods folder."
+                    : "Luma3DS: copy the 'luma' folder to the root of the SD card, then turn on 'Enable game patching' in the Luma3DS config (hold Select while powering on).";
+                string uhuruNote = uhuru ? "Uhuru's 68 files included." : "No Uhuru ROM detected: only pk3DS's changed files.";
+                statusMessage = $"Exported {r.Files.Count} files ({r.Bytes / (1024.0 * 1024):F1} MB) to:\n{outputDir}\n{uhuruNote}\n\n{howTo}";
                 return true;
             }
             catch (Exception ex)
             {
-                statusMessage = $"Error exporting Luma3DS patch: {ex.Message}";
+                statusMessage = $"Error exporting the mod folder: {ex.Message}\nFiles copied before the error stay in {outputDir}.";
                 return false;
             }
         }

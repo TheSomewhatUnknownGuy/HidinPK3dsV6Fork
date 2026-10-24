@@ -1,0 +1,31 @@
+{
+  "Name": "Curious Medicine",
+  "Description": "On switch-in, resets all of the user's own stat stage changes back to neutral (both boosts and drops on Curious Medicine's own holder only - real-game Curious Medicine never touches the opposing side's stats). Transcribed from ABZB's research spreadsheet (Ability Edits/Curious Medicine.xlsx), which labels the routine 'Clear all Stat changes on entry 0x6D/0xA7'.\n\nAbility id 261 ('Curious Medicine', confirmed live via GameConfig.GetText(TextName.AbilityNames)[261] in this exact ROM) has NO existing master-table entry in this build (map.Find(Ability,261) == null before this package), same situation as Cud Chew (291) and Screen Cleaner (251) - nothing to collide with, installed as a brand-new Ability master-table entry.\n\nDUAL TIMING HOOKS (0x6D and 0xA7): ABZB's own header note uses the exact same 'X/Y' notation for this ability's own spreadsheet as it does for Screen Cleaner's ('Remove all screens, and hazards on own side 0x6D/0xA7'), which THIS repo already has installed and working as patch-packages/ScreenCleaner.json - that file's own description states it was 'Authored from ARM Functions/Ability Edits/Screen Cleaner.xlsx with dual timing hooks 0x6D and 0xA7' and installs the identical function code at both Ability Slots 0x6D and 0xA7. Curious Medicine follows the same, already-established convention in this codebase: the identical code is installed at both timing 0x6D and timing 0xA7 rather than guessing which single slot is the real switch-in trigger.\n\nRegister contract cross-checked against reused helpers already independently verified by CudChew.json and ScreenCleaner.json in this exact Battle.cro: 0x87B58 ('check is self', same 'mov r0,0x2; bl 0x87B58; cmp r0,r4' idiom), 0x89E28 (Display/Hide Ability Banner, called with r1=0x1 then later r1=0x2), 0x876F8 (get-field-pointer helper), and 0x7CCF4 (apply/set values). All four disassemble at this session to the exact same clean push{...,lr}-prologue function shapes their existing packages already rely on. The unique-to-this-routine call at 0x604AC (mov r0,r5; mov r2,sp; bl 0x604AC; movs r6,r0; beq <skip>) also disassembles cleanly as a real function (push of 8 registers, sub sp #8, a nested bl, a count-driven loop) fully consistent with 'scan the holder's active stat-stage buffer into a stack array and return the count, skip the whole routine if the count is zero.'\n\nNo PC-relative literal-pool loads appear anywhere in this routine (verified instruction-by-instruction via pk3DS.Core.CTR.ARMCodec.Disassemble against SourceBase 0x107438 - every operand is either a register, an immediate data-processing operand, or a BL/B branch) - so the CudChew-class literal-pool relocation hazard (CodeRelocator.RebaseCode only fixes branches, not LDR Rd,[PC,#imm]) does not apply here; nothing needed rewriting to a PC-relative ADD.\n\nUNRESOLVED, FLAGGED HONESTLY (not silently patched over): ABZB's own spreadsheet marks ONE call as uncertain - row D20's note on 'bl 0x00092ABC' reads verbatim 'revert to 6AD4C if not work', i.e. the spreadsheet author already flagged this exact address as unconfirmed and named their own fallback. Disassembling the AUTHOR'S STATED PRIMARY target, 0x92ABC, in this exact ROM produces invalid ARM (an 'STRSB' encoding, which is not a legal ARM32 store mnemonic, followed by a stray NOP before the next real function at 0x92AC8) - i.e. 0x92ABC is not a real function entry in this build. The AUTHOR'S OWN STATED FALLBACK, 0x6AD4C, disassembles cleanly as a well-formed function (push {r4,r5,r6,lr} / two BL calls / conditional return of either r5 or the constant 4 / pop {r4,r5,r6,pc}) - a completely ordinary, valid subroutine shape. This package uses the fallback address (bytes 398EFDEB, re-encoding the BL's imm24 field from the original 952DFEEB, cross-checked by an independent decode/encode round-trip script). This is the author's own named contingency, backed by hard disassembly evidence the primary is wrong in this build - but it has NOT been dynamically tested in Citra, so the exact runtime semantics of the 0x6AD4C call (which register it hands back, and whether 'r5-or-4' is really 'stat-reset-context-or-nothing-to-reset') are verified structurally (valid, sensible code) but NOT verified behaviorally. If in-game testing shows stat stages are not actually cleared on switch-in, this is the first thing to re-examine - a second candidate, 0x92AC8 (the function immediately after the invalid bytes at the stated primary address), was also inspected and also disassembles cleanly, so it remains a second fallback candidate if 0x6AD4C turns out wrong too.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 261,
+      "Name": "Curious Medicine",
+      "Slots": [
+        {
+          "Timing": "0x6D",
+          "Code": "F0412DE928D04DE20240A0E10150A0E10200A0E3C101FEEB040050E12200001A0500A0E10410A0E1398EFDEB071C80E30500A0E10D20A0E10D64FDEB0060B0E11A00000A0420A0E10110A0E30500A0E1660AFEEB0500A0E10F10A0E30520A0E19600FEEB0080A0E10460C8E50070A0E30700DDE7071088E00500C1E5017087E2060057E1F9FFFF3A0500A0E10810A0E109D6FDEB0420A0E10210A0E30500A0E128D08DE2F041BDE8500AFEEA28D08DE2F081BDE8",
+          "SourceBase": "0x00107438"
+        },
+        {
+          "Timing": "0xA7",
+          "Code": "F0412DE928D04DE20240A0E10150A0E10200A0E3C101FEEB040050E12200001A0500A0E10410A0E1398EFDEB071C80E30500A0E10D20A0E10D64FDEB0060B0E11A00000A0420A0E10110A0E30500A0E1660AFEEB0500A0E10F10A0E30520A0E19600FEEB0080A0E10460C8E50070A0E30700DDE7071088E00500C1E5017087E2060057E1F9FFFF3A0500A0E10810A0E109D6FDEB0420A0E10210A0E30500A0E128D08DE2F041BDE8500AFEEA28D08DE2F081BDE8",
+          "SourceBase": "0x00107438"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

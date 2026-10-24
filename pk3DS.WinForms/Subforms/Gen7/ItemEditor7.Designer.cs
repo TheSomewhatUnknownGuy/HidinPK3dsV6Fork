@@ -29,6 +29,7 @@ partial class ItemEditor7
     private void InitializeComponent()
     {
         this.B_Table = new System.Windows.Forms.Button();
+        this.B_Guide = new System.Windows.Forms.Button();
         this.PB_ItemSprite = new System.Windows.Forms.PictureBox();
         this.B_CopyTable = new System.Windows.Forms.Button();
         this.B_PasteTable = new System.Windows.Forms.Button();
@@ -68,7 +69,7 @@ partial class ItemEditor7
         this.RTB.Location = new System.Drawing.Point(11, 68);
         this.RTB.Name = "RTB";
         this.RTB.ReadOnly = true;
-        this.RTB.Size = new System.Drawing.Size(460, 51);
+        this.RTB.Size = new System.Drawing.Size(568, 51);
         this.RTB.TabIndex = 38;
         this.RTB.Text = "";
         // 
@@ -83,10 +84,13 @@ partial class ItemEditor7
         // 
         // Grid
         // 
+        this.Grid.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
         this.Grid.Location = new System.Drawing.Point(11, 125);
-        this.Grid.Size = new System.Drawing.Size(460, 300);
+        this.Grid.Size = new System.Drawing.Size(568, 300);
         this.Grid.TabIndex = 47;
-        this.PB_ItemSprite.Location = new System.Drawing.Point(400, 5);
+        this.PB_ItemSprite.Location = new System.Drawing.Point(531, 5);
         this.PB_ItemSprite.Name = "PB_ItemSprite";
         this.PB_ItemSprite.Size = new System.Drawing.Size(50, 50);
         this.PB_ItemSprite.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
@@ -94,64 +98,73 @@ partial class ItemEditor7
         // 
         // B_Table
         // 
-        // Two button rows sit between the combo box (ends at x=215) and the sprite (starts at
-        // x=400), so every button here has to live inside 235..390 on row one and 115..390 on row
-        // two. Widths below are chosen to tile those spans exactly, with a 6px gutter.
-        this.B_Table.Location = new System.Drawing.Point(235, 10);
+        // Two rows of three buttons sit between the combo box (ends x=215) and the sprite (starts x=515).
+        // Columns: 225 (88 wide), 318 (88), 411 (100); rows: y=10 and y=36; 5px gutters.
+        this.B_Table.Location = new System.Drawing.Point(225, 10);
         this.B_Table.Name = "B_Table";
-        this.B_Table.Size = new System.Drawing.Size(78, 23);
+        this.B_Table.Size = new System.Drawing.Size(88, 23);
         this.B_Table.TabIndex = 48;
         this.B_Table.Text = "Export Table";
         this.B_Table.UseVisualStyleBackColor = true;
         this.B_Table.Click += new System.EventHandler(this.B_Table_Click);
 
         // B_CopyTable
-        this.B_CopyTable.Location = new System.Drawing.Point(235, 36);
+        this.B_CopyTable.Location = new System.Drawing.Point(225, 36);
         this.B_CopyTable.Name = "B_CopyTable";
-        this.B_CopyTable.Size = new System.Drawing.Size(75, 23);
+        this.B_CopyTable.Size = new System.Drawing.Size(88, 23);
         this.B_CopyTable.TabIndex = 50;
         this.B_CopyTable.Text = "Copy";
         this.B_CopyTable.UseVisualStyleBackColor = true;
         this.B_CopyTable.Click += new System.EventHandler(this.B_CopyTable_Click);
 
-        this.B_PasteTable.Location = new System.Drawing.Point(315, 36);
+        this.B_PasteTable.Location = new System.Drawing.Point(318, 36);
         this.B_PasteTable.Name = "B_PasteTable";
-        this.B_PasteTable.Size = new System.Drawing.Size(75, 23);
+        this.B_PasteTable.Size = new System.Drawing.Size(88, 23);
         this.B_PasteTable.TabIndex = 51;
         this.B_PasteTable.Text = "Paste";
         this.B_PasteTable.UseVisualStyleBackColor = true;
         this.B_PasteTable.Click += new System.EventHandler(this.B_PasteTable_Click);
 
         this.B_MakeMega = new System.Windows.Forms.Button();
-        this.B_MakeMega.Location = new System.Drawing.Point(115, 36);
+        this.B_MakeMega.Location = new System.Drawing.Point(411, 36);
         this.B_MakeMega.Name = "B_MakeMega";
-        this.B_MakeMega.Size = new System.Drawing.Size(115, 23);
+        this.B_MakeMega.Size = new System.Drawing.Size(114, 23);
         this.B_MakeMega.TabIndex = 52;
         this.B_MakeMega.Text = "Make Mega Stone";
         this.B_MakeMega.UseVisualStyleBackColor = true;
         this.B_MakeMega.Click += new System.EventHandler(this.B_MakeMega_Click);
 
         this.B_AddItem = new System.Windows.Forms.Button();
-        this.B_AddItem.Location = new System.Drawing.Point(319, 10);
+        this.B_AddItem.Location = new System.Drawing.Point(318, 10);
         this.B_AddItem.Name = "B_AddItem";
-        this.B_AddItem.Size = new System.Drawing.Size(71, 23);
+        this.B_AddItem.Size = new System.Drawing.Size(88, 23);
         this.B_AddItem.TabIndex = 49;
         this.B_AddItem.Text = "Add Items";
         this.B_AddItem.UseVisualStyleBackColor = true;
         this.B_AddItem.Click += new System.EventHandler(this.B_AddItem_Click);
 
+        // B_Guide sits top-right of the button grid, level with Export Table and Add Items.
+        this.B_Guide.Location = new System.Drawing.Point(411, 10);
+        this.B_Guide.Name = "B_Guide";
+        this.B_Guide.Size = new System.Drawing.Size(114, 23);
+        this.B_Guide.TabIndex = 53;
+        this.B_Guide.Text = "Item Guide";
+        this.B_Guide.UseVisualStyleBackColor = true;
+        this.B_Guide.Click += new System.EventHandler(this.B_Guide_Click);
+
         //
         // ItemEditor7
-        // 
+        //
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(484, 440);
+        this.ClientSize = new System.Drawing.Size(590, 440);
         this.Controls.Add(this.PB_ItemSprite);
         this.Controls.Add(this.B_AddItem);
         this.Controls.Add(this.B_MakeMega);
         this.Controls.Add(this.B_CopyTable);
         this.Controls.Add(this.B_PasteTable);
         this.Controls.Add(this.B_Table);
+        this.Controls.Add(this.B_Guide);
         this.Controls.Add(this.Grid);
         this.Controls.Add(this.L_Index);
         this.Controls.Add(this.RTB);
@@ -176,6 +189,7 @@ partial class ItemEditor7
     private System.Windows.Forms.Label L_Index;
     private System.Windows.Forms.PropertyGrid Grid;
     private System.Windows.Forms.Button B_Table;
+    private System.Windows.Forms.Button B_Guide;
     private System.Windows.Forms.PictureBox PB_ItemSprite;
     private System.Windows.Forms.Button B_CopyTable;
     private System.Windows.Forms.Button B_PasteTable;

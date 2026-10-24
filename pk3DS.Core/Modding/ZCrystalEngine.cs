@@ -22,6 +22,7 @@ namespace pk3DS.Core.Modding
             byte[] patch = BitConverter.GetBytes(0xE3510000 | (uint)newTotal);
             patch.CopyTo(data, idx);
 
+            if (UhuruGuard.RefusalFor(codePath) != null) return false;
             File.WriteAllBytes(codePath, data);
             return true;
         }

@@ -1,0 +1,44 @@
+{
+  "Name": "Protection Failure Table Extension",
+  "Description": "Extends the consecutive protection-move failure lookup table in Battle.cro to include Obstruct (792), Silk Trap (852), and Burning Bulwark (908). Relocates the 18-byte packed table from 0x126D24 to free unreferenced rodata at 0x11DE6A with 13 u16 entries (26 bytes, preserving odd count for pairwise loop), retargets internal relocation entry #1027 addend at 0x145BAC (0x9D24 -> 0x0E6A), and updates loop bound immediate CMP R0, #9 to CMP R0, #13 at 0xCD230.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [
+    {
+      "Offset": "0x11DE6A",
+      "Original": "0000000000000000000000000000000000000000000000000000",
+      "Patched": "B600C500CB00D501F50154024C0231029502180354038C03B600",
+      "IsHook": false,
+      "HookTarget": "",
+      "OffsetValue": 1171050,
+      "OriginalBytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "PatchedBytes": "tgDFAMsA1QH1AVQCTAIxApUCGANUA4wDtgA="
+    },
+    {
+      "Offset": "0x145BAC",
+      "Original": "249D0000",
+      "Patched": "6A0E0000",
+      "IsHook": false,
+      "HookTarget": "",
+      "OffsetValue": 1334188,
+      "OriginalBytes": "JJ0AAA==",
+      "PatchedBytes": "ag4AAA=="
+    },
+    {
+      "Offset": "0xCD230",
+      "Original": "090050E3",
+      "Patched": "0D0050E3",
+      "IsHook": false,
+      "HookTarget": "",
+      "OffsetValue": 840240,
+      "OriginalBytes": "CQBQ4w==",
+      "PatchedBytes": "DQBQ4w=="
+    }
+  ],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

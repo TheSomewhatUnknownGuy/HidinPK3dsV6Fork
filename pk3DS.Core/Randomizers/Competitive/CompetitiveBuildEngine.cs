@@ -23,27 +23,8 @@ public class CompetitiveBuildEngine
     // EV index constants for TrainerPoke7.EVs: [HP, ATK, DEF, SPA, SPD, SPE]
     private const int EV_HP = 0, EV_ATK = 1, EV_DEF = 2, EV_SPA = 3, EV_SPD = 4, EV_SPE = 5;
 
-    private static byte MakeNature(int plusStat, int minusStat)
-    {
-        // plusStat/minusStat: 1=Atk, 2=Def, 3=Spe, 4=SpA, 5=SpD
-        if (plusStat < 1 || plusStat > 5 || minusStat < 1 || minusStat > 5 || plusStat == minusStat)
-            return 0; // Hardy (neutral)
-        return (byte)((plusStat - 1) * 5 + (minusStat - 1));
-    }
-
-    // Named nature constants
-    private static readonly byte Adamant  = MakeNature(1, 4); // +Atk, -SpA
-    private static readonly byte Brave    = MakeNature(1, 3); // +Atk, -Spe
-    private static readonly byte Bold     = MakeNature(2, 1); // +Def, -Atk
-    private static readonly byte Impish   = MakeNature(2, 4); // +Def, -SpA
-    private static readonly byte Jolly    = MakeNature(3, 4); // +Spe, -SpA
-    private static readonly byte Timid    = MakeNature(3, 1); // +Spe, -Atk
-    private static readonly byte Hasty    = MakeNature(3, 2); // +Spe, -Def
-    private static readonly byte Naive    = MakeNature(3, 5); // +Spe, -SpD
-    private static readonly byte Modest   = MakeNature(4, 1); // +SpA, -Atk
-    private static readonly byte Quiet    = MakeNature(4, 3); // +SpA, -Spe
-    private static readonly byte Calm     = MakeNature(5, 1); // +SpD, -Atk
-    private static readonly byte Careful  = MakeNature(5, 4); // +SpD, -SpA
+    private string[] _cachedMoveNames;
+    public string[] GetMoveNames() => _cachedMoveNames ??= (Config?.GetText(TextName.MoveNames) ?? Array.Empty<string>());
 
     public CompetitiveBuildEngine(GameConfig config)
     {
@@ -83,6 +64,9 @@ public class CompetitiveBuildEngine
     /// </summary>
     public AbilityBanList BanList { get; set; }
 
+    /// <summary>Every tunable number (spec §4); the randomizer sets it from the weights file.</summary>
+    public CompetitiveWeights Weights { get; set; } = new();
+
     public int ChooseCompetitiveAbilitySlot(PersonalInfo pi, string[] abilityNames)
     {
         if (pi?.Abilities == null || pi.Abilities.Length == 0 || abilityNames == null) return 1;
@@ -114,13 +98,35 @@ public class CompetitiveBuildEngine
             return 0;
         }
 
-        int bestTier = candidates.Max(c => Tier(c.name));
-        var bestCandidates = candidates.Where(c => Tier(c.name) == bestTier).ToList();
+        int atk = pi.Stats[ATK];
+        int spa = pi.Stats[SPA];
+        bool isSpecialBiased = spa > atk;
+        bool isPhysicalBiased = atk > spa;
+
+        int Score(string name)
+        {
+            if (isSpecialBiased)
+            {
+                if (CompetitiveDatabase.PhysicalAttackBoostingAbilities.Contains(name) ||
+                    (CompetitiveDatabase.AbilityBiasRules.TryGetValue(name, out var r) && r.RequireHigherAtkForBias))
+                    return -1;
+            }
+            if (isPhysicalBiased)
+            {
+                if (CompetitiveDatabase.SpecialAttackBoostingAbilities.Contains(name) ||
+                    (CompetitiveDatabase.AbilityBiasRules.TryGetValue(name, out var r) && r.RequireHigherSpaForBias))
+                    return -1;
+            }
+            return Tier(name);
+        }
+
+        int bestScore = candidates.Max(c => Score(c.name));
+        var bestCandidates = candidates.Where(c => Score(c.name) == bestScore).ToList();
         return bestCandidates[Rnd.Next(bestCandidates.Count)].slot;
     }
 
     /// <summary>How many of a finished set's moves are physical, and how many special.</summary>
-    private (int Physical, int Special) CountAttackCategories(int[] moves)
+    public (int Physical, int Special) CountAttackCategories(int[] moves)
     {
         var data = Config?.Moves;
         if (moves == null || data == null) return (0, 0);
@@ -135,225 +141,154 @@ public class CompetitiveBuildEngine
         return (phys, spec);
     }
 
-    public (int[] evs, byte nature) BuildEVsAndNature(PersonalInfo pi, CompetitiveRole role, int[] moves, bool isTrickRoom = false)
+    /// <summary>Manifesto 0.7: Frail iff HP + Def + SpD <= 200.</summary>
+    public static bool IsFrail(PersonalInfo pi)
     {
-        int[] evs = new int[6]; // EV_HP, EV_ATK, EV_DEF, EV_SPA, EV_SPD, EV_SPE
-        byte nature;
+        if (pi?.Stats == null || pi.Stats.Length < 6) return false;
+        return (pi.Stats[HP] + pi.Stats[DEF] + pi.Stats[SPD]) <= 200;
+    }
 
-        int hp  = pi.Stats[HP];
-        int atk = pi.Stats[ATK];
-        int def = pi.Stats[DEF];
-        int spe = pi.Stats[SPE];
-        int spa = pi.Stats[SPA];
-        int spd = pi.Stats[SPD];
+    public (int[] evs, byte nature) BuildEVsAndNature(PersonalInfo pi, CompetitiveRole role, int[] moves, bool isTrickRoom = false, string[] moveNames = null, int level = 100)
+    {
+        int atk = pi.Stats[ATK], def = pi.Stats[DEF], spe = pi.Stats[SPE], spa = pi.Stats[SPA], spd = pi.Stats[SPD];
 
         var (physCount, specCount) = CountAttackCategories(moves);
         bool physicalSet = physCount != specCount ? physCount > specCount : atk >= spa;
 
-        // Used where a branch needs "how lopsided is this", which stays a stat question.
-        int strongOffense = physicalSet ? atk : spa;
-        int weakOffense = physicalSet ? spa : atk;
-
-        // Trick Room: 0 Spe EVs, Speed-hindering nature, 252 HP + 252 better offense + 4 other
-        if (isTrickRoom)
+        // Check for Gyro Ball: low-speed users want 0 Spe EVs and speed-hindering nature
+        bool hasGyroBall = false;
+        bool hasPivotMove = false;
+        var allMoveNames = moveNames ?? GetMoveNames();
+        if (moves != null && allMoveNames != null && allMoveNames.Length > 0)
         {
-            evs[EV_HP] = 252;
-            if (physicalSet)
+            foreach (int m in moves)
             {
-                evs[EV_ATK] = 252; evs[EV_DEF] = 4;
-                nature = Brave; // +Atk, -Spe
+                if (m <= 0 || m >= allMoveNames.Length) continue;
+                string mName = allMoveNames[m];
+                if (GameNameComparer.Instance.Equals(mName, "Gyro Ball"))
+                    hasGyroBall = true;
+                if (CompetitiveDatabase.PivotMoves.Contains(mName))
+                    hasPivotMove = true;
             }
-            else
-            {
-                evs[EV_SPA] = 252; evs[EV_DEF] = 4;
-                nature = Quiet; // +SpA, -Spe
-            }
-            return (evs, nature);
         }
 
-        switch (role)
-        {
-            // --- FAST OFFENSIVE (Manifesto lines 735-738) ---
-            case CompetitiveRole.OffensiveSweeper:
-            case CompetitiveRole.OffensiveBreaker:
-            case CompetitiveRole.OffensiveCleaner:
-            case CompetitiveRole.SpeedControl:
-                // "Mixed" only when the set really is mixed. Close base stats alone are not
-                // enough - a 139/139 Pokemon running four physical moves wants nothing in Sp. Atk.
-                bool mixedSet = physCount > 0 && specCount > 0 && Math.Abs(atk - spa) <= 15;
-                if (mixedSet)
-                {
-                    if (physicalSet)
-                    {
-                        evs[EV_ATK] = 252; evs[EV_SPE] = 252; evs[EV_SPA] = 4;
-                    }
-                    else
-                    {
-                        evs[EV_SPA] = 252; evs[EV_SPE] = 252; evs[EV_ATK] = 4;
-                    }
-                    nature = (def <= spd) ? Hasty : Naive;
-                }
-                else if (physicalSet)
-                {
-                    evs[EV_ATK] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = (spe >= atk) ? Jolly : Adamant;
-                }
-                else
-                {
-                    evs[EV_SPA] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = (spe >= spa) ? Timid : Modest;
-                }
-                break;
+        // Slow Bulky Pivot: per Smogon VoltTurn momentum, base Spe <= 65 moving LAST absorbs hits safely
+        bool isSlowBulkyPivot = (role is CompetitiveRole.BulkyPivot or CompetitiveRole.DefensivePivot ||
+                                 IsDefensiveRole(role) || IsBulkyRole(role)) && hasPivotMove && spe <= 65;
 
-            // --- OFFENSIVE PIVOT ---
-            case CompetitiveRole.OffensivePivot:
-                if (physicalSet)
-                {
-                    evs[EV_ATK] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = Jolly;
-                }
-                else
-                {
-                    evs[EV_SPA] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = Timid;
-                }
-                break;
+        // Trick Room, slow Gyro Ball user, or slow bulky pivot: 0 Spe EVs and IV, Speed-lowering nature
+        bool slow = isTrickRoom || (hasGyroBall && spe <= 80) || isSlowBulkyPivot;
 
-            // --- OFFENSIVE UTILITY ---
-            case CompetitiveRole.OffensiveUtility:
-                if (physicalSet)
-                {
-                    evs[EV_ATK] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = Jolly;
-                }
-                else
-                {
-                    evs[EV_SPA] = 252; evs[EV_SPE] = 252;
-                    Assign4EVRemainder(evs, hp, def, spd);
-                    nature = Timid;
-                }
-                break;
+        // Which stats a role invests in is the old role table; how much is the optimizer's job (spec §1).
+        bool isWall = role is CompetitiveRole.BulkyPivot or CompetitiveRole.BulkyUtility
+                           or CompetitiveRole.DefensiveWall or CompetitiveRole.DefensivePivot;
+        bool supportLead = role == CompetitiveRole.BulkyLead ||
+                           (role == CompetitiveRole.OffensiveLead && atk < 90 && spa < 90);
+        bool defensiveSpread = slow ? IsDefensiveRole(role) || isSlowBulkyPivot : isWall;
+        bool fillAttack = !defensiveSpread && (slow || !supportLead);
 
-            // --- LEADS (Manifesto lines 738-740) ---
-            case CompetitiveRole.OffensiveLead:
-                if (atk >= 90 || spa >= 90) // Offensive lead
-                {
-                    if (physicalSet)
-                    {
-                        evs[EV_ATK] = 252; evs[EV_SPE] = 252;
-                        Assign4EVRemainder(evs, hp, def, spd);
-                        nature = Jolly;
-                    }
-                    else
-                    {
-                        evs[EV_SPA] = 252; evs[EV_SPE] = 252;
-                        Assign4EVRemainder(evs, hp, def, spd);
-                        nature = Timid;
-                    }
-                }
-                else // Screen/Hazard lead: 252 HP / 252 Spe / 4 lower def
-                {
-                    evs[EV_HP] = 252; evs[EV_SPE] = 252;
-                    evs[def <= spd ? EV_DEF : EV_SPD] = 4;
-                    nature = (physicalSet) ? Jolly : Timid;
-                }
-                break;
+        // Offensive roles and leads beat the benchmark; bulky and tanky attackers creep past an
+        // uninvested Pokemon of their own base Speed; everyone else puts nothing in Speed.
+        bool benchmark = !slow && (IsOffensiveRole(role) || role == CompetitiveRole.BulkyLead);
+        bool creep = !slow && !benchmark && !defensiveSpread;
+        var w = Weights;
+        int target = benchmark
+            ? CompetitiveMath.Stat(CompetitiveMath.SPE, w.SpeedBenchmarkBase, w.SpeedBenchmarkIv, w.SpeedBenchmarkEv, level, w.SpeedBenchmarkNaturePercent)
+            : creep ? CompetitiveMath.Stat(CompetitiveMath.SPE, spe, 31, 0, level, 100) : 0;
 
-            case CompetitiveRole.BulkyLead:
-                // Bulky lead: 252 HP / 252 Spe / 4 lower def
-                evs[EV_HP] = 252; evs[EV_SPE] = 252;
-                evs[def <= spd ? EV_DEF : EV_SPD] = 4;
-                nature = (physicalSet) ? Jolly : Timid;
-                break;
+        var goal = !defensiveSpread ? BulkGoal.Mixed : def >= spd ? BulkGoal.Physical : BulkGoal.Special;
+        int attackStat = physicalSet ? CompetitiveMath.ATK : CompetitiveMath.SPA;
+        // A set with no attacks lowers Atk, matching BuildIvs (Foul Play, confusion damage).
+        int unusedAttack = physCount + specCount == 0 || !physicalSet ? CompetitiveMath.ATK : CompetitiveMath.SPA;
+        int[] ivs = [31, 31, 31, 31, 31, slow ? 0 : 31];
 
-            // --- TANKY / BULKY OFFENSIVE (Manifesto lines 743-745) ---
-            case CompetitiveRole.TankySweeper:
-            case CompetitiveRole.TankyCleaner:
-            case CompetitiveRole.BulkyAttacker:
-                evs[EV_HP] = 252;
-                if (physicalSet)
-                {
-                    evs[EV_ATK] = 252; evs[EV_SPE] = 4;
-                    nature = Adamant;
-                }
-                else
-                {
-                    evs[EV_SPA] = 252; evs[EV_SPE] = 4;
-                    nature = Modest;
-                }
-                break;
+        // Stealth Rock takes 1/4 of a 2x Rock-weak Pokemon's HP and 1/2 of a 4x one's; an HP stat it
+        // doesn't divide evenly survives one more entry.
+        float rockWeakness = TypeEffectivenessChart.GetEffectiveness(PokemonTypes.Rock, pi.Types);
+        int hazardModulus = rockWeakness >= 4f ? 2 : rockWeakness >= 2f ? 4 : 0;
 
-            case CompetitiveRole.BulkySweeper:
-                evs[EV_HP] = 252;
-                if (physicalSet)
-                {
-                    evs[EV_SPE] = 252; evs[EV_ATK] = 4;
-                    nature = Jolly;
-                }
-                else
-                {
-                    evs[EV_SPE] = 252; evs[EV_SPA] = 4;
-                    nature = Timid;
-                }
-                break;
-
-            // --- BULKY PIVOT / UTILITY ---
-            case CompetitiveRole.BulkyPivot:
-            case CompetitiveRole.BulkyUtility:
-                evs[EV_HP] = 252;
-                if (def >= spd) // Physically defensive pivot
-                {
-                    evs[EV_DEF] = 252;
-                    evs[spd >= spe ? EV_SPD : EV_SPE] = 4;
-                    nature = (physicalSet) ? Impish : Bold;
-                }
-                else // Specially defensive pivot
-                {
-                    evs[EV_SPD] = 252;
-                    evs[def >= spe ? EV_DEF : EV_SPE] = 4;
-                    nature = (physicalSet) ? Careful : Calm;
-                }
-                break;
-
-            // --- DEFENSIVE (Manifesto lines 748-750) ---
-            case CompetitiveRole.DefensiveWall:
-            case CompetitiveRole.DefensivePivot:
-                evs[EV_HP] = 252;
-                if (def >= spd) // Physically Defensive
-                {
-                    evs[EV_DEF] = 252;
-                    evs[spd >= spe ? EV_SPD : EV_SPE] = 4;
-                    nature = (physicalSet) ? Impish : Bold;
-                }
-                else // Specially Defensive
-                {
-                    evs[EV_SPD] = 252;
-                    evs[def >= spe ? EV_DEF : EV_SPE] = 4;
-                    nature = (physicalSet) ? Careful : Calm;
-                }
-                break;
-
-            default:
-                evs[EV_HP] = 252;
-                if (physicalSet) { evs[EV_ATK] = 252; evs[EV_SPE] = 4; nature = Adamant; }
-                else { evs[EV_SPA] = 252; evs[EV_SPE] = 4; nature = Modest; }
-                break;
-        }
-
-        return (evs, nature);
+        return CompetitiveMath.OptimizeSpread(new SpreadRequest(
+            CompetitiveMath.ToEvOrder(pi.Stats), ivs, level,
+            fillAttack ? attackStat : -1, unusedAttack, target, slow, goal,
+            HazardHpModulus: hazardModulus,
+            DenyDownloadSpA: benchmark && fillAttack && def >= spd,
+            SpeedCreep: creep));
     }
 
-    // Places 4 remaining EVs: HP if odd, else lower defense stat
-    private static void Assign4EVRemainder(int[] evs, int hp, int def, int spd)
+    /// <summary>
+    /// Generates optimal competitive IVs dynamically based on moves, role, and speed stat:
+    /// - 0 Spe IV for Trick Room, Gyro Ball users (Spe <= 80), or slow bulky pivots (Spe <= 65)
+    /// - 0 Atk IV for pure special attackers or defensive walls with 0 physical attacks (mitigates Foul Play, confusion self-damage, Strength Sap)
+    /// - 31 (or random when fullIvs is false) for remaining stats.
+    /// Format matches TrainerPoke7.IVs: [HP, Atk, Def, SpA, SpD, Spe]
+    /// </summary>
+    public int[] BuildIvs(PersonalInfo pi, CompetitiveRole role, int[] moves, bool isTrickRoom = false, string[] moveNames = null, bool fullIvs = true)
     {
-        if (hp % 2 == 1) evs[EV_HP] = 4;
-        else if (def <= spd) evs[EV_DEF] = 4;
-        else evs[EV_SPD] = 4;
+        int[] ivs = fullIvs
+            ? [31, 31, 31, 31, 31, 31]
+            : [Rnd.Next(32), Rnd.Next(32), Rnd.Next(32), Rnd.Next(32), Rnd.Next(32), Rnd.Next(32)];
+
+        var allMoveNames = moveNames ?? GetMoveNames();
+        bool hasGyroBall = false;
+        bool hasPivotMove = false;
+        if (moves != null && allMoveNames != null && allMoveNames.Length > 0)
+        {
+            foreach (int m in moves)
+            {
+                if (m <= 0 || m >= allMoveNames.Length) continue;
+                string mName = allMoveNames[m];
+                if (GameNameComparer.Instance.Equals(mName, "Gyro Ball"))
+                    hasGyroBall = true;
+                if (CompetitiveDatabase.PivotMoves.Contains(mName))
+                    hasPivotMove = true;
+            }
+        }
+
+        int spe = pi?.Stats != null ? pi.Stats[SPE] : 100;
+        bool isSlowBulkyPivot = (role is CompetitiveRole.BulkyPivot or CompetitiveRole.DefensivePivot ||
+                                 IsDefensiveRole(role) || IsBulkyRole(role)) &&
+                                hasPivotMove && spe <= 65;
+
+        // Trick Room teams, slow Gyro Ball users, and slow bulky pivots need 0 Speed IV
+        if (isTrickRoom || (hasGyroBall && spe <= 80) || isSlowBulkyPivot)
+            ivs[5] = 0;
+
+        // Pure special or status attackers (0 physical attacks): 0 Atk IV to minimize Foul Play damage & confusion
+        var (physAttacks, _) = CountAttackCategories(moves);
+        if (physAttacks == 0)
+            ivs[1] = 0;
+
+        return ivs;
+    }
+
+    /// <summary>
+    /// Dynamically adapts a team role to match the Pokemon's actual base stat distribution.
+    /// Prevents high-offense titans or Megas from being trapped in 0-offense defensive roles,
+    /// and prevents frail Pokemon from being assigned wall/tank roles.
+    /// </summary>
+    public static CompetitiveRole AdaptRoleForPokemon(PersonalInfo pi, CompetitiveRole baseRole, bool isMega = false)
+    {
+        if (pi?.Stats == null) return baseRole;
+        int hp = pi.Stats[HP], atk = pi.Stats[ATK], def = pi.Stats[DEF];
+        int spe = pi.Stats[SPE], spa = pi.Stats[SPA], spd = pi.Stats[SPD];
+        int maxOffense = Math.Max(atk, spa);
+        int bulk = hp + def + spd;
+
+        // 1. Offensive Titans (Max Atk or SpA >= 130, or holding offensive Mega):
+        // Relegate away from purely passive defensive wall roles into bulky sweeper or breaker
+        if ((maxOffense >= 130 || isMega) && baseRole is CompetitiveRole.DefensiveWall or CompetitiveRole.DefensivePivot)
+        {
+            return bulk >= 240 ? CompetitiveRole.BulkySweeper : CompetitiveRole.OffensiveSweeper;
+        }
+
+        // 2. Frail Pokemon (Bulk <= 200, e.g. Deoxys, Pheromosa, Sharpedo):
+        // Never allow frail Pokemon to be assigned defensive or bulky utility roles
+        if (bulk <= 200 && (baseRole is CompetitiveRole.DefensiveWall or CompetitiveRole.DefensivePivot or CompetitiveRole.BulkyUtility or CompetitiveRole.BulkyLead))
+        {
+            return (spe >= 90) ? CompetitiveRole.OffensiveSweeper : CompetitiveRole.OffensiveBreaker;
+        }
+
+        return baseRole;
     }
 
     public ushort AssignItem(
@@ -361,12 +296,13 @@ public class CompetitiveBuildEngine
         string[] itemNames, string[] moveNames, Move[] moveData,
         ref bool assignedMega, ref bool assignedZCrystal,
         TeamArchetype archetype = TeamArchetype.Balance,
-        List<string> teamAbilities = null)
+        List<string> teamAbilities = null,
+        bool isDoubles = false)
     {
         ushort GetItemId(string name)
         {
             if (itemNames == null || itemNames.Length == 0 || string.IsNullOrEmpty(name)) return 0;
-            int idx = Array.FindIndex(itemNames, z => z.Equals(name, StringComparison.OrdinalIgnoreCase));
+            int idx = Array.FindIndex(itemNames, z => GameNameComparer.Instance.Equals(z, name));
             return idx > 0 ? (ushort)idx : (ushort)0;
         }
 
@@ -402,12 +338,19 @@ public class CompetitiveBuildEngine
         // === 0. MEGA STONE (max 1 per team) ===
         if (!assignedMega && species > 0)
         {
-            ushort megaItem = TryAssignMegaStone(species, itemNames, ref assignedMega);
+            ushort megaItem = TryAssignMegaStone(species, itemNames, ref assignedMega, pi);
             if (megaItem > 0) return megaItem;
         }
 
         // === 0b. Z-CRYSTAL (max 1 per team, Gen 7) ===
-        if (!assignedZCrystal && species > 0 && Config != null && Config.Generation == 7 && IsOffensiveRole(role))
+        bool abilityBlocksZCrystal =
+            abilityName.Equals("Unburden", StringComparison.OrdinalIgnoreCase) ||
+            abilityName.Equals("Poison Heal", StringComparison.OrdinalIgnoreCase) ||
+            abilityName.Equals("Toxic Boost", StringComparison.OrdinalIgnoreCase) ||
+            abilityName.Equals("Guts", StringComparison.OrdinalIgnoreCase) ||
+            abilityName.Equals("Flare Boost", StringComparison.OrdinalIgnoreCase);
+
+        if (!assignedZCrystal && !abilityBlocksZCrystal && species > 0 && Config != null && Config.Generation == 7 && IsOffensiveRole(role))
         {
             ushort zItem = TryAssignZCrystal(species, pi, moves, itemNames, moveNames, moveData, ref assignedZCrystal);
             if (zItem > 0) return zItem;
@@ -456,9 +399,13 @@ public class CompetitiveBuildEngine
             return ReturnItem("Starf Berry", "Sitrus Berry");
         }
 
-        // Magic Guard + offensive -> Focus Sash (frail) or Life Orb
-        if (abilityName.Equals("Magic Guard", StringComparison.OrdinalIgnoreCase) && IsOffensiveRole(role))
-            return ReturnItem(def + spd < 140 ? "Focus Sash" : "Life Orb");
+        // Life Orb synergy: Magic Guard and Sheer Force attackers take 0 recoil damage (Smogon staple)
+        if (IsOffensiveRole(role) && !string.IsNullOrEmpty(abilityName) && CompetitiveDatabase.LifeOrbSynergyAbilities.Contains(abilityName))
+            return ReturnItem(IsFrail(pi) && abilityName.Equals("Magic Guard", StringComparison.OrdinalIgnoreCase) ? "Focus Sash" : "Life Orb");
+
+        // Contact damage punishment: Rough Skin and Iron Barbs -> Rocky Helmet
+        if (!string.IsNullOrEmpty(abilityName) && (abilityName.Equals("Rough Skin", StringComparison.OrdinalIgnoreCase) || abilityName.Equals("Iron Barbs", StringComparison.OrdinalIgnoreCase)))
+            return ReturnItem("Rocky Helmet", (pi.Types != null && Array.IndexOf(pi.Types, PokemonTypes.Poison) >= 0) ? "Black Sludge" : "Leftovers");
 
         // Moody -> Leftovers (manifesto: Substitute + Protect moveset)
         if (abilityName.Equals("Moody", StringComparison.OrdinalIgnoreCase))
@@ -506,21 +453,90 @@ public class CompetitiveBuildEngine
                     return ReturnItem("Misty Seed", "Air Balloon");
             }
             // Fallback consumable
-            if (def + spd < 140) return ReturnItem("Focus Sash");
+            if (IsFrail(pi)) return ReturnItem("Focus Sash");
             if (currentMoveNames.Overlaps(CompetitiveDatabase.StatDropMoves)) return ReturnItem("White Herb");
             if (currentMoveNames.Overlaps(CompetitiveDatabase.TwoTurnMoves)) return ReturnItem("Power Herb");
             return ReturnItem("Air Balloon");
         }
 
-        // === 4. MOVE-SPECIFIC ITEMS ===
+        // === 4. MOVE-SPECIFIC & PATCH ITEMS ===
 
-        // Loaded Dice
+        // Doubles: Redirection -> Safety Goggles (immune to Spore/Sleep Powder and weather chip)
+        if (isDoubles && currentMoveNames.Overlaps(CompetitiveDatabase.RedirectionMoves) && HasItem("Safety Goggles"))
+            return ReturnItem("Safety Goggles", "Sitrus Berry");
+
+        // Trick Room Setter / Disruptor -> Mental Herb (prevents Taunt shutdown)
+        if (currentMoveNames.Contains("Trick Room") && HasItem("Mental Herb") && (archetype == TeamArchetype.TrickRoom || isDoubles))
+            return ReturnItem("Mental Herb", "Focus Sash");
+
+        // Weakness Policy: strictly for bulky offensive sweepers/attackers with direct attacking moves and >= 2 weaknesses
+        if (HasItem("Weakness Policy") &&
+            (role is CompetitiveRole.BulkySweeper or CompetitiveRole.TankySweeper or CompetitiveRole.BulkyAttacker or CompetitiveRole.OffensiveSweeper) &&
+            (CompetitiveDatabase.WeaknessPolicyAbilities.Contains(abilityName) || (hp + def + spd >= 210)))
+        {
+            int weaknessCount = 0;
+            if (pi.Types != null)
+            {
+                for (int t = 0; t < 18; t++)
+                {
+                    if (TypeEffectivenessChart.GetEffectiveness(t, pi.Types) > 1.0f)
+                        weaknessCount++;
+                }
+            }
+
+            int investedCat = isPhysical ? 1 : 2;
+            int directAttacks = moves?.Count(m => m > 0 && m < (moveData?.Length ?? 0) &&
+                                                  moveData[m].Category == investedCat &&
+                                                  moveData[m].Power > 0 &&
+                                                  !CompetitiveDatabase.FixedDamageMoves.Contains(moveNames[m]) &&
+                                                  !moveNames[m].Equals("Foul Play", StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+            if (weaknessCount >= 2 && directAttacks >= 2 && Rnd.Next(100) < (isDoubles ? 60 : 35))
+                return ReturnItem("Weakness Policy", "Life Orb");
+        }
+
+        // Punching Glove (Gen 9)
+        if (currentMoveNames.Overlaps(CompetitiveDatabase.PunchingMoves) && isPhysical && HasItem("Punching Glove"))
+            return ReturnItem("Punching Glove");
+
+        // Throat Spray (Gen 8)
+        if (currentMoveNames.Overlaps(CompetitiveDatabase.SoundMoves) && !isPhysical && HasItem("Throat Spray"))
+            return ReturnItem("Throat Spray");
+
+        // Loaded Dice (Gen 9)
         if (currentMoveNames.Overlaps(CompetitiveDatabase.MultiHitMoves) && HasItem("Loaded Dice"))
             return ReturnItem("Loaded Dice");
 
         // Power Herb
         if (currentMoveNames.Overlaps(CompetitiveDatabase.TwoTurnMoves))
             return ReturnItem("Power Herb");
+
+        // Clear Amulet (Gen 9)
+        if (isPhysical && (currentMoveNames.Overlaps(CompetitiveDatabase.AtkSetupMoves) || role == CompetitiveRole.OffensiveBreaker) && HasItem("Clear Amulet") && Rnd.Next(100) < 35)
+            return ReturnItem("Clear Amulet");
+
+        // Covert Cloak (Gen 9)
+        if ((IsDefensiveRole(role) || IsBulkyRole(role)) && HasItem("Covert Cloak") && Rnd.Next(100) < 25)
+            return ReturnItem("Covert Cloak");
+
+        // Eject Pack (Gen 8)
+        if (currentMoveNames.Overlaps(CompetitiveDatabase.StatDropMoves) && (role == CompetitiveRole.OffensivePivot || role == CompetitiveRole.BulkyPivot || role == CompetitiveRole.OffensiveLead) && HasItem("Eject Pack"))
+            return ReturnItem("Eject Pack");
+
+        // Blunder Policy (Gen 8)
+        bool hasLowAccMove = moves != null && moveData != null && moves.Any(m => m > 0 && m < moveData.Length && moveData[m].Accuracy > 0 && moveData[m].Accuracy < 90);
+        if (hasLowAccMove && IsOffensiveRole(role) && HasItem("Blunder Policy") && Rnd.Next(100) < 30)
+            return ReturnItem("Blunder Policy");
+
+        // Stealth Rock weakness -> Heavy-Duty Boots (Gen 8)
+        float rockWeakness = 1f;
+        if (pi.Types != null)
+        {
+            foreach (int t in pi.Types)
+                rockWeakness *= TypeEffectivenessChart.GetEffectiveness(PokemonTypes.Rock, t);
+        }
+        if (rockWeakness >= 2f && HasItem("Heavy-Duty Boots") && Rnd.Next(100) < 65)
+            return ReturnItem("Heavy-Duty Boots");
 
         // === 5. MEGA STONE (max 1 per team) ===
         if (!assignedMega && pi is PersonalInfo megaPi)
@@ -529,23 +545,72 @@ public class CompetitiveBuildEngine
             // Species ID isn't directly available from PersonalInfo; handled by caller
         }
 
+        // Belly Drum -> Sitrus Berry (recovers 25% immediately after 50% HP deduction)
+        if (currentMoveNames.Contains("Belly Drum") && HasItem("Sitrus Berry"))
+            return ReturnItem("Sitrus Berry");
+
+        // 4x / 2x Fatal Weakness Neutralization via Type-Resist Berries:
+        // Dynamically evaluate all 18 attacking types against pi.Types using TypeEffectivenessChart.
+        // Setup sweepers, offensive breakers, and bulky attackers have a ~45% chance to run the resist berry.
+        if (pi.Types != null && (currentMoveNames.Overlaps(CompetitiveDatabase.SetupMoves) || IsOffensiveRole(role) || role == CompetitiveRole.BulkyAttacker))
+        {
+            int fatalAtkType = -1;
+            float maxWeakness = 1.0f;
+            for (int t = 0; t <= 17; t++)
+            {
+                float eff = TypeEffectivenessChart.GetEffectiveness(t, pi.Types);
+                if (eff > maxWeakness)
+                {
+                    maxWeakness = eff;
+                    fatalAtkType = t;
+                }
+            }
+            if (maxWeakness >= 4.0f && fatalAtkType >= 0 && CompetitiveDatabase.TypeToResistBerry.TryGetValue(fatalAtkType, out string resistBerry) && HasItem(resistBerry) && Rnd.Next(100) < 45)
+            {
+                return ReturnItem(resistBerry);
+            }
+        }
+
+        // Doubles: bulky attackers / support with high composite bulk -> Sitrus Berry
+        if (isDoubles && (hp + def + spd >= 210) && (role == CompetitiveRole.BulkyAttacker || role == CompetitiveRole.BulkyUtility) && HasItem("Sitrus Berry") && Rnd.Next(100) < 35)
+            return ReturnItem("Sitrus Berry");
+
+        string defaultDefensiveItem = (pi.Types != null && Array.IndexOf(pi.Types, PokemonTypes.Poison) >= 0) ? "Black Sludge" : "Leftovers";
+
+        // Eviolite for non-final stage defensive/bulky Pokemon
+        if (species > 0 && Legal.CanSpeciesEvolve(species, Config) &&
+            (IsDefensiveRole(role) || IsBulkyRole(role) || role == CompetitiveRole.BulkyLead))
+        {
+            return ReturnItem("Eviolite", defaultDefensiveItem);
+        }
+
+
+        // Strict competitive viability checks for Choice and Assault Vest items
+        bool hasProtect = currentMoveNames.Overlaps(CompetitiveDatabase.ProtectMoves);
+        bool hasSetup = currentMoveNames.Overlaps(CompetitiveDatabase.SetupMoves);
+        bool hasRecovery = currentMoveNames.Overlaps(CompetitiveDatabase.RecoveryMoves);
+        bool canUseChoice = !hasProtect && !hasSetup && !hasRecovery && (statusCount == 0 || currentMoveNames.Contains("Trick") || currentMoveNames.Contains("Switcheroo"));
+        bool canUseAssaultVest = statusCount == 0 && !hasProtect;
+
         // === 6. ROLE-BASED ITEMS ===
         switch (role)
         {
             case CompetitiveRole.OffensiveLead:
-                return ReturnItem(def + spd < 140 ? "Focus Sash" : "Heavy-Duty Boots");
+                return ReturnItem(IsFrail(pi) ? "Focus Sash" : "Heavy-Duty Boots");
 
             case CompetitiveRole.BulkyLead:
-                if (currentMoveNames.Overlaps(CompetitiveDatabase.HazardMoves))
+                if (currentMoveNames.Contains("Trick Room"))
+                    return ReturnItem("Mental Herb", "Focus Sash");
+                if (currentMoveNames.Overlaps(CompetitiveDatabase.HazardMoves) && Rnd.Next(100) < 25)
                     return ReturnItem("Mental Herb");
-                return ReturnItem("Heavy-Duty Boots");
+                return ReturnItem("Heavy-Duty Boots", defaultDefensiveItem);
 
             case CompetitiveRole.OffensiveSweeper:
             case CompetitiveRole.OffensiveBreaker:
                 if (statusCount == 0 && physCount + specCount == 4)
                 {
-                    // All attacks: Assault Vest viable for special bulk, or offensive item
-                    if (isPhysical) return ReturnItem("Choice Band");
+                    // All attacks: Choice item viable only if eligible
+                    if (canUseChoice && isPhysical) return ReturnItem("Choice Band");
                     return ReturnItem("Life Orb");
                 }
                 if (currentMoveNames.Overlaps(CompetitiveDatabase.SetupMoves))
@@ -560,48 +625,52 @@ public class CompetitiveBuildEngine
                 return ReturnItem("Life Orb");
 
             case CompetitiveRole.SpeedControl:
-                return ReturnItem("Choice Scarf");
+                if (canUseChoice && (statusCount == 0 || currentMoveNames.Contains("Trick") || currentMoveNames.Contains("Switcheroo")))
+                    return ReturnItem("Choice Scarf");
+                return ReturnItem("Focus Sash", "Life Orb");
 
             case CompetitiveRole.OffensivePivot:
                 if (physCount + specCount >= 3) return ReturnItem("Expert Belt");
-                return ReturnItem("Heavy-Duty Boots");
+                return ReturnItem("Heavy-Duty Boots", "Life Orb");
 
             case CompetitiveRole.OffensiveUtility:
                 if (physCount + specCount >= 3) return ReturnItem("Life Orb");
-                return ReturnItem("Heavy-Duty Boots");
+                return ReturnItem("Heavy-Duty Boots", "Life Orb");
 
             case CompetitiveRole.TankySweeper:
             case CompetitiveRole.TankyCleaner:
                 if (currentMoveNames.Overlaps(CompetitiveDatabase.SetupMoves))
-                    return ReturnItem("Leftovers");
-                return ReturnItem(isPhysical ? "Choice Band" : "Choice Specs");
+                    return ReturnItem(defaultDefensiveItem);
+                if (canUseChoice)
+                    return ReturnItem(isPhysical ? "Choice Band" : "Choice Specs");
+                return ReturnItem(defaultDefensiveItem);
 
             case CompetitiveRole.BulkyAttacker:
-                if (statusCount == 0) return ReturnItem("Assault Vest");
-                return ReturnItem("Leftovers");
+                if (canUseAssaultVest) return ReturnItem("Assault Vest");
+                return ReturnItem(defaultDefensiveItem);
 
             case CompetitiveRole.BulkySweeper:
-                return ReturnItem("Leftovers");
+                return ReturnItem(defaultDefensiveItem);
 
             case CompetitiveRole.BulkyPivot:
             case CompetitiveRole.BulkyUtility:
                 // Check for Stealth Rock weakness -> Heavy-Duty Boots
-                if (Rnd.Next(100) < 30) return ReturnItem("Heavy-Duty Boots");
-                return ReturnItem("Leftovers");
+                if (Rnd.Next(100) < 30) return ReturnItem("Heavy-Duty Boots", defaultDefensiveItem);
+                return ReturnItem(defaultDefensiveItem);
 
             case CompetitiveRole.DefensiveWall:
             case CompetitiveRole.DefensivePivot:
-                if (hp + def > 160 && Rnd.Next(100) < 40)
+                if (hp + Math.Max(def, spd) > 160 && Rnd.Next(100) < 40)
                     return ReturnItem("Rocky Helmet");
-                return ReturnItem("Leftovers");
+                return ReturnItem(defaultDefensiveItem);
 
             default:
-                return ReturnItem(hp + def > 150 ? "Leftovers" : "Life Orb");
+                return ReturnItem(hp + Math.Max(def, spd) > 150 ? defaultDefensiveItem : "Life Orb");
         }
     }
 
     // Mega Stone assignment as a separate pass (called by the team builder)
-    public ushort TryAssignMegaStone(int species, string[] itemNames, ref bool assignedMega)
+    public ushort TryAssignMegaStone(int species, string[] itemNames, ref bool assignedMega, PersonalInfo pi = null)
     {
         if (assignedMega) return 0;
         if (!CompetitiveDatabase.MegaStoneMap.TryGetValue(species, out var stones)) return 0;
@@ -609,12 +678,25 @@ public class CompetitiveBuildEngine
         ushort GetItemId(string name)
         {
             if (itemNames == null || itemNames.Length == 0) return 0;
-            int idx = Array.FindIndex(itemNames, z => z.Equals(name, StringComparison.OrdinalIgnoreCase));
+            int idx = Array.FindIndex(itemNames, z => GameNameComparer.Instance.Equals(z, name));
             return idx > 0 ? (ushort)idx : (ushort)0;
         }
 
-        // Pick a random valid Mega Stone for this species
-        foreach (var stone in stones)
+        // For dual Mega species (Charizard, Mewtwo), pick X for physical bias, Y for special bias
+        string[] candidateStones;
+        if (stones.Length > 1 && pi?.Stats != null)
+        {
+            bool wantsPhysical = pi.Stats[ATK] > pi.Stats[SPA];
+            candidateStones = wantsPhysical
+                ? stones.OrderByDescending(s => s.EndsWith(" X", StringComparison.OrdinalIgnoreCase)).ToArray()
+                : stones.OrderByDescending(s => s.EndsWith(" Y", StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
+        else
+        {
+            candidateStones = stones.Length > 1 ? stones.OrderBy(_ => Util.Rand.Next()).ToArray() : stones;
+        }
+
+        foreach (var stone in candidateStones)
         {
             ushort id = GetItemId(stone);
             if (id > 0)
@@ -634,7 +716,7 @@ public class CompetitiveBuildEngine
         ushort GetItemId(string name)
         {
             if (itemNames == null || itemNames.Length == 0) return 0;
-            int idx = Array.FindIndex(itemNames, z => z.Equals(name, StringComparison.OrdinalIgnoreCase));
+            int idx = Array.FindIndex(itemNames, z => GameNameComparer.Instance.Equals(z, name));
             return idx > 0 ? (ushort)idx : (ushort)0;
         }
 
@@ -687,30 +769,44 @@ public class CompetitiveBuildEngine
         int species, CompetitiveRole role, PersonalInfo pi,
         MoveRandomizer fallbackMoveRand, string abilityName = "",
         TeamArchetype archetype = TeamArchetype.Balance,
-        Move[] moveData = null, List<string> teamAbilities = null)
+        Move[] moveData = null, List<string> teamAbilities = null,
+        bool isDoubles = false,
+        string[] moveNames = null,
+        int level = 100)
     {
-        var legal = LearnsetAggregator.GetLegalMoves(species);
+        if (moveNames == null || moveNames.Length == 0)
+            moveNames = Config?.GetText(TextName.MoveNames) ?? Array.Empty<string>();
+
+        var legal = LearnsetAggregator?.GetLegalMoves(species) ?? new HashSet<int>();
         if (legal.Count < 4)
         {
-            var broadMoveNames = Config?.GetText(TextName.MoveNames);
+            var broadMoveNames = moveNames.Length > 0 ? moveNames : Config?.GetText(TextName.MoveNames);
             var broadMoveData = moveData ?? Config?.Moves;
-            if (Config != null && broadMoveNames != null && broadMoveData != null)
+            if (broadMoveData != null)
             {
-                legal = Enumerable.Range(1, Math.Min(Config.Info.MaxMoveID, Math.Min(broadMoveNames.Length, broadMoveData.Length) - 1))
-                    .Where(m => !string.IsNullOrEmpty(broadMoveNames[m]) && broadMoveNames[m] != "—" && broadMoveNames[m] != "———" &&
-                                !Legal.Z_Moves.Contains(m) && broadMoveData[m].PP != 1)
+                int maxId = Config?.Info != null ? Config.Info.MaxMoveID : (broadMoveData.Length - 1);
+                int limit = broadMoveNames != null ? Math.Min(maxId, Math.Min(broadMoveNames.Length, broadMoveData.Length) - 1) : Math.Min(maxId, broadMoveData.Length - 1);
+                legal = Enumerable.Range(1, Math.Max(0, limit))
+                    .Where(m => (broadMoveNames == null ? !Legal.Z_Moves.Contains(m) : Legal.IsUsableMove(m, broadMoveNames)) &&
+                                broadMoveData[m].PP != 1)
                     .ToHashSet();
             }
             if (legal.Count < 4)
                 return fallbackMoveRand?.GetRandomMoveset(species) ?? new int[4];
         }
 
-        string[] moveNames = Config?.GetText(TextName.MoveNames) ?? Array.Empty<string>();
         if (moveData == null) moveData = Config?.Moves;
         int[] types = pi?.Types ?? new int[0];
         int spa = pi != null ? pi.Stats[SPA] : 0;
 
         var pool = legal.ToList();
+
+        // In Singles battles, strictly purge all doubles-only moves (Wide Guard, Quick Guard, Redirection, Helping Hand)
+        if (!isDoubles && moveNames.Length > 0)
+        {
+            pool.RemoveAll(m => m > 0 && m < moveNames.Length && CompetitiveDatabase.DoublesOnlyMoves.Contains(moveNames[m]));
+        }
+
         var selected = new List<int>();
         bool isPhysicalAttacker = pi != null && pi.Stats[ATK] >= spa;
 
@@ -720,19 +816,89 @@ public class CompetitiveBuildEngine
         int weakStat = pi != null ? Math.Min(pi.Stats[ATK], spa) : 0;
         bool statGapDecisive = pi != null && weakStat * 4 < strongStat * 3;
 
+        // Spec §2's S is the final attacking stat from §1. Moves come first, so it's read from a
+        // provisional spread built without them (Trick Room is known; Gyro Ball and pivots aren't yet).
+        double physStat = 1, specStat = 1;
+        if (pi != null)
+        {
+            var (provEvs, provNature) = BuildEVsAndNature(pi, role, null, archetype == TeamArchetype.TrickRoom, moveNames, level);
+            int[] evBase = CompetitiveMath.ToEvOrder(pi.Stats);
+            physStat = CompetitiveMath.Stat(CompetitiveMath.ATK, evBase[CompetitiveMath.ATK], 31, provEvs[CompetitiveMath.ATK], level, CompetitiveMath.NaturePercent(provNature, CompetitiveMath.ATK));
+            specStat = CompetitiveMath.Stat(CompetitiveMath.SPA, evBase[CompetitiveMath.SPA], 31, provEvs[CompetitiveMath.SPA], level, CompetitiveMath.NaturePercent(provNature, CompetitiveMath.SPA));
+        }
+        bool adaptability = GameNameComparer.Instance.Equals(abilityName, "Adaptability");
+
+        double ScoreMove(int m)
+        {
+            if (moveData == null || m <= 0 || m >= moveData.Length) return 1;
+            var md = moveData[m];
+            string name = m < moveNames.Length ? moveNames[m] ?? "" : "";
+            double weight = CompetitiveDatabase.CompetitiveMoves.Contains(name) ? Weights.ShouldWeight
+                          : CompetitiveDatabase.SituationalMoves.Contains(name) ? Weights.WeakShouldWeight : 1;
+            if (md.Category == 0) return CompetitiveMath.StatusScore(Math.Max(physStat, specStat), weight, Weights);
+            if (CompetitiveDatabase.WeakPriorityAttacks.Contains(name)) weight *= Weights.WeakPriorityFactor;
+            if (isDoubles && CompetitiveDatabase.DoublesSpreadMoves.Contains(name)) weight *= Weights.SpreadMoveFactor;
+
+            double damage = CompetitiveMath.ExpectedDamage(md.Power, md.Accuracy, md.HitMin, md.HitMax,
+                Array.IndexOf(types, md.Type) >= 0, adaptability, md.Category == 1 ? physStat : specStat,
+                NeedsChargeTurn(name, abilityName, teamAbilities), Weights);
+            var setTypes = selected.Where(s => s > 0 && s < moveData.Length && moveData[s].Category != 0)
+                                   .Select(s => moveData[s].Type).ToList();
+            return CompetitiveMath.Score(damage, CompetitiveMath.CoverageGain(md.Type, setTypes, Weights), weight, Weights);
+        }
+        bool Banned(int m) => m > 0 && m < moveNames.Length && IsBannedMove(moveNames[m], pi, selected, pool, moveNames);
+
+        void TryAddFakeOut()
+        {
+            if (selected.Count >= 4 || moveNames.Length == 0) return;
+            int fakeOutId = pool.FirstOrDefault(m => m > 0 && m < moveNames.Length && moveNames[m].Equals("Fake Out", StringComparison.OrdinalIgnoreCase));
+            if (fakeOutId > 0 && Rnd.Next(100) < 75)
+            {
+                selected.Add(fakeOutId);
+                pool.Remove(fakeOutId);
+            }
+        }
+
+        void TryAdd(string moveName)
+        {
+            if (selected.Count >= 4 || moveNames.Length == 0 || string.IsNullOrEmpty(moveName)) return;
+            int moveId = pool.FirstOrDefault(m => m > 0 && m < moveNames.Length && GameNameComparer.Instance.Equals(moveNames[m], moveName));
+            if (moveId > 0 && !selected.Contains(moveId))
+            {
+                selected.Add(moveId);
+                pool.Remove(moveId);
+            }
+        }
+
         // Helper: Try to add moves from a named category, prioritizing STAB
         void TryAddCategory(HashSet<string> categorySet, int maxAdd = 1, bool preferSTAB = false)
         {
             if (moveNames.Length == 0) return;
 
             // Sort pool: STAB first if preferred
-            var candidates = new List<(int id, bool isStab, bool matchesCat, int power)>();
+            var candidates = new List<(int id, bool isStab, bool matchesCat, int power, int hazardWeight)>();
             foreach (int moveId in pool)
             {
                 if (moveId <= 0 || moveId >= moveNames.Length) continue;
                 string name = moveNames[moveId];
                 if (string.IsNullOrEmpty(name) || !categorySet.Contains(name)) continue;
                 if (selected.Contains(moveId)) continue;
+
+                // Ban Sticky Web on Stall, Semi-Stall, and Trick Room archetypes
+                if (categorySet == CompetitiveDatabase.HazardMoves && name.Equals("Sticky Web", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (archetype is TeamArchetype.Stall or TeamArchetype.SemiStall or TeamArchetype.TrickRoom)
+                        continue;
+                }
+
+                if (IsBannedMove(name, pi, selected, pool, moveNames)) continue;
+
+                // For Special Attackers, do not give physical U-turn unless Bug STAB with adequate Attack
+                if (categorySet == CompetitiveDatabase.PivotMoves && name.Equals("U-turn", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!isPhysicalAttacker && !(types != null && types.Contains(PokemonTypes.Bug) && pi.Stats[ATK] >= 80))
+                        continue;
+                }
 
                 bool isStab = false;
                 bool matchesCat = true; // status moves (Category == 0) have no phys/spec mismatch to worry about
@@ -746,13 +912,26 @@ public class CompetitiveBuildEngine
                         matchesCat = (isPhysicalAttacker && md.Category == 1) || (!isPhysicalAttacker && md.Category == 2);
                 }
 
-                if (statGapDecisive && !matchesCat) continue;
+                // Enforce category: attacks must match physical/special specialization
+                if (!matchesCat) continue;
 
-                candidates.Add((moveId, isStab, matchesCat, power));
+                int hazardWeight = 0;
+                if (categorySet == CompetitiveDatabase.HazardMoves)
+                {
+                    if (name.Equals("Stealth Rock", StringComparison.OrdinalIgnoreCase)) hazardWeight = 1000;
+                    else if (name.Equals("Toxic Spikes", StringComparison.OrdinalIgnoreCase)) hazardWeight = 950;
+                    else if (name.Equals("Spikes", StringComparison.OrdinalIgnoreCase)) hazardWeight = 900;
+                    else if (name.Equals("Ceaseless Edge", StringComparison.OrdinalIgnoreCase) || name.Equals("Stone Axe", StringComparison.OrdinalIgnoreCase)) hazardWeight = 850;
+                    else if (name.Equals("Sticky Web", StringComparison.OrdinalIgnoreCase)) hazardWeight = 700;
+                }
+
+                candidates.Add((moveId, isStab, matchesCat, power, hazardWeight));
             }
 
-            // Sort: STAB first (if preferred), then category-match, then by power descending
-            if (preferSTAB)
+            // Sort: hazardWeight first if hazard category, else STAB first (if preferred), then category-match, then by power descending
+            if (categorySet == CompetitiveDatabase.HazardMoves)
+                candidates.Sort((a, b) => b.hazardWeight.CompareTo(a.hazardWeight));
+            else if (preferSTAB)
                 candidates.Sort((a, b) => a.isStab != b.isStab ? (b.isStab ? 1 : -1) :
                                            a.matchesCat != b.matchesCat ? (b.matchesCat ? 1 : -1) :
                                            b.power.CompareTo(a.power));
@@ -760,7 +939,7 @@ public class CompetitiveBuildEngine
                 candidates.Sort((a, b) => a.matchesCat != b.matchesCat ? (b.matchesCat ? 1 : -1) : b.power.CompareTo(a.power));
 
             int count = 0;
-            foreach (var (id, _, _, _) in candidates)
+            foreach (var (id, _, _, _, _) in candidates)
             {
                 if (selected.Count >= 4 || count >= maxAdd) break;
                 selected.Add(id);
@@ -779,13 +958,55 @@ public class CompetitiveBuildEngine
         switch (role)
         {
             case CompetitiveRole.OffensiveLead:
-                TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
-                if (selected.Count < 4) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                    TryAddCategory(CompetitiveDatabase.DoublesSpeedControlMoves, 1);
+                }
+                else
+                {
+                    if (archetype == TeamArchetype.HyperOffenseScreens)
+                    {
+                        TryAdd("Reflect"); TryAdd("Light Screen");
+                    }
+                    else
+                    {
+                        // Setting hazards is top priority for leads in Singles
+                        TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
+                        if (!selected.Any(m => CompetitiveDatabase.HazardMoves.Contains(moveNames[m])))
+                        {
+                            TryAddCategory(CompetitiveDatabase.UtilityStatusMoves, 1);
+                        }
+                    }
+                }
+                if (selected.Count < 4 && Rnd.Next(100) < 35) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
                 break;
 
             case CompetitiveRole.BulkyLead:
-                TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
-                if (selected.Count < 4) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                    TryAddCategory(CompetitiveDatabase.WideQuickGuardMoves, 1);
+                    TryAddCategory(CompetitiveDatabase.RedirectionMoves, 1);
+                    TryAddCategory(CompetitiveDatabase.DoublesSpeedControlMoves, 1);
+                }
+                else
+                {
+                    if (archetype == TeamArchetype.HyperOffenseScreens)
+                    {
+                        TryAdd("Reflect"); TryAdd("Light Screen");
+                    }
+                    else
+                    {
+                        // Setting hazards is top priority for leads in Singles
+                        TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
+                        if (!selected.Any(m => CompetitiveDatabase.HazardMoves.Contains(moveNames[m])))
+                        {
+                            TryAddCategory(CompetitiveDatabase.UtilityStatusMoves, 1);
+                        }
+                    }
+                }
+                if (selected.Count < 4 && Rnd.Next(100) < 35) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
                 break;
 
             case CompetitiveRole.OffensiveSweeper:
@@ -807,13 +1028,21 @@ public class CompetitiveBuildEngine
                 TryAddCategory(CompetitiveDatabase.RecoveryMoves, 1);
                 if (role == CompetitiveRole.DefensivePivot)
                     TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
-                TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
-                if (selected.Count < 4 && Rnd.Next(100) < 50)
+                // Hazards prioritized on defensive roles in Singles
+                if (!isDoubles && selected.Count < 4 && Rnd.Next(100) < 65)
+                    TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
+                if (selected.Count < 4 && Rnd.Next(100) < 60)
                     TryAddCategory(CompetitiveDatabase.UtilityStatusMoves, 1);
+                // Hazard removal is less prioritized: low probability (15%) in Singles only
+                if (!isDoubles && selected.Count < 4 && Rnd.Next(100) < 15)
+                    TryAddCategory(CompetitiveDatabase.HazardRemovalMoves, 1);
                 break;
 
             case CompetitiveRole.OffensiveBreaker:
-                // Breakers just want attacks; no special role moves
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                }
                 break;
 
             case CompetitiveRole.OffensiveCleaner:
@@ -828,22 +1057,60 @@ public class CompetitiveBuildEngine
                 break;
 
             case CompetitiveRole.SpeedControl:
-                // Choice Scarf user, just wants attacks
+                if (isDoubles)
+                {
+                    TryAddCategory(CompetitiveDatabase.DoublesSpeedControlMoves, 1);
+                    TryAddCategory(CompetitiveDatabase.WideQuickGuardMoves, 1);
+                }
                 break;
 
             case CompetitiveRole.OffensiveUtility:
-                TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
-                if (selected.Count < 4) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                    TryAddCategory(CompetitiveDatabase.DoublesSpeedControlMoves, 1);
+                }
+                else
+                {
+                    // Hazards prioritized on offensive utility in Singles
+                    if (Rnd.Next(100) < 70)
+                        TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
+                    else
+                        TryAddCategory(CompetitiveDatabase.UtilityStatusMoves, 1);
+
+                    // Hazard removal is less prioritized: low probability (15%) in Singles only
+                    if (selected.Count < 4 && Rnd.Next(100) < 15)
+                        TryAddCategory(CompetitiveDatabase.HazardRemovalMoves, 1);
+                }
+                if (selected.Count < 4 && Rnd.Next(100) < 35) TryAddCategory(CompetitiveDatabase.PivotMoves, 1);
                 break;
 
             case CompetitiveRole.BulkyUtility:
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                    TryAddCategory(CompetitiveDatabase.WideQuickGuardMoves, 1);
+                    TryAddCategory(CompetitiveDatabase.RedirectionMoves, 1);
+                }
                 TryAddCategory(CompetitiveDatabase.RecoveryMoves, 1);
-                TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
+                // Hazards prioritized on bulky utility in Singles
+                if (!isDoubles && selected.Count < 4 && Rnd.Next(100) < 65)
+                    TryAddCategory(CompetitiveDatabase.HazardMoves, 1);
                 if (selected.Count < 4 && Rnd.Next(100) < 50)
                     TryAddCategory(CompetitiveDatabase.UtilityStatusMoves, 1);
+                // Hazard removal is less prioritized: low probability (15%) in Singles only
+                if (!isDoubles && selected.Count < 4 && Rnd.Next(100) < 15)
+                    TryAddCategory(CompetitiveDatabase.HazardRemovalMoves, 1);
                 break;
 
             case CompetitiveRole.BulkyAttacker:
+                if (isDoubles)
+                {
+                    TryAddFakeOut();
+                    if (Rnd.Next(100) < 50) TryAddCategory(CompetitiveDatabase.WideQuickGuardMoves, 1);
+                }
+                break;
+
             case CompetitiveRole.TankyCleaner:
                 // Wants attacks primarily
                 break;
@@ -853,36 +1120,62 @@ public class CompetitiveBuildEngine
         // Ensure at least 2 STAB attacking moves for offensive roles
         if (IsOffensiveRole(role))
         {
-            FillSTABAttacks(selected, pool, moveNames, moveData, types, pi, role, 2);
+            FillSTABAttacks(selected, pool, moveNames, moveData, types, pi, 2, ScoreMove, Banned);
         }
         else
         {
-            FillSTABAttacks(selected, pool, moveNames, moveData, types, pi, role, 1);
+            FillSTABAttacks(selected, pool, moveNames, moveData, types, pi, 1, ScoreMove, Banned);
+        }
+
+        // --- Phase 3b: DOUBLES PROTECT & WIDE/QUICK GUARD INJECTION ---
+        if (isDoubles && selected.Count < 4)
+        {
+            if (role != CompetitiveRole.OffensiveBreaker || Rnd.Next(100) < 60)
+            {
+                // If species has Wide Guard or Quick Guard available, give 50% chance to select it (Smogon VGC staple)
+                if (Rnd.Next(100) < 50 && pool.Any(m => m > 0 && m < moveNames.Length && CompetitiveDatabase.WideQuickGuardMoves.Contains(moveNames[m])))
+                {
+                    TryAddCategory(CompetitiveDatabase.WideQuickGuardMoves, 1);
+                }
+                if (selected.Count < 4)
+                {
+                    TryAddCategory(CompetitiveDatabase.ProtectMoves, 1);
+                }
+            }
         }
 
         // --- Phase 4: COVERAGE fill ---
         // Fill remaining with coverage moves (non-STAB attacks that provide good type coverage)
-        FillCoverageAttacks(selected, pool, moveNames, moveData, types, pi, role);
+        FillCoverageAttacks(selected, pool, moveNames, moveData, pi, role, ScoreMove, Banned);
 
         bool isPhysicalFill = pi.Stats[ATK] >= spa;
         bool CategoryOk(int m) => moveData == null || m >= moveData.Length ||
             moveData[m].Category == 0 ||
             (isPhysicalFill && moveData[m].Category == 1) ||
             (!isPhysicalFill && moveData[m].Category == 2);
-        bool IsCompetitiveMove(int m) => m < moveNames.Length &&
-            (CompetitiveDatabase.CompetitiveMoves.Contains(moveNames[m]) || CompetitiveDatabase.SituationalMoves.Contains(moveNames[m]));
+        bool IsCompetitiveMove(int m)
+        {
+            if (m <= 0 || m >= moveNames.Length) return false;
+            string name = moveNames[m];
+            if (string.IsNullOrEmpty(name) || IsBannedMove(name, pi, selected, pool, moveNames)) return false;
+            return CompetitiveDatabase.CompetitiveMoves.Contains(name) || CompetitiveDatabase.SituationalMoves.Contains(name);
+        }
+        bool IsAttack(int m) => m > 0 && moveData != null && m < moveData.Length && moveData[m].Category != 0;
+        bool IsViable(int m) => CompetitiveValidator.IsViableAttack(m, moveData, moveNames);
 
         while (selected.Count < 4 && pool.Count > 0)
         {
             var remaining = pool.Where(m => m > 0 && m < moveNames.Length).ToList();
             if (remaining.Count == 0) break;
 
-            var tier = remaining.Where(m => CategoryOk(m) && IsCompetitiveMove(m)).ToList();
-            if (tier.Count == 0) tier = remaining.Where(CategoryOk).ToList();
-            if (tier.Count == 0) tier = remaining.Where(IsCompetitiveMove).ToList();
+            var tier = remaining.Where(m => CategoryOk(m) && IsCompetitiveMove(m) && (!IsAttack(m) || IsViable(m))).ToList();
+            if (tier.Count == 0) tier = remaining.Where(m => IsCompetitiveMove(m) && (!IsAttack(m) || IsViable(m))).ToList();
+            if (tier.Count == 0) tier = remaining.Where(m => CategoryOk(m) && (!IsAttack(m) || IsViable(m))).ToList();
+            if (tier.Count == 0) tier = remaining.Where(m => !moveNames[m].Equals("Last Resort", StringComparison.OrdinalIgnoreCase)).ToList();
             if (tier.Count == 0) tier = remaining;
 
-            int pick = tier[Rnd.Next(tier.Count)];
+            // Spec §2: weighted by score through the seeded Rnd, so a seed still reproduces the set.
+            int pick = tier[CompetitiveMath.WeightedIndex(tier.Select(ScoreMove).ToList(), Rnd)];
             selected.Add(pick);
             pool.Remove(pick);
         }
@@ -904,7 +1197,7 @@ public class CompetitiveBuildEngine
         string[] moveNames, Move[] moveData, int[] types,
         PersonalInfo pi, bool statGapDecisive, bool isPhysicalAttacker)
     {
-        if (!statGapDecisive || moveData == null || pi == null) return;
+        if (moveData == null || pi == null) return;
 
         int wantedCategory = isPhysicalAttacker ? 1 : 2;
 
@@ -932,7 +1225,7 @@ public class CompetitiveBuildEngine
             if (!Attacking(current) || RightSide(current)) continue;
 
             int replacement = pool
-                .Where(m => RightSide(m) && !selected.Contains(m))
+                .Where(m => RightSide(m) && CompetitiveValidator.IsViableAttack(m, moveData, moveNames) && !selected.Contains(m))
                 .OrderByDescending(Score)
                 .DefaultIfEmpty(0)
                 .First();
@@ -1179,6 +1472,77 @@ public class CompetitiveBuildEngine
                 TryAdd("Hurricane");
         }
 
+        // Water Bubble -> 1+ Water attack
+        else if (abilLower == "water bubble")
+        {
+            var waterMoves = pool.Where(m =>
+                m > 0 && m < (moveData?.Length ?? 0) &&
+                moveData[m].Type == PokemonTypes.Water &&
+                moveData[m].Category != 0).ToList();
+            if (waterMoves.Count > 0)
+            {
+                int best = OrderByBetterCategoryThenPower(waterMoves).First();
+                selected.Add(best); pool.Remove(best);
+            }
+        }
+
+        // Beads of Ruin -> 3+ Special attacks
+        else if (abilLower == "beads of ruin")
+        {
+            var specAttacks = pool.Where(m =>
+                m > 0 && m < (moveData?.Length ?? 0) &&
+                moveData[m].Category == 2).OrderByDescending(m => moveData[m].Power).ToList();
+            int added = 0;
+            foreach (int id in specAttacks)
+            {
+                if (selected.Count >= 4 || added >= 3) break;
+                selected.Add(id); pool.Remove(id); added++;
+            }
+        }
+
+        // Physical Attack boosting abilities -> 2+ Physical attacks
+        else if (abilLower is "chilling neigh" or "moxie" or "defiant" or "hustle" or "intrepid sword" or "orichalcum pulse" or "sword of ruin")
+        {
+            var physAttacks = pool.Where(m =>
+                m > 0 && m < (moveData?.Length ?? 0) &&
+                moveData[m].Category == 1).OrderByDescending(m => moveData[m].Power).ToList();
+            int added = 0;
+            foreach (int id in physAttacks)
+            {
+                if (selected.Count >= 4 || added >= 2) break;
+                selected.Add(id); pool.Remove(id); added++;
+            }
+        }
+
+        // Special Attack boosting abilities -> 2+ Special attacks
+        else if (abilLower is "soul-heart" or "competitive" or "hadron engine" or "berserk" or "solar power" or "grim neigh")
+        {
+            var specAttacks = pool.Where(m =>
+                m > 0 && m < (moveData?.Length ?? 0) &&
+                moveData[m].Category == 2).OrderByDescending(m => moveData[m].Power).ToList();
+            int added = 0;
+            foreach (int id in specAttacks)
+            {
+                if (selected.Count >= 4 || added >= 2) break;
+                selected.Add(id); pool.Remove(id); added++;
+            }
+        }
+
+        // No Guard -> 1+ high-power, low-accuracy attack (<= 80% acc, >= 100 power)
+        else if (abilLower == "no guard")
+        {
+            var noGuardMoves = pool.Where(m =>
+                m > 0 && m < (moveData?.Length ?? 0) &&
+                moveData[m].Category != 0 &&
+                moveData[m].Power >= 100 &&
+                moveData[m].Accuracy <= 80 && moveData[m].Accuracy > 0).ToList();
+            if (noGuardMoves.Count > 0)
+            {
+                int best = OrderByBetterCategoryThenPower(noGuardMoves).First();
+                selected.Add(best); pool.Remove(best);
+            }
+        }
+
         // Protean / Libero -> all different-type attacks
         else if (abilLower is "protean" or "libero")
         {
@@ -1190,118 +1554,93 @@ public class CompetitiveBuildEngine
         // Handled by ensuring minimum attacks in role-based logic
     }
 
-    // Fills STAB attacking moves, prioritizing by power
-    private void FillSTABAttacks(
-        List<int> selected, List<int> pool,
-        string[] moveNames, Move[] moveData, int[] types,
-        PersonalInfo pi, CompetitiveRole role, int minSTAB)
+    // Fills STAB attacks, each time taking the best-scoring legal one (spec §2)
+    private static void FillSTABAttacks(
+        List<int> selected, List<int> pool, string[] moveNames, Move[] moveData, int[] types,
+        PersonalInfo pi, int minSTAB, Func<int, double> score, Func<int, bool> banned)
     {
         if (moveData == null || types.Length == 0) return;
         bool isPhysical = pi.Stats[ATK] >= pi.Stats[SPA];
 
-        int stabCount = selected.Count(m =>
-            m > 0 && m < (moveData?.Length ?? 0) &&
+        int needed = minSTAB - selected.Count(m =>
+            m > 0 && m < moveData.Length &&
             Array.IndexOf(types, moveData[m].Type) >= 0 &&
             moveData[m].Category != 0);
 
-        int needed = minSTAB - stabCount;
-        if (needed <= 0) return;
-
-        int strong = Math.Max(pi.Stats[ATK], pi.Stats[SPA]);
-        int weak = Math.Min(pi.Stats[ATK], pi.Stats[SPA]);
-        bool gapIsDecisive = weak * 4 < strong * 3;      // weaker stat below 75% of the stronger
-
-        var stabCandidates = pool.Where(m =>
-            m > 0 && m < moveData.Length &&
-            Array.IndexOf(types, moveData[m].Type) >= 0 &&
-            moveData[m].Category != 0 &&
-            !selected.Contains(m) &&
-            (!gapIsDecisive ||
-             (isPhysical && moveData[m].Category == 1) || (!isPhysical && moveData[m].Category == 2)))
-            .OrderByDescending(m =>
-            {
-                bool matchesCat = (isPhysical && moveData[m].Category == 1) ||
-                                  (!isPhysical && moveData[m].Category == 2);
-                string name = m < moveNames.Length ? moveNames[m] : "";
-                bool isCompetitive = !string.IsNullOrEmpty(name) && CompetitiveDatabase.CompetitiveMoves.Contains(name);
-                bool isSituational = !isCompetitive && !string.IsNullOrEmpty(name) && CompetitiveDatabase.SituationalMoves.Contains(name);
-                return (matchesCat ? 100000 : 0) + (isCompetitive ? 2000 : isSituational ? 1000 : 0) + moveData[m].Power;
-            })
-            .ToList();
-
-        foreach (int id in stabCandidates)
+        while (needed > 0 && selected.Count < 4)
         {
-            if (selected.Count >= 4 || needed <= 0) break;
-            selected.Add(id); pool.Remove(id); needed--;
+            int pick = pool.Where(m =>
+                    m > 0 && m < moveData.Length &&
+                    Array.IndexOf(types, moveData[m].Type) >= 0 &&
+                    CompetitiveValidator.IsViableAttack(m, moveData, moveNames) &&
+                    !selected.Contains(m) && !banned(m) &&
+                    ((isPhysical && moveData[m].Category == 1) || (!isPhysical && moveData[m].Category == 2)) &&
+                    // Never a redundant attack of the exact same type and category (e.g. Sludge Bomb + Sludge Wave)
+                    !selected.Any(sm => sm > 0 && sm < moveData.Length &&
+                                        moveData[sm].Category == moveData[m].Category &&
+                                        moveData[sm].Type == moveData[m].Type))
+                .OrderByDescending(score)
+                .DefaultIfEmpty(0)
+                .First();
+            if (pick <= 0) break;
+            selected.Add(pick); pool.Remove(pick); needed--;
         }
     }
 
-    // Fills coverage (non-STAB) attacks
-    private void FillCoverageAttacks(
-        List<int> selected, List<int> pool,
-        string[] moveNames, Move[] moveData, int[] types,
-        PersonalInfo pi, CompetitiveRole role)
+    // Fills coverage attacks: each pick is the best score among viable attacks of a type the set lacks
+    private static void FillCoverageAttacks(
+        List<int> selected, List<int> pool, string[] moveNames, Move[] moveData,
+        PersonalInfo pi, CompetitiveRole role, Func<int, double> score, Func<int, bool> banned)
     {
-        if (moveData == null || selected.Count >= 4) return;
+        if (moveData == null) return;
         if (IsDefensiveRole(role)) return; // Defensive roles don't need coverage fill
-
         bool isPhysical = pi.Stats[ATK] >= pi.Stats[SPA];
-        var coveredTypes = new HashSet<int>();
 
-        // Already covered types from selected moves
-        foreach (int m in selected)
+        while (selected.Count < 4)
         {
-            if (m > 0 && m < moveData.Length && moveData[m].Category != 0)
-                coveredTypes.Add(moveData[m].Type);
+            var coveredTypes = selected.Where(m => m > 0 && m < moveData.Length && moveData[m].Category != 0)
+                                       .Select(m => moveData[m].Type).ToHashSet();
+            int pick = pool.Where(m =>
+                    m > 0 && m < moveData.Length &&
+                    CompetitiveValidator.IsViableAttack(m, moveData, moveNames) &&
+                    !coveredTypes.Contains(moveData[m].Type) &&
+                    !selected.Contains(m) && !banned(m) &&
+                    ((isPhysical && moveData[m].Category == 1) || (!isPhysical && moveData[m].Category == 2)))
+                .OrderByDescending(score)
+                .DefaultIfEmpty(0)
+                .First();
+            if (pick <= 0) break;
+            selected.Add(pick); pool.Remove(pick);
         }
+    }
 
-        // Types that resist this Pokemon's own STAB — coverage should aim to hit these hard,
-        // per the manifesto's "coverage that attacks Pokemon that resist [STAB]" requirement.
-        var stabResistedTypes = new HashSet<int>();
-        if (types != null)
-        {
-            for (int t = 0; t < 18; t++)
-            {
-                foreach (int stabType in types)
-                {
-                    if (TypeEffectivenessChart.GetEffectiveness(stabType, t) < 1f)
-                    {
-                        stabResistedTypes.Add(t);
-                        break;
-                    }
-                }
-            }
-        }
+    /// <summary>The manifesto's MUST NOT move rules, shared by every phase that picks a move.</summary>
+    private static bool IsBannedMove(string name, PersonalInfo pi, List<int> selected, List<int> pool, string[] moveNames)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        // Trick Room on a fast Pokemon (Spe > 65)
+        if (pi != null && pi.Stats[SPE] > 65 && GameNameComparer.Instance.Equals(name, "Trick Room")) return true;
+        // Fixed damage (Seismic Toss / Night Shade) on an attacker (Atk or SpA >= 75)
+        if (pi != null && (pi.Stats[ATK] >= 75 || pi.Stats[SPA] >= 75) && CompetitiveDatabase.FixedDamageMoves.Contains(name)) return true;
+        // Rest alongside instant recovery, or with no Sleep Talk to pair it with
+        if (GameNameComparer.Instance.Equals(name, "Rest"))
+            return selected.Any(m => m > 0 && m < moveNames.Length && CompetitiveDatabase.RecoveryMoves.Contains(moveNames[m]))
+                || !pool.Any(m => m > 0 && m < moveNames.Length && GameNameComparer.Instance.Equals(moveNames[m], "Sleep Talk"));
+        return false;
+    }
 
-        int CandidateScore(int m)
-        {
-            string name = m < moveNames.Length ? moveNames[m] : "";
-            bool isCompetitive = !string.IsNullOrEmpty(name) && CompetitiveDatabase.CompetitiveMoves.Contains(name);
-            bool isSituational = !isCompetitive && !string.IsNullOrEmpty(name) && CompetitiveDatabase.SituationalMoves.Contains(name);
-            int moveType = moveData[m].Type;
-            bool hitsStabResist = stabResistedTypes.Any(rt => TypeEffectivenessChart.GetEffectiveness(moveType, rt) > 1f);
-            return (hitsStabResist ? 5000 : 0) + (isCompetitive ? 2000 : isSituational ? 1000 : 0) + moveData[m].Power;
-        }
-
-        var eligible = pool.Where(m =>
-            m > 0 && m < moveData.Length &&
-            moveData[m].Category != 0 &&
-            !coveredTypes.Contains(moveData[m].Type) &&
-            !selected.Contains(m))
-            .ToList();
-
-        var coverageCandidates = eligible
-            .Where(m => (isPhysical && moveData[m].Category == 1) || (!isPhysical && moveData[m].Category == 2))
-            .OrderByDescending(CandidateScore)
-            .ToList();
-
-        foreach (int id in coverageCandidates)
-        {
-            if (selected.Count >= 4) break;
-            coveredTypes.Add(moveData[id].Type);
-            selected.Add(id);
-            pool.Remove(id);
-        }
+    // Power Herb is picked after the moveset (AssignItem), so only weather can be seen here.
+    private static bool NeedsChargeTurn(string move, string ability, List<string> teamAbilities)
+    {
+        if (CompetitiveDatabase.RechargeMoves.Contains(move)) return true;
+        if (!CompetitiveDatabase.TwoTurnMoves.Contains(move)) return false;
+        bool Has(string a) => GameNameComparer.Instance.Equals(ability, a) ||
+                              teamAbilities?.Any(t => GameNameComparer.Instance.Equals(t, a)) == true;
+        if (GameNameComparer.Instance.Equals(move, "Solar Beam") || GameNameComparer.Instance.Equals(move, "Solar Blade"))
+            return !(Has("Drought") || Has("Desolate Land"));
+        if (GameNameComparer.Instance.Equals(move, "Electro Shot"))
+            return !(Has("Drizzle") || Has("Primordial Sea"));
+        return true;
     }
 
     private static HashSet<string> ResolveMoveNames(int[] moves, string[] moveNames)
@@ -1342,4 +1681,22 @@ public class CompetitiveBuildEngine
         CompetitiveRole.TankyCleaner => true,
         _ => false
     };
+
+    /// <summary>Which team jobs a set of moves can do (v2 spec §3 role coverage).</summary>
+    public static TeamRoles RolesOf(IEnumerable<int> moves, string[] moveNames, bool trickRoomTeam)
+    {
+        var roles = TeamRoles.None;
+        foreach (int m in moves)
+        {
+            if (m <= 0 || m >= moveNames.Length) continue;
+            string n = moveNames[m];
+            if (CompetitiveDatabase.HazardMoves.Contains(n)) roles |= TeamRoles.Hazards;
+            if (CompetitiveDatabase.HazardRemovalMoves.Contains(n)) roles |= TeamRoles.HazardRemoval;
+            if (CompetitiveDatabase.PivotMoves.Contains(n)) roles |= TeamRoles.Pivot;
+            if (CompetitiveDatabase.TeamSpeedControlMoves.Contains(n) ||
+                (trickRoomTeam && GameNameComparer.Instance.Equals(n, "Trick Room")))
+                roles |= TeamRoles.SpeedControl;
+        }
+        return roles;
+    }
 }

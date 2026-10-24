@@ -15,10 +15,15 @@ public class TutorRandomizer
     private static readonly uint[] TutorPatchAddrs = { 0x4C8, 0x4D4, 0x4E0, 0x4EC };
     private static readonly int[] DefaultLengths = { 16, 17, 16, 18 };
 
+    /// <summary>True when randomizing was asked for but refused on Uhuru: the lists are read, not changed.</summary>
+    public bool UhuruReadOnly { get; }
+
     public TutorRandomizer(string romfsPath, int mode)
     {
         RomFSPath = romfsPath;
-        Mode = mode;
+        // Uhuru: Shop.cro is not patched unchecked, but the trainer builder still needs the tutor lists.
+        UhuruReadOnly = mode != 0 && pk3DS.Core.Modding.UhuruGuard.RefusalFor(Path.Combine(romfsPath ?? "", "Shop.cro")) != null;
+        Mode = UhuruReadOnly ? 0 : mode;
     }
 
     /// <summary>
@@ -42,9 +47,8 @@ public class TutorRandomizer
             int limit = maxMoveID > 0 ? Math.Min(maxMoveID, moveNames.Length) : moveNames.Length;
             for (int m = 1; m < limit; m++)
             {
-                if (Legal.Z_Moves.Contains(m)) continue;
+                if (!Legal.IsUsableMove(m, moveNames)) continue;
                 string name = moveNames[m];
-                if (string.IsNullOrWhiteSpace(name) || name == "—" || name == "———") continue;
                 if (isCompetitive && !Competitive.CompetitiveDatabase.CompetitiveMoves.Contains(name) && !Competitive.CompetitiveDatabase.SituationalMoves.Contains(name)) continue;
                 validMoveList.Add(m);
             }
@@ -79,8 +83,9 @@ public class TutorRandomizer
                 }
                 else
                 {
+                    // No names: only dodge Z-moves, as before. With names: retry at most 1000 times, then keep the last pick.
                     move = (int)(Util.Random32() % (uint)(maxMoveID > 0 ? maxMoveID : 720)) + 1;
-                    while (Legal.Z_Moves.Contains(move))
+                    for (int tries = 0; tries < 1000 && (moveNames is { Length: > 0 } ? !Legal.IsUsableMove(move, moveNames) : Legal.Z_Moves.Contains(move)); tries++)
                         move = (int)(Util.Random32() % (uint)(maxMoveID > 0 ? maxMoveID : 720)) + 1;
                 }
 

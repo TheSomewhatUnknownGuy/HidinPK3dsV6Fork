@@ -54,6 +54,8 @@ partial class MaisonEditor7
         this.B_ShowdownImport = new System.Windows.Forms.Button();
         this.B_ShowdownBox = new System.Windows.Forms.Button();
         this.B_ExportTeam = new System.Windows.Forms.Button();
+        this.B_AddTrainer = new System.Windows.Forms.Button();
+        this.B_AddPokemon = new System.Windows.Forms.Button();
         this.PB_Mascot = new System.Windows.Forms.PictureBox();
 
         this.GB_Trainer.SuspendLayout();
@@ -243,7 +245,7 @@ partial class MaisonEditor7
         // Bottom Tools
         // 
         this.LB_StoredSets.Location = new System.Drawing.Point(5, 295);
-        this.LB_StoredSets.Size = new System.Drawing.Size(455, 145);
+        this.LB_StoredSets.Size = new System.Drawing.Size(455, 250);
         this.LB_StoredSets.SelectedIndexChanged += new System.EventHandler(this.LB_StoredSets_SelectedIndexChanged);
         this.LB_StoredSets.FormattingEnabled = true;
 
@@ -274,11 +276,23 @@ partial class MaisonEditor7
 
         this.B_ExportTeam.Location = new System.Drawing.Point(465, 385);
         this.B_ExportTeam.Size = new System.Drawing.Size(150, 30);
-        this.B_ExportTeam.Text = "Export Team";
+        this.B_ExportTeam.Text = "Export List";
         this.B_ExportTeam.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
         this.B_ExportTeam.Click += new System.EventHandler(this.B_ExportTeam_Click);
 
-        this.PB_Mascot.Location = new System.Drawing.Point(565, 425);
+        this.B_AddTrainer.Location = new System.Drawing.Point(465, 420);
+        this.B_AddTrainer.Size = new System.Drawing.Size(150, 30);
+        this.B_AddTrainer.Text = "Add Trainer(s)";
+        this.B_AddTrainer.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+        this.B_AddTrainer.Click += new System.EventHandler(this.B_AddTrainer_Click);
+
+        this.B_AddPokemon.Location = new System.Drawing.Point(465, 455);
+        this.B_AddPokemon.Size = new System.Drawing.Size(150, 30);
+        this.B_AddPokemon.Text = "Add Pokémon Set(s)";
+        this.B_AddPokemon.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+        this.B_AddPokemon.Click += new System.EventHandler(this.B_AddPokemonSet_Click);
+
+        this.PB_Mascot.Location = new System.Drawing.Point(565, 495);
         this.PB_Mascot.Size = new System.Drawing.Size(50, 50);
         this.PB_Mascot.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
 
@@ -287,7 +301,7 @@ partial class MaisonEditor7
         // 
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(620, 480);
+        this.ClientSize = new System.Drawing.Size(620, 560);
         this.Controls.Add(this.L_Trainer);
         this.Controls.Add(this.CB_Trainer);
         this.Controls.Add(this.DumpTRs);
@@ -303,6 +317,8 @@ partial class MaisonEditor7
         this.Controls.Add(this.B_ShowdownImport);
         this.Controls.Add(this.B_ShowdownBox);
         this.Controls.Add(this.B_ExportTeam);
+        this.Controls.Add(this.B_AddTrainer);
+        this.Controls.Add(this.B_AddPokemon);
         this.Controls.Add(this.PB_Mascot);
         this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
@@ -363,6 +379,8 @@ partial class MaisonEditor7
     private System.Windows.Forms.Button B_ShowdownImport;
     private System.Windows.Forms.Button B_ShowdownBox;
     private System.Windows.Forms.Button B_ExportTeam;
+    private System.Windows.Forms.Button B_AddTrainer;
+    private System.Windows.Forms.Button B_AddPokemon;
     private System.Windows.Forms.PictureBox PB_Mascot;
     private System.Windows.Forms.Label L_StoredSets;
 }

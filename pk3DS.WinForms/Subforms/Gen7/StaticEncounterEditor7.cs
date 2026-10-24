@@ -12,9 +12,15 @@ namespace pk3DS.WinForms;
 public partial class StaticEncounterEditor7 : Form
 {
     private readonly byte[][] files;
-    private readonly EncounterGift7[] Gifts;
-    private readonly EncounterStatic7[] Encounters;
-    private readonly EncounterTrade7[] Trades;
+    private readonly List<EncounterGift7> Gifts;
+    private List<EncounterStatic7> Encounters;
+    private readonly List<EncounterTrade7> Trades;
+    // Uhuru: the game reads a/1/5/9 file 6 + difficulty mode; 1 = 6 = 7 = 8 (Normal) and 9 = 10 = 11 (Hard).
+    private static readonly int[][] UhuruGroups = [[1, 6, 7, 8], [9, 10, 11]];
+    private readonly bool uhuru;
+    private readonly List<EncounterStatic7>[] variants;
+    private int variant;
+    private ComboBox CB_EncVariant;
     private readonly LearnsetRandomizer learn = new(Main.Config, Main.Config.Learnsets);
     private readonly string[] movelist = Main.Config.GetText(TextName.MoveNames);
     private readonly string[] itemlist = Main.Config.GetText(TextName.ItemNames);
@@ -70,46 +76,60 @@ public partial class StaticEncounterEditor7 : Form
     private static readonly int[] Totem = [020, 105, 735, 738, 743, 746, 752, 754, 758, 777, 778, 784]; // Totem battles
     private static readonly int[] UnevolvedLegend = [772, 789, 803]; // Type: Null, Cosmog, Poipole gifts
 
+    private static void WidenIvBoxes(Control parent)
+    {
+        foreach (Control c in parent.Controls)
+        {
+            if (c is NumericUpDown n && n.Name.Contains("IV", StringComparison.Ordinal) && n.Minimum == -4) n.Minimum = sbyte.MinValue;
+            WidenIvBoxes(c);
+        }
+    }
+
     public StaticEncounterEditor7(byte[][] infiles)
     {
         InitializeComponent();
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
+        // "3 perfect IVs" is decoded from the IV bytes and has no setter, and saving never reads
+        // these boxes: show the state, but don't offer an edit that would silently do nothing.
+        CHK_GIV3.Enabled = CHK_EIV3.Enabled = false;
+        // The designer allows -4..31 (-1..-4 are the "random / perfect IV" codes), but Uhuru data holds -5 and lower.
+        // Widen to the sbyte range so every stored value shows and saves back unchanged.
+        WidenIvBoxes(this);
         files = infiles;
 
         // File 0: Gifts
         {
             byte[] data = files[0];
-            Gifts = new EncounterGift7[data.Length / EncounterGift7.SIZE];
+            Gifts = new List<EncounterGift7>(data.Length / EncounterGift7.SIZE);
             for (int i = 0; i < data.Length; i += EncounterGift7.SIZE)
             {
                 byte[] entry = new byte[EncounterGift7.SIZE];
                 Array.Copy(data, i, entry, 0, entry.Length);
-                Gifts[i / EncounterGift7.SIZE] = new EncounterGift7(entry);
+                Gifts.Add(new EncounterGift7(entry));
             }
         }
         oldStarters = Gifts.Take(3).Select(gift => gift.Species).ToArray();
 
-        // File 1: Encounters
+        // File 1: Encounters (Uhuru: one list per difficulty table, see UhuruGroups)
+        uhuru = Main.Config.Info is { TrainerBaseCount: > 0 } && files.Length >= 12;
+        List<EncounterStatic7> Parse(byte[] data)
         {
-            byte[] data = files[1];
-            Encounters = new EncounterStatic7[data.Length / EncounterStatic7.SIZE];
-            for (int i = 0; i < data.Length; i += EncounterStatic7.SIZE)
-            {
-                byte[] entry = new byte[EncounterStatic7.SIZE];
-                Array.Copy(data, i, entry, 0, entry.Length);
-                Encounters[i / EncounterStatic7.SIZE] = new EncounterStatic7(entry);
-            }
+            var list = new List<EncounterStatic7>(data.Length / EncounterStatic7.SIZE);
+            for (int i = 0; i + EncounterStatic7.SIZE <= data.Length; i += EncounterStatic7.SIZE)
+                list.Add(new EncounterStatic7(data.AsSpan(i, EncounterStatic7.SIZE).ToArray()));
+            return list;
         }
+        variants = uhuru ? UhuruGroups.Select(g => Parse(files[g[0]])).ToArray() : [Parse(files[1])];
+        Encounters = variants[0];
 
         // File 4: Trades
         {
             byte[] data = files[4];
-            Trades = new EncounterTrade7[data.Length / EncounterTrade7.SIZE];
+            Trades = new List<EncounterTrade7>(data.Length / EncounterTrade7.SIZE);
             for (int i = 0; i < data.Length; i += EncounterTrade7.SIZE)
             {
                 byte[] entry = new byte[EncounterTrade7.SIZE];
                 Array.Copy(data, i, entry, 0, entry.Length);
-                Trades[i / EncounterTrade7.SIZE] = new EncounterTrade7(entry);
+                Trades.Add(new EncounterTrade7(entry));
             }
         }
 
@@ -156,6 +176,17 @@ public partial class StaticEncounterEditor7 : Form
 
         NUD_Ally1.Maximum = NUD_Ally2.Maximum = Main.Config.USUM ? 251 : 136;
 
+        if (uhuru)
+        {
+            CB_EncVariant = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = LB_Encounter.Left, Top = LB_Encounter.Top, Width = LB_Encounter.Width };
+            CB_EncVariant.Items.AddRange(["Normal (modes 0-2: files 1, 6-8)", "Hard (modes 3-7: files 9-11)"]);
+            CB_EncVariant.SelectedIndex = 0;
+            CB_EncVariant.SelectedIndexChanged += (_, _) => ChangeVariant(CB_EncVariant.SelectedIndex);
+            LB_Encounter.Top += CB_EncVariant.Height + 4;
+            LB_Encounter.Height -= CB_EncVariant.Height + 4;
+            LB_Encounter.Parent.Controls.Add(CB_EncVariant);
+        }
+
         GetListBoxEntries();
         LB_Gift.SelectedIndex = 0;
         LB_Encounter.SelectedIndex = 0;
@@ -170,16 +201,34 @@ public partial class StaticEncounterEditor7 : Form
 
     private void GetListBoxEntries()
     {
+        GetGiftEntries();
+        GetEncounterEntries();
+        GetTradeEntries();
+    }
+
+    private void GetGiftEntries()
+    {
         loading = true;
         LB_Gift.Items.Clear();
-        LB_Encounter.Items.Clear();
-        LB_Trade.Items.Clear();
-
-        for (int i = 0; i < Gifts.Length; i++)
+        for (int i = 0; i < Gifts.Count; i++)
             LB_Gift.Items.Add(GetEntryText(Gifts[i], i));
-        for (int i = 0; i < Encounters.Length; i++)
+        loading = false;
+    }
+
+    private void GetEncounterEntries()
+    {
+        loading = true;
+        LB_Encounter.Items.Clear();
+        for (int i = 0; i < Encounters.Count; i++)
             LB_Encounter.Items.Add(GetEntryText(Encounters[i], i));
-        for (int i = 0; i < Trades.Length; i++)
+        loading = false;
+    }
+
+    private void GetTradeEntries()
+    {
+        loading = true;
+        LB_Trade.Items.Clear();
+        for (int i = 0; i < Trades.Count; i++)
             LB_Trade.Items.Add(GetEntryText(Trades[i], i));
         loading = false;
     }
@@ -206,7 +255,12 @@ public partial class StaticEncounterEditor7 : Form
     private void SaveData()
     {
         files[0] = Gifts.SelectMany(file => file.Data).ToArray();
-        files[1] = Encounters.SelectMany(file => file.Data).ToArray();
+        if (uhuru)
+            for (int g = 0; g < UhuruGroups.Length; g++)
+                foreach (int f in UhuruGroups[g])
+                    files[f] = variants[g].SelectMany(x => x.Data).ToArray();
+        else
+            files[1] = Encounters.SelectMany(file => file.Data).ToArray();
         files[4] = Trades.SelectMany(file => file.Data).ToArray();
 
         if (Gifts.Take(3).Select(gift => gift.Species).SequenceEqual(oldStarters))
@@ -242,6 +296,17 @@ public partial class StaticEncounterEditor7 : Form
         GetAllies();
     }
 
+    private void ChangeVariant(int v)
+    {
+        if (v == variant) return;
+        SetEncounter();          // keep the edit in progress on the old variant
+        variant = v;
+        Encounters = variants[v];
+        eEntry = -1;
+        GetEncounterEntries();
+        LB_Encounter.SelectedIndex = Encounters.Count > 0 ? 0 : -1;
+    }
+
     private void LB_Trade_SelectedIndexChanged(object sender, EventArgs e)
     {
         SetTrade();
@@ -253,7 +318,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void GetAllies()
     {
-        if (eEntry < 0)
+        if (eEntry < 0 || eEntry >= Encounters.Count)
             return;
         var entry = Encounters[eEntry];
 
@@ -266,7 +331,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void GetGift()
     {
-        if (gEntry < 0)
+        if (gEntry < 0 || gEntry >= Gifts.Count)
             return;
 
         loading = true;
@@ -287,7 +352,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void SetGift()
     {
-        if (gEntry < 0)
+        if (gEntry < 0 || gEntry >= Gifts.Count)
             return;
 
         var entry = Gifts[gEntry];
@@ -304,7 +369,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void GetEncounter()
     {
-        if (eEntry < 0)
+        if (eEntry < 0 || eEntry >= Encounters.Count)
             return;
 
         loading = true;
@@ -350,7 +415,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void SetEncounter()
     {
-        if (eEntry < 0)
+        if (eEntry < 0 || eEntry >= Encounters.Count)
             return;
 
         var entry = Encounters[eEntry];
@@ -395,7 +460,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void GetTrade()
     {
-        if (tEntry < 0)
+        if (tEntry < 0 || tEntry >= Trades.Count)
             return;
 
         loading = true;
@@ -424,7 +489,7 @@ public partial class StaticEncounterEditor7 : Form
 
     private void SetTrade()
     {
-        if (tEntry < 0)
+        if (tEntry < 0 || tEntry >= Trades.Count)
             return;
 
         var entry = Trades[tEntry];
@@ -458,18 +523,24 @@ public partial class StaticEncounterEditor7 : Form
 
         if (sender == CB_GSpecies)
         {
+            if (gEntry < 0 || gEntry >= Gifts.Count)
+                return;
             var entry = Gifts[gEntry];
             entry.Species = cb.SelectedIndex;
             LB_Gift.Items[gEntry] = GetEntryText(entry, gEntry);
         }
         else if (sender == CB_ESpecies)
         {
+            if (eEntry < 0 || eEntry >= Encounters.Count)
+                return;
             var entry = Encounters[eEntry];
             entry.Species = cb.SelectedIndex;
             LB_Encounter.Items[eEntry] = GetEntryText(entry, eEntry);
         }
         else if (sender == CB_TSpecies)
         {
+            if (tEntry < 0 || tEntry >= Trades.Count)
+                return;
             var entry = Trades[tEntry];
             entry.Species = cb.SelectedIndex;
             LB_Trade.Items[tEntry] = GetEntryText(entry, tEntry);
@@ -479,6 +550,117 @@ public partial class StaticEncounterEditor7 : Form
     private void ChangeTID(object sender, EventArgs e)
     {
         L_TTID.Text = $"Gen 7 ID: {NUD_TID.Value % 100000:000000}";
+    }
+
+    // Gifts Add / Clone / Delete
+    private void B_AddGift_Click(object sender, EventArgs e)
+    {
+        SetGift();
+        var newEntry = new EncounterGift7(new byte[EncounterGift7.SIZE])
+        {
+            Species = 1,
+            Level = 5,
+        };
+        Gifts.Add(newEntry);
+        GetGiftEntries();
+        LB_Gift.SelectedIndex = Gifts.Count - 1;
+    }
+
+    private void B_DupGift_Click(object sender, EventArgs e)
+    {
+        if (gEntry < 0 || gEntry >= Gifts.Count)
+            return;
+        SetGift();
+        var clone = new EncounterGift7((byte[])Gifts[gEntry].Data.Clone());
+        int newIndex = gEntry + 1;
+        Gifts.Insert(newIndex, clone);
+        GetGiftEntries();
+        LB_Gift.SelectedIndex = newIndex;
+    }
+
+    private void B_DelGift_Click(object sender, EventArgs e)
+    {
+        if (Gifts.Count <= 1 || gEntry < 0 || gEntry >= Gifts.Count)
+            return;
+        int oldIndex = gEntry;
+        Gifts.RemoveAt(oldIndex);
+        gEntry = -1;
+        GetGiftEntries();
+        LB_Gift.SelectedIndex = Math.Min(oldIndex, Gifts.Count - 1);
+    }
+
+    // Encounters Add / Clone / Delete
+    private void B_AddStatic_Click(object sender, EventArgs e)
+    {
+        SetEncounter();
+        var newEntry = new EncounterStatic7(new byte[EncounterStatic7.SIZE])
+        {
+            Species = 1,
+            Level = 5,
+        };
+        Encounters.Add(newEntry);
+        GetEncounterEntries();
+        LB_Encounter.SelectedIndex = Encounters.Count - 1;
+    }
+
+    private void B_DupStatic_Click(object sender, EventArgs e)
+    {
+        if (eEntry < 0 || eEntry >= Encounters.Count)
+            return;
+        SetEncounter();
+        var clone = new EncounterStatic7((byte[])Encounters[eEntry].Data.Clone());
+        int newIndex = eEntry + 1;
+        Encounters.Insert(newIndex, clone);
+        GetEncounterEntries();
+        LB_Encounter.SelectedIndex = newIndex;
+    }
+
+    private void B_DelStatic_Click(object sender, EventArgs e)
+    {
+        if (Encounters.Count <= 1 || eEntry < 0 || eEntry >= Encounters.Count)
+            return;
+        int oldIndex = eEntry;
+        Encounters.RemoveAt(oldIndex);
+        eEntry = -1;
+        GetEncounterEntries();
+        LB_Encounter.SelectedIndex = Math.Min(oldIndex, Encounters.Count - 1);
+    }
+
+    // Trades Add / Clone / Delete
+    private void B_AddTrade_Click(object sender, EventArgs e)
+    {
+        SetTrade();
+        var newEntry = new EncounterTrade7(new byte[EncounterTrade7.SIZE])
+        {
+            Species = 1,
+            Level = 5,
+        };
+        Trades.Add(newEntry);
+        GetTradeEntries();
+        LB_Trade.SelectedIndex = Trades.Count - 1;
+    }
+
+    private void B_DupTrade_Click(object sender, EventArgs e)
+    {
+        if (tEntry < 0 || tEntry >= Trades.Count)
+            return;
+        SetTrade();
+        var clone = new EncounterTrade7((byte[])Trades[tEntry].Data.Clone());
+        int newIndex = tEntry + 1;
+        Trades.Insert(newIndex, clone);
+        GetTradeEntries();
+        LB_Trade.SelectedIndex = newIndex;
+    }
+
+    private void B_DelTrade_Click(object sender, EventArgs e)
+    {
+        if (Trades.Count <= 1 || tEntry < 0 || tEntry >= Trades.Count)
+            return;
+        int oldIndex = tEntry;
+        Trades.RemoveAt(oldIndex);
+        tEntry = -1;
+        GetTradeEntries();
+        LB_Trade.SelectedIndex = Math.Min(oldIndex, Trades.Count - 1);
     }
 
     // Randomization
@@ -528,7 +710,7 @@ public partial class StaticEncounterEditor7 : Form
         int randFinalEvo() => (int)(Util.Random32() % FinalEvo.Length);
         int randLegend() => (int)(Util.Random32() % ReplaceLegend.Length);
 
-        for (int i = 0; i < Gifts.Length; i++) // Including Starters
+        for (int i = 0; i < Gifts.Count; i++) // Including Starters
         {
             var t = Gifts[i];
             
@@ -575,8 +757,9 @@ public partial class StaticEncounterEditor7 : Form
                 else
                 {
                     int rv;
+                    int tries = 0;
                     do { rv = Util.Rand.Next(1, CB_SpecialMove.Items.Count); }
-                    while (banned.Contains(rv));
+                    while ((banned.Contains(rv) || !Legal.IsUsableMove(rv, movelist)) && ++tries < 1000);
                     t.SpecialMove = rv;
                 }
             }

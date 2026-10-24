@@ -54,5 +54,14 @@
   },
   "ItemNames": {
     "${itemId}": "Room Service"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Room Services"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Room Service[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nIt lowers the holder's Speed when\nTrick Room takes effect."
   }
 }

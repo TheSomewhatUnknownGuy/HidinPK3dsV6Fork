@@ -1,0 +1,34 @@
+{
+  "Name": "Grim Neigh",
+  "Description": "Grim Neigh (Ability 265). When the Pok\u00E9mon knocks out a target with an attack, it raises its Sp. Atk stat by 1 stage.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 265,
+      "Name": "Grim Neigh",
+      "Slots": [
+        {
+          "Timing": "0x9E",
+          "Code": "F0412DE90240A0E10150A0E10060A0E10370A0E10500A0E14685F9EB000050E33400001A0730A0E10420A0E10510A0E10600A0E1FE7FF9EB000050E32D00000AB803D6E1010010E32870A0030180A0032970A0130380A0130420A0E10110A0E30500A0E16F27FAEB0420A0E10310A0E30500A0E19F1DFAEB0060A0E10720A0E10110A0E3040086E2F726FAEB0410A0E1040086E2DAFDF9EB0610A0E10500A0E113F3F9EB0420A0E10D10A0E30500A0E1901DFAEB0060A0E1000096E5020580E3000086E50100A0E31100C6E51000C6E50C40C6E50480C6E50610A0E10500A0E103F3F9EB0420A0E10210A0E30500A0E1F041BDE84B27FAEAF081BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 158,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "8EEt6QJAoOEBUKDhAGCg4QNwoOEFAKDhRoX56wAAUOM0AAAaBzCg4QQgoOEFEKDhBgCg4f5/+esAAFDjLQAACrgD1uEBABDjKHCgAwGAoAMpcKATA4CgEwQgoOEBEKDjBQCg4W8n+usEIKDhAxCg4wUAoOGfHfrrAGCg4QcgoOEBEKDjBACG4vcm+usEEKDhBACG4tr9+esGEKDhBQCg4RPz+esEIKDhDRCg4wUAoOGQHfrrAGCg4QAAluUCBYDjAACG5QEAoOMRAMblEADG5QxAxuUEgMblBhCg4QUAoOED8/nrBCCg4QIQoOMFAKDh8EG96Esn+urwgb3o"
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

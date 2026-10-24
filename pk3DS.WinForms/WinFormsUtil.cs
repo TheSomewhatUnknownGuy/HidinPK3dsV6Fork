@@ -648,44 +648,38 @@ public static class WinFormsUtil
 
     public static void ApplyCyberSlateTheme(Form form, VisualTheme theme)
     {
-        bool dark = theme == VisualTheme.Dark;
-        bool grey = theme == VisualTheme.Grey;
-        bool light = theme == VisualTheme.Light;
-        bool purple = theme == VisualTheme.GalaxyPurple;
+        var pal = ThemePalette.For(theme);
 
         if (form.Name != "Main")
-        {
-            if (light) form.BackColor = Color.FromArgb(245, 246, 248);
-            else if (purple) form.BackColor = Color.FromArgb(40, 22, 44);
-            else form.BackColor = dark ? Color.FromArgb(18, 18, 24) : Color.FromArgb(45, 45, 48);
-        }
-        if (light) form.ForeColor = Color.FromArgb(33, 37, 41);
-        else if (purple) form.ForeColor = Color.FromArgb(245, 235, 250);
-        else form.ForeColor = dark ? Color.FromArgb(230, 230, 240) : Color.FromArgb(241, 241, 241);
-        form.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Regular, GraphicsUnit.Point);
-        
+            form.BackColor = pal.Surface;
+        form.ForeColor = pal.Text;
+        // A Font change makes the form rescale all its children, so set it only when it really differs.
+        if (form.Font.Name != "Segoe UI" || form.Font.SizeInPoints != 9F || form.Font.Style != FontStyle.Regular || form.Font.Unit != GraphicsUnit.Point)
+            form.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+
+        // Sub-forms get solid surfaces: the gradient and translucent panels made every child repaint its parent first.
+        // Only Main keeps the gradient.
+        if (form.Name != "Main")
+            SetDoubleBuffered(form);
+
+        form.SuspendLayout();
         foreach (Control c in form.Controls)
             ApplyCyberSlateTheme(c, theme);
-            
+        form.ResumeLayout(true);
+
         // Handle MenuStrips
         foreach (MenuStrip ms in form.Controls.OfType<MenuStrip>())
         {
-            if (light) {
-                ms.BackColor = Color.FromArgb(235, 238, 242);
-                ms.ForeColor = Color.FromArgb(33, 37, 41);
-            } else if (purple) {
-                ms.BackColor = Color.FromArgb(32, 16, 36);
-                ms.ForeColor = Color.FromArgb(245, 235, 250);
-            } else {
-                ms.BackColor = dark ? Color.FromArgb(45, 50, 65) : Color.FromArgb(60, 60, 70);
-                ms.ForeColor = Color.WhiteSmoke;
-            }
+            ms.BackColor = pal.Strip;
+            ms.ForeColor = pal.StripText;
             foreach (ToolStripMenuItem item in ms.Items)
                 ApplyThemeToMenuItem(item, theme);
         }
     }
 
     private static bool _filterAdded = false;
+
+    private static bool OnMain(Control c) => c.FindForm() is { Name: "Main" };
 
     private static void ApplyCyberSlateTheme(Control c, VisualTheme theme)
     {
@@ -695,204 +689,289 @@ public static class WinFormsUtil
             _filterAdded = true;
         }
 
-        bool dark = theme == VisualTheme.Dark;
-        bool grey = theme == VisualTheme.Grey;
-        bool light = theme == VisualTheme.Light;
-        bool purple = theme == VisualTheme.GalaxyPurple;
+        var pal = ThemePalette.For(theme);
 
         if ((c is Panel || c is GroupBox || c is TabPage) && c.Name != "PNL_Sidebar")
         {
-            if (light) { c.BackColor = Color.FromArgb(255, 255, 255); c.ForeColor = Color.FromArgb(33, 37, 41); }
-            else if (purple) { c.BackColor = Color.FromArgb(52, 28, 58); c.ForeColor = Color.FromArgb(245, 235, 250); }
-            else { c.BackColor = dark ? Color.FromArgb(20, 20, 30) : Color.FromArgb(55, 55, 60); c.ForeColor = Color.WhiteSmoke; }
+            c.BackColor = pal.Card;
+            c.ForeColor = pal.CardText;
             if (c is TabPage tp) tp.UseVisualStyleBackColor = false;
         }
         else if (c is Label lbl)
         {
-            if (light) { lbl.ForeColor = Color.FromArgb(33, 37, 41); }
-            else if (purple) { lbl.ForeColor = Color.FromArgb(245, 235, 250); }
-            else { lbl.ForeColor = dark ? Color.FromArgb(220, 220, 220) : Color.FromArgb(235, 235, 235); }
+            // Main sits on its gradient, so its labels are transparent. Everywhere else a label follows its parent's solid colour.
+            if (lbl.Parent != null && lbl.BackColor == lbl.Parent.BackColor)
+            {
+                if (OnMain(lbl)) lbl.BackColor = Color.Transparent;
+                else lbl.ResetBackColor();
+            }
+            lbl.ForeColor = pal.LabelText;
         }
         else if (c is PictureBox pb)
         {
-            pb.BackColor = Color.Transparent;
+            pb.BackColor = Color.Transparent;   // kept on sub-forms too: TitleScreenEditor6 and ToolsUI read it as a toggle state
         }
         else if (c is CheckBox chk)
         {
-            chk.BackColor = Color.Transparent;
+            if (OnMain(chk)) chk.BackColor = Color.Transparent;
+            else chk.ResetBackColor();
+            // Some forms hard-code white text on their checkboxes, which vanishes on the light theme.
+            chk.ForeColor = pal.CheckText;
         }
         else if (c is Button btn)
         {
             btn.FlatStyle = FlatStyle.Flat;
-            if (light) {
-                btn.BackColor = Color.FromArgb(235, 238, 242);
-                btn.ForeColor = Color.FromArgb(33, 37, 41);
-                btn.FlatAppearance.BorderColor = Color.FromArgb(206, 212, 218);
-                btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(248, 249, 250);
-            } else if (purple) {
-                btn.BackColor = Color.FromArgb(68, 36, 76);
-                btn.ForeColor = Color.FromArgb(245, 235, 250);
-                btn.FlatAppearance.BorderColor = Color.FromArgb(102, 53, 114);
-                btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(88, 48, 98);
-            } else {
-                btn.BackColor = dark ? Color.FromArgb(32, 34, 46) : Color.FromArgb(70, 70, 75);
-                btn.ForeColor = Color.WhiteSmoke;
-                btn.FlatAppearance.BorderColor = dark ? Color.FromArgb(60, 65, 85) : Color.FromArgb(90, 90, 95);
-                btn.FlatAppearance.MouseOverBackColor = dark ? Color.FromArgb(50, 55, 75) : Color.FromArgb(85, 85, 90);
+            btn.BackColor = pal.Button;
+            btn.ForeColor = pal.ButtonText;
+            btn.FlatAppearance.BorderColor = pal.ButtonBorder;
+            btn.FlatAppearance.MouseOverBackColor = pal.ButtonHover;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(btn.BackColor, 0.1f);
+            if (btn.FindForm()?.AcceptButton == btn)
+            {
+                btn.BackColor = Accent(theme);
+                btn.ForeColor = OnAccent(theme);
+                btn.FlatAppearance.BorderColor = Accent(theme);
+                btn.FlatAppearance.MouseOverBackColor = ControlPaint.Light(Accent(theme), 0.2f);
             }
-            btn.FlatAppearance.BorderSize = 1;
             btn.Cursor = Cursors.Hand;
+            RoundButton(btn);
         }
         else if (c is TextBoxBase tb)
         {
-            if (light) {
-                tb.BackColor = Color.FromArgb(255, 255, 255);
-                tb.ForeColor = Color.FromArgb(33, 37, 41);
-            } else if (purple) {
-                tb.BackColor = Color.FromArgb(32, 16, 36);
-                tb.ForeColor = Color.FromArgb(245, 235, 250);
-            } else {
-                tb.BackColor = dark ? Color.FromArgb(12, 12, 18) : Color.FromArgb(40, 40, 45);
-                tb.ForeColor = Color.FromArgb(220, 220, 230);
-            }
+            tb.BackColor = pal.Input;
+            tb.ForeColor = pal.InputText;
             tb.BorderStyle = BorderStyle.FixedSingle;
         }
         else if (c is TreeView tv)
         {
             // TreeView was not handled at all, so it kept the system's white background whatever the
             // theme - the OWSE script tree being the visible case.
-            if (light) {
-                tv.BackColor = SystemColors.Window;
-                tv.ForeColor = SystemColors.WindowText;
-                tv.LineColor = SystemColors.ControlDark;
-            } else if (purple) {
-                tv.BackColor = Color.FromArgb(32, 16, 36);
-                tv.ForeColor = Color.FromArgb(245, 235, 250);
-                tv.LineColor = Color.FromArgb(142, 73, 128);
-            } else {
-                tv.BackColor = dark ? Color.FromArgb(12, 12, 18) : Color.FromArgb(40, 40, 45);
-                tv.ForeColor = Color.FromArgb(220, 220, 230);
-                tv.LineColor = Color.FromArgb(90, 95, 115);
-            }
+            tv.BackColor = pal.Input;
+            tv.ForeColor = pal.InputText;
+            tv.LineColor = pal.TreeLine;
             tv.BorderStyle = BorderStyle.FixedSingle;
         }
         else if (c is ListControl lc)
         {
-            if (light) {
-                lc.BackColor = SystemColors.Window;
-                lc.ForeColor = SystemColors.WindowText;
-            } else if (purple) {
-                lc.BackColor = Color.FromArgb(82, 42, 74);
-                lc.ForeColor = Color.WhiteSmoke;
-            } else {
-                lc.BackColor = dark ? Color.FromArgb(12, 12, 18) : Color.FromArgb(40, 40, 45);
-                lc.ForeColor = Color.FromArgb(220, 220, 230);
-            }
-        }
-        else if (c is ComboBox cb)
-        {
-            if (light) {
-                cb.BackColor = SystemColors.Window;
-                cb.ForeColor = SystemColors.WindowText;
-            } else if (purple) {
-                cb.BackColor = Color.FromArgb(92, 47, 82);
-                cb.ForeColor = Color.WhiteSmoke;
-            } else {
-                cb.BackColor = dark ? Color.FromArgb(25, 25, 35) : Color.FromArgb(50, 50, 55);
-                cb.ForeColor = Color.WhiteSmoke;
-            }
-            cb.FlatStyle = FlatStyle.Flat;
-        }
-        else if (c is ListBox lb)
-        {
-            if (light) {
-                lb.BackColor = SystemColors.Window;
-                lb.ForeColor = SystemColors.WindowText;
-            } else if (purple) {
-                lb.BackColor = Color.FromArgb(82, 42, 74);
-                lb.ForeColor = Color.WhiteSmoke;
-            } else {
-                lb.BackColor = dark ? Color.FromArgb(15, 15, 25) : Color.FromArgb(45, 45, 50);
-                lb.ForeColor = Color.WhiteSmoke;
-            }
-            lb.BorderStyle = BorderStyle.FixedSingle;
+            lc.BackColor = pal.List;
+            lc.ForeColor = pal.ListText;
+            if (c is ListBox plainList) AccentListBox(plainList, theme);
+            else if (c is ComboBox combo) ThemeCombo(combo);                // ComboBox is a ListControl too, so it lands here
         }
         else if (c is DataGridView dgv)
         {
-            if (light) {
-                dgv.BackgroundColor = SystemColors.ControlDark;
-                dgv.DefaultCellStyle.BackColor = SystemColors.Window;
-                dgv.DefaultCellStyle.ForeColor = SystemColors.WindowText;
-                dgv.ColumnHeadersDefaultCellStyle.BackColor = SystemColors.Control;
-                dgv.ColumnHeadersDefaultCellStyle.ForeColor = SystemColors.ControlText;
-                dgv.GridColor = SystemColors.ControlDark;
-            } else if (purple) {
-                dgv.BackgroundColor = Color.FromArgb(122, 63, 110);
-                dgv.DefaultCellStyle.BackColor = Color.FromArgb(102, 53, 92);
-                dgv.DefaultCellStyle.ForeColor = Color.WhiteSmoke;
-                dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(142, 73, 128);
-                dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.WhiteSmoke;
-                dgv.GridColor = Color.FromArgb(162, 83, 146);
-            } else {
-                dgv.BackgroundColor = dark ? Color.FromArgb(18, 18, 24) : Color.FromArgb(45, 45, 50);
-                dgv.DefaultCellStyle.BackColor = dark ? Color.FromArgb(24, 26, 36) : Color.FromArgb(50, 50, 55);
-                dgv.DefaultCellStyle.ForeColor = Color.WhiteSmoke;
-                dgv.ColumnHeadersDefaultCellStyle.BackColor = dark ? Color.FromArgb(40, 44, 60) : Color.FromArgb(65, 65, 70);
-                dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.WhiteSmoke;
-                dgv.GridColor = dark ? Color.FromArgb(45, 50, 65) : Color.FromArgb(70, 70, 75);
-            }
+            dgv.BackgroundColor = pal.GridBack;
+            dgv.DefaultCellStyle.BackColor = pal.Cell;
+            dgv.DefaultCellStyle.ForeColor = pal.CellText;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = pal.Header;
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = pal.HeaderText;
+            dgv.GridColor = pal.GridLine;
             dgv.EnableHeadersVisualStyles = false;
+            dgv.AlternatingRowsDefaultCellStyle.BackColor = Tint(dgv.DefaultCellStyle.BackColor, theme == VisualTheme.Light ? -8 : 8);
+            dgv.DefaultCellStyle.SelectionBackColor = Accent(theme);
+            dgv.DefaultCellStyle.SelectionForeColor = OnAccent(theme);
+            dgv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         }
         
         if (c is TabControl tc)
         {
             tc.Appearance = TabAppearance.Normal;
+            tc.Padding = new Point(14, 5);   // room for the owner-drawn text, so long tab names are not clipped
             SetDoubleBuffered(tc);
             ApplyOwnerDrawnTabs(tc, theme);
         }
 
         // Glassmorphism effect for panels
         if (c is Panel p && p.Name.Contains("Glass"))
-        {
-            if (light) p.BackColor = Color.FromArgb(180, 240, 240, 240);
-            else if (purple) p.BackColor = Color.FromArgb(180, 122, 63, 110);
-            else p.BackColor = dark ? Color.FromArgb(180, 25, 25, 35) : Color.FromArgb(180, 50, 50, 60);
-        }
+            p.BackColor = pal.Glass;
 
         foreach (Control child in c.Controls)
             ApplyCyberSlateTheme(child, theme);
+
+        // Group titles: accent colour, bold. Children are pinned to their own font and colour first, because
+        // unset controls inherit both from the GroupBox and would turn bold gold as well.
+        if (c is GroupBox gb)
+        {
+            foreach (Control k in gb.Controls) { k.Font = k.Font; k.ForeColor = k.ForeColor; }
+            gb.ForeColor = Accent(theme);
+            gb.Font = new Font(gb.Font.FontFamily, gb.Font.Size, FontStyle.Bold);
+        }
+    }
+
+    /// <summary>The gradient Main is showing; sub-forms reuse it so every window shares one look. Set by Main.</summary>
+    public static string CurrentGradientName { get; set; }
+
+    // The accent follows the gradient on screen: the gradient's most saturated stop, kept at its hue and
+    // re-lit so it reads on the theme (bright on dark panels, deep on the light theme). Unknown gradient
+    // names fall back to a fixed gold. Used for focus, the default button, selected rows, group titles
+    // and any coloured heading.
+    private static (string Gradient, VisualTheme Theme, Color Colour) _accentCache;
+
+    public static Color Accent(VisualTheme t)
+    {
+        string name = CurrentGradientName;
+        if (_accentCache.Gradient == name && _accentCache.Theme == t && _accentCache.Colour != default) return _accentCache.Colour;
+
+        Color result = t switch
+        {
+            VisualTheme.Light => Color.FromArgb(150, 92, 0),
+            VisualTheme.GalaxyPurple => Color.FromArgb(255, 190, 110),
+            _ => Color.FromArgb(232, 181, 72),
+        };
+        LoadGradients();
+        if (!string.IsNullOrEmpty(name) && Gradients.TryGetValue(name, out var stops) && stops.Length > 0)
+        {
+            Color best = stops.OrderByDescending(c => c.GetSaturation()).First();
+            float sat = Math.Max(best.GetSaturation(), 0.55f);
+            result = FromHsl(best.GetHue(), sat, t == VisualTheme.Light ? 0.30f : 0.68f);
+        }
+        _accentCache = (name, t, result);
+        return result;
+    }
+
+    public static Color OnAccent(VisualTheme t) => Accent(t).GetBrightness() > 0.5f ? Color.FromArgb(24, 20, 10) : Color.White;
+
+    private static Color FromHsl(float hue, float sat, float light)
+    {
+        float c = (1 - Math.Abs(2 * light - 1)) * sat;
+        float x = c * (1 - Math.Abs(hue / 60 % 2 - 1));
+        float m = light - c / 2;
+        (float r, float g, float b) = (int)(hue / 60) switch
+        {
+            0 => (c, x, 0f), 1 => (x, c, 0f), 2 => (0f, c, x),
+            3 => (0f, x, c), 4 => (x, 0f, c), _ => (c, 0f, x),
+        };
+        return Color.FromArgb((int)Math.Round((r + m) * 255), (int)Math.Round((g + m) * 255), (int)Math.Round((b + m) * 255));
+    }
+
+    private static Color Tint(Color c, int d) => Color.FromArgb(c.A,
+        Math.Clamp(c.R + d, 0, 255), Math.Clamp(c.G + d, 0, 255), Math.Clamp(c.B + d, 0, 255));
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ListBox, object> AccentedLists = new();
+
+    /// <summary>Draws the selected row in the theme accent instead of system blue. Only for plain lists nobody owner-draws already.</summary>
+    private static void AccentListBox(ListBox lb, VisualTheme theme)
+    {
+        if (lb.DrawMode != DrawMode.Normal || AccentedLists.TryGetValue(lb, out _)) return;
+        AccentedLists.Add(lb, new object());
+        lb.DrawMode = DrawMode.OwnerDrawFixed;
+        lb.DrawItem += (_, e) =>
+        {
+            if (e.Index < 0) return;
+            bool sel = (e.State & DrawItemState.Selected) != 0;
+            using (var back = new SolidBrush(sel ? Accent(CurrentTheme) : lb.BackColor)) e.Graphics.FillRectangle(back, e.Bounds);
+            TextRenderer.DrawText(e.Graphics, lb.GetItemText(lb.Items[e.Index]), lb.Font, e.Bounds,
+                sel ? OnAccent(CurrentTheme) : lb.ForeColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        };
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object> ThemedCombos = new();
+
+    /// <summary>Flat combo whose border and arrow button are repainted in theme colours. The system draws both white
+    /// whatever BackColor says, and no owner-draw mode reaches them, so a NativeWindow repaints them after each WM_PAINT.</summary>
+    private static void ThemeCombo(ComboBox cb)
+    {
+        cb.FlatStyle = FlatStyle.Flat;
+        if (ThemedCombos.TryGetValue(cb, out _)) return;
+        ThemedCombos.Add(cb, new ComboPainter(cb));
+    }
+
+    private sealed class ComboPainter : NativeWindow
+    {
+        private const int WM_PAINT = 0x000F;
+        private readonly ComboBox cb;
+
+        public ComboPainter(ComboBox c)
+        {
+            cb = c;
+            if (c.IsHandleCreated) AssignHandle(c.Handle);
+            c.HandleCreated += (_, _) => AssignHandle(c.Handle);
+            c.HandleDestroyed += (_, _) => ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            if (m.Msg == WM_PAINT) Repaint();
+        }
+
+        private void Repaint()
+        {
+            var back = cb.BackColor;
+            bool light = CurrentTheme == VisualTheme.Light;
+            var border = light ? SystemColors.ControlDark : Tint(back, 50);
+            var button = Tint(back, light ? -12 : 20);
+            int bw = SystemInformation.VerticalScrollBarWidth;
+            var r = new Rectangle(0, 0, cb.Width, cb.Height);
+            var btn = new Rectangle(r.Right - bw - 1, 1, bw, r.Height - 2);
+            using var g = Graphics.FromHwnd(cb.Handle);
+            using (var pen = new Pen(back)) g.DrawRectangle(pen, 1, 1, r.Width - 3, r.Height - 3);   // inner ring the flat style leaves white
+            using (var pen = new Pen(border)) g.DrawRectangle(pen, 0, 0, r.Width - 1, r.Height - 1);
+            using (var fill = new SolidBrush(button)) g.FillRectangle(fill, btn);
+            using (var pen = new Pen(border)) g.DrawLine(pen, btn.X - 1, 1, btn.X - 1, r.Height - 2);
+            // a focused drop-down list shows its selected text highlighted: use the theme accent instead of system blue
+            if (cb.DropDownStyle == ComboBoxStyle.DropDownList && cb.Focused)
+            {
+                var text = new Rectangle(2, 2, btn.X - 4, r.Height - 4);
+                using (var fill = new SolidBrush(Accent(CurrentTheme))) g.FillRectangle(fill, text);
+                TextRenderer.DrawText(g, cb.GetItemText(cb.SelectedItem), cb.Font, text, OnAccent(CurrentTheme),
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            }
+            int cx = btn.X + btn.Width / 2, cy = btn.Y + btn.Height / 2;
+            using (var fill = new SolidBrush(cb.ForeColor)) g.FillPolygon(fill, new[] { new Point(cx - 3, cy - 1), new Point(cx + 4, cy - 1), new Point(cx, cy + 3) });
+        }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Button, object> RoundedButtons = new();
+
+    /// <summary>Rounds a flat button's corners and redraws its outline smoothly. Attached once per button.</summary>
+    private static void RoundButton(Button b)
+    {
+        if (RoundedButtons.TryGetValue(b, out _)) return;
+        RoundedButtons.Add(b, new object());
+        const int radius = 6;
+        static System.Drawing.Drawing2D.GraphicsPath Path(Rectangle r)
+        {
+            var gp = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = radius * 2;
+            gp.AddArc(r.X, r.Y, d, d, 180, 90);
+            gp.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            gp.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            gp.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            gp.CloseFigure();
+            return gp;
+        }
+        void Reshape()
+        {
+            if (b.Width < radius * 2 || b.Height < radius * 2) return;
+            using var gp = Path(new Rectangle(0, 0, b.Width, b.Height));
+            b.Region?.Dispose();
+            b.Region = new Region(gp);
+        }
+        b.SizeChanged += (_, _) => Reshape();
+        b.Paint += (_, e) =>
+        {
+            if (b.Width < radius * 2 || b.Height < radius * 2) return;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var gp = Path(new Rectangle(0, 0, b.Width - 1, b.Height - 1));
+            using var pen = new Pen(b.Focused ? b.ForeColor : b.FlatAppearance.BorderColor);
+            e.Graphics.DrawPath(pen, gp);
+        };
+        Reshape();
     }
 
     public static void ApplyThemeToMenuItem(ToolStripMenuItem item, VisualTheme theme)
     {
-        bool dark = theme == VisualTheme.Dark;
-        bool grey = theme == VisualTheme.Grey;
-        bool light = theme == VisualTheme.Light;
-        bool purple = theme == VisualTheme.GalaxyPurple;
+        var pal = ThemePalette.For(theme);
 
-        if (light) {
-            item.BackColor = SystemColors.Control;
-            item.ForeColor = SystemColors.ControlText;
-        } else if (purple) {
-            item.BackColor = Color.FromArgb(122, 63, 110);
-            item.ForeColor = Color.WhiteSmoke;
-        } else {
-            item.BackColor = dark ? Color.FromArgb(45, 50, 65) : Color.FromArgb(60, 60, 70);
-            item.ForeColor = Color.WhiteSmoke;
-        }
+        item.BackColor = pal.MenuItem;
+        item.ForeColor = pal.MenuItemText;
 
         foreach (ToolStripItem sub in item.DropDownItems)
         {
-            if (light) {
-                sub.BackColor = SystemColors.Control;
-                sub.ForeColor = SystemColors.ControlText;
-            } else if (purple) {
-                sub.BackColor = Color.FromArgb(122, 63, 110);
-                sub.ForeColor = Color.WhiteSmoke;
-            } else {
-                sub.BackColor = dark ? Color.FromArgb(45, 50, 65) : Color.FromArgb(60, 60, 70);
-                sub.ForeColor = Color.WhiteSmoke;
-            }
+            sub.BackColor = pal.MenuItem;
+            sub.ForeColor = pal.MenuItemText;
 
             if (sub is ToolStripMenuItem tsmi)
                 ApplyThemeToMenuItem(tsmi, theme);
@@ -920,16 +999,8 @@ public static class WinFormsUtil
     /// </summary>
     private static void ApplyOwnerDrawnTabs(TabControl tc, VisualTheme theme)
     {
-        bool light = theme == VisualTheme.Light;
-        bool purple = theme == VisualTheme.GalaxyPurple;
-
-        Color strip = light ? Color.FromArgb(235, 235, 240)
-                    : purple ? Color.FromArgb(38, 20, 44)
-                    : Color.FromArgb(20, 20, 30);
-        Color selected = light ? Color.White
-                       : purple ? Color.FromArgb(72, 40, 82)
-                       : Color.FromArgb(45, 45, 60);
-        Color text = light ? Color.FromArgb(33, 37, 41) : Color.WhiteSmoke;
+        var pal = ThemePalette.For(theme);
+        Color strip = pal.TabStrip, selected = pal.TabSelected, text = pal.TabText;
 
         tc.DrawMode = TabDrawMode.OwnerDrawFixed;
 
@@ -1097,6 +1168,30 @@ public static class WinFormsUtil
         SetDoubleBuffered(c);
         foreach (Control child in c.Controls)
             SetDoubleBufferedTree(child);
+    }
+
+    /// <summary>
+    /// A ComboBox with AutoCompleteSource.ListItems rebuilds its autocomplete list on every Items change,
+    /// which made a 5-item refill cost 44 ms instead of 12 ms. This keeps autocomplete off until the combo
+    /// is used (mouse or key), so list changes while it is idle are cheap. Not Enter: a form focuses its first
+    /// combo when shown, which would switch it back on straight away.
+    /// </summary>
+    public static void DeferAutoComplete(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            if (c is ComboBox cb && cb.DropDownStyle != ComboBoxStyle.DropDownList
+                && cb.AutoCompleteMode != AutoCompleteMode.None && cb.AutoCompleteSource == AutoCompleteSource.ListItems)
+            {
+                var mode = cb.AutoCompleteMode;
+                cb.AutoCompleteMode = AutoCompleteMode.None;
+                void On(object _, EventArgs __) { if (cb.AutoCompleteMode != mode) cb.AutoCompleteMode = mode; }
+                cb.MouseDown += On;
+                cb.KeyDown += On;
+                cb.Leave += (_, _) => { if (cb.AutoCompleteMode != AutoCompleteMode.None) cb.AutoCompleteMode = AutoCompleteMode.None; };
+            }
+            DeferAutoComplete(c);
+        }
     }
 
     public static void SetDoubleBuffered(Control c)
@@ -1570,7 +1665,10 @@ public class ComboBoxArrowKeyFilter : IMessageFilter
         // that Control.FromHandle returns null for. Walk up via GetParent.
         ComboBox cb = FindComboBox(m.HWnd);
         if (cb != null)
+        {
+            pk3DS.WinForms.Controls.LazyCombo.Expand(cb);   // Up/Down walks the list, so a lazy combo needs it first
             return HandleComboBoxNavigation(cb, key);
+        }
 
         return false;
     }

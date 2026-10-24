@@ -1,0 +1,26 @@
+{
+  "Name": "Magic Powder",
+  "Description": "Implements Magic Powder (move 750) by cloning Soak's real routine (0x0C8658, timing 0xBF) byte-for-byte and changing its embedded 16-bit packed type descriptor at 0xC86E0 from Soak's Water/Water/None (0x494A = (18 << 10) | (10 << 5) | 10) to pure Psychic (0x49AD = (18 << 10) | (13 << 5) | 13), setting the target's type to pure Psychic. Move 750 in a/0/1/1 shares EffectSequence 294 with Soak.",
+  "Category": "Move mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 750,
+      "Name": "Magic Powder",
+      "Slots": [
+        {
+          "Timing": "0xBF",
+          "Code": "F05F2DE90300A0E30180A0E10270A0E13AFDFEEB070050E11900001A0500A0E336FDFEEB006050E20040A0E31400009A50A09FE50090A0E301B0A0E30720A0E11510A0E30800A0E114FCFEEBB4A0C0E10050A0E10690C0E5060084E2FF0000E226FDFEEB0700C5E50510A0E10800A0E109B0C5E588D1FEEB014084E2060054E1EDFFFF3AF09FBDE8AD490000",
+          "SourceBase": "0xC8658"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

@@ -1,0 +1,60 @@
+{
+  "Name": "Pokemon Center NPC Services",
+  "Description": "Re-points the NPC inside each Pokemon Center at whichever service you choose, instead of all fifteen offering the same Cafe. REPLACES the old 'Center Move Tutor' package, which was marked DO-NOT-INSTALL because it aimed at LoadRemaindWaza - the Move Relearner's own move-list loader, not a tutor entry point at all. The right mechanism, taken from ABZB's 'Move Relearner Replaces Cafe.xlsx' and re-verified against both real binaries, is not a UI call at all: the Center NPC handler at 0x39A044 dispatches on a SCRIPT ID in r1, and the fifteen Centers occupy consecutive ids 0x14AA-0x14B8 (Route 1, Hau'oli, Route 2, Heahea, Royal Avenue, Route 8, Konikoni, Malie, Tapu Village, Route 16, Seafolk, Paniola, Route 5, Mt Lanakila, Mt Hokulani, in that order). Swapping that id makes the NPC run a different service outright. Known ids: 5500 (0x157C) Move Relearner, 5655 (0x1617) Super Training; 0 leaves that Center's NPC as the stock Cafe. Any other script id you know - a Move Tutor's, for instance - can be dropped straight into the list, which is the point: the package supplies the redirect mechanism and lets you aim it. Hooked by displacing the 'sub sp,sp,#0xc' at 0x39A048 into the injected routine, which performs it and then rewrites r1. Both the hook site and its two vanilla words are IDENTICAL on Ultra Sun and Ultra Moon (E92D4FF0 / E24DD00C, verified), so this needs no per-version handling. It does NOT touch the relearner's level-limit code that the source sheet also patches - that is a separate feature and those addresses do shift by 4 on UM. KNOWN ISSUE (tester report, 2026-09-25): redirecting a Center to 5500 (Move Relearner) crashes the game when used (NoExecuteFault, PC=0x10, LR inside a CRO). The installer output was verified byte-for-byte against ABZB's sheet on the Concept code.bin (hook BL, block, PC-relative table and all 15 values land correctly), when installed alone. Found afterwards (2026-09-26): pk3DS's code.bin allocator used to take the FIRST zero run anywhere in the file, so once another code.bin package had used the .text tail, this block landed in .rodata (0x5BDCF4 on the Concept build), where the NPC's branch faults on execute, and other packages' blocks overwrote live .rodata constants. The allocator is now limited to .text. That is the most likely cause, but the reported PC does not match it exactly, so 5500 stays out of the default list until it is re-tested on a ROM built with the fixed allocator.",
+  "Category": "Quality of Life",
+  "Requires": [],
+  "Parameters": {
+    "centerScriptIds": {
+      "Description": "Script id each Pokemon Center NPC should run, in Center order (Route 1, Hau'oli, Route 2, Heahea, Royal Avenue, Route 8, Konikoni, Malie, Tapu Village, Route 16, Seafolk, Paniola, Route 5, Mt Lanakila, Mt Hokulani). 5500 = Move Relearner (WARNING: crashes in testing, see package description; not in the default list), 5655 = Super Training, 0 = leave as the stock Cafe.",
+      "Type": "list",
+      "Default": "0,0,5655,0,0,5655,0,0,5655,0,0,5655,0,0,5655",
+      "AllowUnnamed": false
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "CodeBin": {
+    "LoadBase": 1048576,
+    "Blocks": [
+      {
+        "Name": "center-npc-service-remap",
+        "Code": "0CD04DE20C402DE9052B41E2AA2052E2060000BA0E0052E30400008A10308FE2823083E0B030D3E1000053E30310A0110C80BDE80000000000000000000000000000000000000000000000000000000000000000",
+        "SourceBase": "0x005B9F8C",
+        "CallsSymbols": [],
+        "CodeBytes": "DNBN4gxALekFK0HiqiBS4gYAALoOAFLjBAAAihAwj+KCMIPgsDDT4QAAU+MDEKARDIC96AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "SourceBaseValue": 6004620
+      }
+    ],
+    "Patches": [
+      {
+        "Name": "center-npc-dispatch-hook",
+        "Symbol": "",
+        "Offset": 2728008,
+        "Original": "0CD04DE2",
+        "BranchTo": "center-npc-service-remap",
+        "BranchOffset": 0,
+        "Link": true,
+        "OriginalBytes": "DNBN4g=="
+      }
+    ]
+  },
+  "DataTables": [
+    {
+      "Target": "code.bin",
+      "Block": "center-npc-service-remap",
+      "Offset": "0x34",
+      "ElementSize": 2,
+      "Values": "${centerScriptIds}",
+      "Terminate": false,
+      "Capacity": 15,
+      "OffsetValue": 52
+    }
+  ],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

@@ -1,211 +1,182 @@
 using System;
-using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
 /// <summary>
-/// Where the item IDs backing the Expansion Pack's extra TMs come from.
+/// The item IDs behind the Expansion Pack's extra TMs (TM101-TM128), and writing their names and bag entries.
 /// <para>
-/// Expanding USUM from 100 TMs to 128 needs 28 item IDs that do not already mean something. The
-/// obvious approach — scavenging slots whose name still reads "???" — no longer works on a real
-/// Expansion Pack build: only nine such slots remain, and the fallback for the rest handed out
-/// 960 upward, which on the checked UM Expansion ROM is Booster Energy, Eternatusite, Tera Crystal,
-/// the Rusted Sword/Shield, Reins of Unity, the Ogerpon masks and a dozen more. Saving the TM
-/// editor would have renamed those to "TM108".."TM128" and overwritten their item records with
-/// clones of TM01, destroying twenty-one real items.
+/// <see cref="ExpandCode"/> takes its IDs from <c>TMExpansion.PickItemIds</c>: the lowest IDs below 1024 that no item
+/// uses. The bag stores item IDs in 10 bits, so an ID of 1024 or more would show as a different item.
 /// </para>
 /// <para>
-/// So the IDs are allocated as a fresh contiguous block above everything that exists, rather than
-/// scavenged. <see cref="DefaultStartId"/> is the first ID past the Expansion Pack's own range.
+/// The checked US Expansion and Uhuru ROMs have 36 usable "???" ids below 960; the UM Expansion could differ (nine
+/// was observed there), so ids are chosen at runtime by name. Handing out ids from 960 up was dropped: on the checked
+/// UM Expansion ROM those are real items (Booster Energy, Eternatusite, Tera Crystal, and more), and writing TM names
+/// over them would have destroyed them.
 /// </para>
 /// </summary>
 public static class ExpandedTMItems
 {
-    /// <summary>TMs a retail USUM build has. The game's own bound reads <c>CMP R0, #100</c>.</summary>
-    public const int VanillaTMCount = 100;
-
-    /// <summary>TM count the expansion targets.</summary>
-    public const int ExpandedTMCount = 128;
-
-    /// <summary>How many brand-new item IDs the expansion needs: TM101 through TM128.</summary>
-    public const int NewItemCount = ExpandedTMCount - VanillaTMCount;
-
-    /// <summary>
-    /// Fallback start ID, used only when the loaded game's item table cannot be read.
-    /// <para>
-    /// 1024 is correct for the checked UM Expansion build — its own items run through 1023 with
-    /// Darkranite last, and the item name table holds exactly 1024 entries. It is wrong for
-    /// anything else, so prefer <see cref="ResolveStartId"/>, which reads the table instead of
-    /// assuming this.
-    /// </para>
-    /// </summary>
-    public const int DefaultStartId = 1024;
-
-    /// <summary>
-    /// First free item ID in the loaded game, so the block lands after whatever that ROM actually
-    /// has rather than at a number fixed for one build.
-    /// </summary>
-    public static int ResolveStartId(GameConfig cfg, int fallback = DefaultStartId)
-    {
-        string[] names = null;
-        try { names = cfg?.GetText(TextName.ItemNames); }
-        catch { /* a language with no item archive falls through to the fallback */ }
-
-        if (names == null || names.Length == 0) return fallback;
-
-        // Already allocated on a previous run? Reuse that block.
-        string firstName = GetTMName(VanillaTMCount); // "TM101"
-        for (int i = names.Length - 1; i >= 0; i--)
-        {
-            if (string.Equals(names[i]?.Trim(), firstName, StringComparison.OrdinalIgnoreCase))
-                return i;
-        }
-
-        // Otherwise the first index past the last item that actually has a name.
-        int last = names.Length - 1;
-        while (last >= 0 && string.IsNullOrWhiteSpace(names[last])) last--;
-
-        int start = last + 1;
-        return start > 0 ? start : fallback;
-    }
-
-    /// <summary>
-    /// Whether a start ID can be used without overwriting an item that already means something.
-    /// </summary>
-    public static bool IsSafeStartId(GameConfig cfg, int startId)
-    {
-        if (startId <= 0) return false;
-
-        string[] names = null;
-        try { names = cfg?.GetText(TextName.ItemNames); }
-        catch { /* unreadable: fall through */ }
-
-        // Nothing to check against; the caller's fallback is as good as it gets.
-        if (names == null || names.Length == 0) return true;
-
-        for (int i = 0; i < NewItemCount; i++)
-        {
-            int id = startId + i;
-            if (id >= names.Length) continue;      // past the table: free by definition
-
-            string name = names[id]?.Trim();
-            if (string.IsNullOrEmpty(name)) continue;                 // unnamed slot
-            if (name.Equals(GetTMName(VanillaTMCount + i), StringComparison.OrdinalIgnoreCase))
-                continue;                                             // already ours
-            if (name is "???" or "-----") continue;                   // placeholder rows
-
-            return false;   // a real item lives here
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Explains what <see cref="ResolveStartId"/> decided and why, for the preflight report.
-    /// </summary>
-    public static string DescribeAllocation(GameConfig cfg)
-    {
-        string[] names = null;
-        try { names = cfg?.GetText(TextName.ItemNames); }
-        catch { /* reported below as unreadable */ }
-
-        if (names == null || names.Length == 0)
-            return $"Item name table unreadable; falling back to the fixed start ID {DefaultStartId}.";
-
-        int start = ResolveStartId(cfg);
-        string firstName = GetTMName(VanillaTMCount);
-
-        bool reused = start < names.Length
-                      && string.Equals(names[start]?.Trim(), firstName, StringComparison.OrdinalIgnoreCase);
-
-        int named = names.Length - 1;
-        while (named >= 0 && string.IsNullOrWhiteSpace(names[named])) named--;
-
-        return reused
-            ? $"Reusing the existing block: {firstName} is already at ID {start}, so TM101-TM128 "
-              + $"keep IDs {start}-{HighestId(start)}."
-            : $"Item table holds {names.Length} rows, {named + 1} of them named. "
-              + $"Allocating TM101-TM128 at IDs {start}-{HighestId(start)}.";
-    }
-
-    /// <summary>Highest ID handed out when starting from <paramref name="startId"/>.</summary>
-    public static int HighestId(int startId = DefaultStartId) => startId + NewItemCount - 1;
-
-    /// <summary>
-    /// Item ID for a table index, or 0 when the index is not one of the new slots.
-    /// <para>
-    /// Index 100 is TM101. That boundary is 100 and not 107: the seven entries at 100-106 in the
-    /// stock table are the leftover HM moves (Cut, Fly, Surf, Strength, Waterfall, Rock Smash,
-    /// Dive), and USUM has no HMs — Ride Pager replaced them. The expanded table is relocated
-    /// wholesale into free space by
-    /// <see cref="pk3DS.Core.Modding.ResearchEngine.ApplyExpandedTMCodePatch"/>, so the original
-    /// 107-entry table stays intact in place for anything else that reads it, and the new one is
-    /// pure TMs. Counting from 107 instead would yield only 21 new slots, not 28, and would label
-    /// them TM108-TM128.
-    /// </para>
-    /// </summary>
-    public static int GetItemId(int tableIndex, int startId = DefaultStartId)
-    {
-        if (tableIndex < VanillaTMCount || tableIndex >= ExpandedTMCount) return 0;
-        return startId + (tableIndex - VanillaTMCount);
-    }
-
-    /// <summary>True when <paramref name="tableIndex"/> is one of the 28 expansion slots.</summary>
-    public static bool IsNewSlot(int tableIndex) =>
-        tableIndex >= VanillaTMCount && tableIndex < ExpandedTMCount;
-
     /// <summary>Display name for a slot: index 100 is "TM101".</summary>
     public static string GetTMName(int tableIndex) => $"TM{tableIndex + 1:D3}";
 
     /// <summary>
-    /// Overwrites the expansion slots of <paramref name="itemlist"/> with the new block, leaving
-    /// TM01-TM100 on their stock item IDs. Returns the IDs assigned.
+    /// Grows the TM table in <paramref name="code"/> to <paramref name="newCount"/> entries. The new TMs get the
+    /// lowest item ids below 1024 that no item uses, so none overwrites a real item. <paramref name="code"/> is not
+    /// changed: returns the new code.bin buffer, or null with the reason in <paramref name="error"/>.
     /// </summary>
-    public static IReadOnlyList<ushort> AssignTo(ushort[] itemlist, int startId = DefaultStartId)
-    {
-        var assigned = new List<ushort>();
-        if (itemlist == null) return assigned;
+    /// <param name="newMoves">One move per new TM.</param>
+    /// <param name="newItemIds">The item ids of the new TMs, in TM order.</param>
+#nullable enable
+    public static byte[]? ExpandCode(GameConfig cfg, byte[] code, int newCount, ushort[] newMoves,
+                                     out ushort[] newItemIds, out string error) =>
+        ExpandCode(cfg, code, newCount, newMoves, false, out newItemIds, out error, out _);
 
-        int end = Math.Min(itemlist.Length, ExpandedTMCount);
-        for (int i = VanillaTMCount; i < end; i++)
+    /// <summary>Like the compatibility overload, and reports any code.bin growth needed for the allocation.</summary>
+    public static byte[]? ExpandCode(GameConfig cfg, byte[] code, int newCount, ushort[] newMoves,
+                                     out ushort[] newItemIds, out string error, out GrowResult? growth) =>
+        ExpandCode(cfg, code, newCount, newMoves, true, out newItemIds, out error, out growth);
+
+    private static byte[]? ExpandCode(GameConfig cfg, byte[] code, int newCount, ushort[] newMoves, bool allowGrowth,
+                                      out ushort[] newItemIds, out string error, out GrowResult? growth)
+    {
+        newItemIds = [];
+        growth = null;
+        error = "";
+        if (newCount > TMExpansion.EffectiveMax && PassiveGuard.Enabled) { error = PassiveGuard.TmCapReason; return null; } // before any growth is attempted
+        var t = TMTable.Locate(code, out error);
+        if (t == null) return null;
+
+        string[] names = cfg.GetText(TextName.ItemNames);
+        // With no item names, every id looks free, so the new TMs would take ids 1..28 over real items.
+        if (names.Length == 0) { error = "the item name table is empty, so the new TMs cannot be named"; return null; }
+        bool Usable(int id) => (id >= names.Length || RecipeIdAllocator.IsFree(names, id))
+            && !UhuruGuard.ProtectedPocketItems.Contains(id) && !UhuruGuard.ProtectedBattleBagItems.Contains(id);
+        int[] ids = TMExpansion.PickItemIds(newCount - t.Count, Usable);
+        if (ids.Length == 0)
         {
-            var id = (ushort)GetItemId(i, startId);
-            itemlist[i] = id;
-            assigned.Add(id);
+            error = $"not enough free item ids below 1024 for {newCount - t.Count} new TMs (the bag stores item ids in 10 bits; ids from 1024 show as other items)";
+            return null;
         }
-        return assigned;
+
+        long needed = TMExpansion.CodeBytes + 4L * newCount;
+        if (needed <= 0 || needed > int.MaxValue)
+        { error = $"TM expansion needs {needed} bytes, outside the supported range"; return null; }
+
+        var keepOut = InstallRecord.Load(cfg.RomFS).PlacedIn("code.bin");
+        byte[]? TryExpand(byte[] source, TMTable table, int textEnd, out string failure, out bool spaceRefused)
+        {
+            // One allocator decides where the block goes. When nothing fits, the largest remaining run goes in as
+            // the room, so Expand reports its usual executable-padding refusal.
+            var allocator = CodeSpaceAllocator.ForCodeBin(source, keepOut, textEnd);
+            var grant = allocator.Allocate((int)needed, "TM expansion");
+            var room = grant.Success ? ((int)grant.Offset, grant.Size) : allocator.LargestFree();
+            byte[]? expanded = TMExpansion.Expand(source, newCount,
+                table.ReadItems(source).Concat(ids.Select(i => (ushort)i)).ToArray(),
+                table.ReadMoves(source).Concat(newMoves).ToArray(), room, out failure);
+            spaceRefused = expanded == null && failure.Contains("not enough executable padding in .text", StringComparison.Ordinal);
+            return expanded;
+        }
+
+        string? romRootForText = string.IsNullOrWhiteSpace(cfg.ExeFS) ? null : Directory.GetParent(Path.GetFullPath(cfg.ExeFS))?.FullName;
+        string? exHeaderForText = romRootForText == null ? null : Path.Combine(romRootForText, "ExHeader.bin");
+        byte[]? exHeaderBytes = exHeaderForText != null && File.Exists(exHeaderForText) ? File.ReadAllBytes(exHeaderForText) : null;
+        byte[]? result = TryExpand(code, t, CodeGrowth.TextEndFor(exHeaderBytes, code.LongLength), out error, out bool spaceRefused);
+        GrowResult? pendingGrowth = null;
+        if (result == null && spaceRefused && allowGrowth && GameConfig.AllowGrowth && !UhuruGuard.Active)
+        {
+            string? exeFsPath = cfg.ExeFS;
+            string? romRoot = string.IsNullOrWhiteSpace(exeFsPath)
+                ? null : Directory.GetParent(Path.GetFullPath(exeFsPath))?.FullName;
+            string? exHeaderPath = romRoot == null ? null : Path.Combine(romRoot, "ExHeader.bin");
+            string? ncch0Path = romRoot == null ? null : Path.Combine(romRoot, "HeaderNCCH0.bin");
+            if (exHeaderPath == null || !File.Exists(exHeaderPath))
+            {
+                error += "; ExHeader.bin was not found next to ExeFS, so code.bin could not grow";
+                return null;
+            }
+
+            byte[] exHeader = File.ReadAllBytes(exHeaderPath);
+            byte[]? ncch0 = ncch0Path != null && File.Exists(ncch0Path) ? File.ReadAllBytes(ncch0Path) : null;
+            // The editor records the offset journal only after the user approves the code.bin write.
+            var grown = CodeGrowth.Grow(code, exHeader, ncch0, (int)needed);
+            if (!grown.Ok)
+            {
+                error += "; code.bin growth refused: " + grown.Error;
+                return null;
+            }
+
+            var grownTable = TMTable.Locate(grown.Code, out string grownTableError);
+            if (grownTable == null)
+            {
+                error = "TM table was not found after code.bin growth: " + grownTableError;
+                return null;
+            }
+            result = TryExpand(grown.Code, grownTable, CodeGrowth.TextEndFor(grown.ExHeader), out error, out _);
+            if (result == null) return null;
+            pendingGrowth = grown;
+        }
+        if (result == null) return null;
+
+        int maxId = ids.Max();
+        if (maxId >= (int)ItemCeilingPatcher.RetailCeiling)
+        {
+            var ceiling = ItemCeilingPatcher.Raise(result, maxId);
+            if (!ceiling.Success)
+            {
+                error = ceiling.Describe();
+                return null;
+            }
+        }
+
+        // Applied, or already pointing at the icon from an earlier run. A refusal leaves NewIcon at 0,
+        // or PreviousIcon different from NewIcon.
+        var icon = TMIconPatcher.Retarget(result);
+        if (!(icon.Applied || (icon.NewIcon != 0 && icon.PreviousIcon == icon.NewIcon)))
+        {
+            error = icon.Message;
+            return null;
+        }
+
+        newItemIds = ids.Select(i => (ushort)i).ToArray();
+        growth = pendingGrowth;
+        return result;
     }
+#nullable restore
 
     /// <summary>
-    /// The stock item IDs for TM01-TM100 plus the HM block, as the unexpanded table holds them.
-    /// Used as the fallback when a ROM carries no relocation patch to read real values from.
+    /// Writes what the new TMs need outside code.bin: their pocket and bag entries in the RomFS, and their names
+    /// and move descriptions in the item text. Call it only after code.bin was written.
     /// </summary>
-    public static ushort[] GetVanillaItemTable()
+    /// <param name="firstSlot">TM index of <paramref name="newItemIds"/>[0], e.g. 100 for TM101.</param>
+    public static void WriteItemData(GameConfig cfg, ushort[] newItemIds, ushort[] newMoves, int firstSlot)
     {
-        var items = new ushort[107];
-        for (int i = 0; i < 92; i++) items[i] = (ushort)(328 + i);   // TM01-TM92
-        for (int i = 92; i < 95; i++) items[i] = (ushort)(618 + (i - 92));  // TM93-TM95
-        for (int i = 95; i < 100; i++) items[i] = (ushort)(690 + (i - 95)); // TM96-TM100
-        for (int i = 100; i < 106; i++) items[i] = (ushort)(420 + (i - 100)); // HM01-HM06
-        items[106] = 737; // HM07 Dive
-        return items;
-    }
+        // Thrown, not returned: the caller reports it. A silent return would leave TM101+ unnamed with no message.
+        if (string.IsNullOrWhiteSpace(cfg.RomFS) || !Directory.Exists(cfg.RomFS)) throw new DirectoryNotFoundException("RomFS folder not found");
+        if (newItemIds.Length == 0) return;
 
-    /// <summary>
-    /// Full item table for <paramref name="count"/> slots: stock IDs below 100, then the new block
-    /// when <paramref name="expanded"/>. When not expanded the legacy HM entries are kept so an
-    /// unexpanded ROM still reads the way it always did.
-    /// </summary>
-    public static ushort[] BuildItemTable(int count, bool expanded, int startId = DefaultStartId)
-    {
-        var vanilla = GetVanillaItemTable();
-        var items = new ushort[Math.Max(count, 0)];
+        int maxItemID = newItemIds.Max();
+        ResearchEngine.ApplyExpandedTMItemAttributesPatch(cfg.RomFS, maxItemID, newItemIds);
+        ResearchEngine.ApplyExpandedTMBattleBagPatch(cfg.RomFS, maxItemID, newItemIds);
+        ExpandedTMText.EnsureCapacity(cfg, maxItemID + 1);
 
-        for (int i = 0; i < items.Length; i++)
+        string[] itemNames = cfg.GetText(TextName.ItemNames);
+        string[] itemDescriptions = cfg.GetText(TextName.ItemFlavor);
+        string[] moveDescriptions = cfg.GetText(TextName.MoveFlavor);
+        for (int i = 0; i < newItemIds.Length; i++)
         {
-            if (expanded && IsNewSlot(i)) items[i] = (ushort)GetItemId(i, startId);
-            else if (i < vanilla.Length) items[i] = vanilla[i];
-            else items[i] = 0;
+            int itemId = newItemIds[i];
+            if (itemId <= 0 || itemId >= itemNames.Length) continue;
+            itemNames[itemId] = GetTMName(firstSlot + i);
+            if (itemId < itemDescriptions.Length && i < newMoves.Length && newMoves[i] > 0 && newMoves[i] < moveDescriptions.Length)
+                itemDescriptions[itemId] = moveDescriptions[newMoves[i]];
         }
-        return items;
+
+        cfg.SetText(TextName.ItemNames, itemNames);
+        cfg.SetText(TextName.ItemFlavor, itemDescriptions);
+        cfg.SaveText(TextName.ItemNames);
+        cfg.SaveText(TextName.ItemFlavor);
     }
 }

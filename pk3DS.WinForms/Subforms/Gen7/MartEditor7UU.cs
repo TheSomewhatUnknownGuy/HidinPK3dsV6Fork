@@ -224,6 +224,7 @@ public partial class MartEditor7UU : Form
 
     private void B_Save_Click(object sender, EventArgs e)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(CROPath) is { } uhuru) { WinFormsUtil.Alert(uhuru); Close(); return; }
         if (entryItem > -1) SetListItem();
         if (entryBPItem > -1) SetListBPItem();
         CROUtil.UpdateHashes(data);
@@ -601,6 +602,13 @@ public partial class MartEditor7UU : Form
 
     private void SyncMartsToCodeBin()
     {
+        // Shop.cro only needs the RomFS, so this editor opens without an ExeFS; Path.Combine(null)
+        // used to throw here after Shop.cro was already written, leaving the form stuck open.
+        if (string.IsNullOrEmpty(Main.ExeFSPath))
+        {
+            WinFormsUtil.Alert("Shops saved to Shop.cro.", "No ExeFS is loaded, so the shop size limits in code.bin were not updated. Open the ExeFS and save again if you changed how many items a shop holds.");
+            return;
+        }
         string binName = File.Exists(Path.Combine(Main.ExeFSPath, ".code.bin")) ? ".code.bin" : "code.bin";
         string codePath = Path.Combine(Main.ExeFSPath, binName);
         if (!File.Exists(codePath)) return;

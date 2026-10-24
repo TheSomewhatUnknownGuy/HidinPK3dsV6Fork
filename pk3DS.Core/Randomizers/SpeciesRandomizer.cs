@@ -14,17 +14,19 @@ public class SpeciesRandomizer
     public SpeciesRandomizer(GameConfig config)
     {
         var Game = config;
-        MaxSpeciesID = Game.Info.MaxSpeciesID;
-        SpeciesStat = Game.Personal.Table;
+        MaxSpeciesID = Game?.Info?.MaxSpeciesID ?? Game?.MaxSpeciesID ?? 807;
+        SpeciesStat = Game?.Personal?.Table ?? new PersonalInfo[MaxSpeciesID + 1];
     }
+
+    public int[] AllowedSpecies { get; private set; } = [];
 
     /// <summary>
     /// To be called after the allowed species are provided.
     /// </summary>
     public void Initialize()
     {
-        var list = InitializeSpeciesList();
-        RandSpec = new GenericRandomizer(list);
+        AllowedSpecies = InitializeSpeciesList();
+        RandSpec = new GenericRandomizer(AllowedSpecies);
     }
 
     public Dictionary<int, int> GlobalSpeciesMap { get; private set; } = new();
@@ -175,16 +177,18 @@ public class SpeciesRandomizer
     {
         if (!rEXP)
             return false;
-        // Experience Growth Rate matches
-        return oldpkm.EXPGrowth != pkm.EXPGrowth;
+        // Experience Growth Rate matches; give up after as many tries as the A->A rule does, so a
+        // pool with no matching rate (Gen 1 only, Nincada's Erratic) cannot loop forever.
+        return oldpkm.EXPGrowth != pkm.EXPGrowth && loopctr < MaxSpeciesID * 10;
     }
 
     private bool IsSpeciesTypeBad(PersonalInfo oldpkm, PersonalInfo pkm)
     {
         if (!rType)
             return false;
-        // Type has to be somewhat similar
-        return !oldpkm.Types.Any(z => pkm.Types.Contains(z));
+        // Type has to be somewhat similar, until the pool has clearly run out of matches
+        // (Gen 1 only has no Dark type for Umbreon's slot).
+        return !oldpkm.Types.Any(z => pkm.Types.Contains(z)) && loopctr < MaxSpeciesID * 10;
     }
 
     private bool IsSpeciesBSTBad(PersonalInfo oldpkm, PersonalInfo pkm)
@@ -264,7 +268,11 @@ public class SpeciesRandomizer
     {
         list.AddRange(Enumerable.Range(495, 143)); // Snivy - Volcarona
         if (L) list.AddRange(Enumerable.Range(638, 9)); // Unova Legends
-        if (E) list.Add(494); list.AddRange(Enumerable.Range(647, 3)); // Victini, Keldeo, Meloetta, Genesect
+        if (E)
+        {
+            list.Add(494); // Victini
+            list.AddRange(Enumerable.Range(647, 3)); // Keldeo, Meloetta, Genesect
+        }
     }
 
     private void AddGen6Species(List<int> list)
@@ -286,7 +294,7 @@ public class SpeciesRandomizer
         }
         if (E) list.AddRange(Enumerable.Range(801, 2)); // Magearna, Marshadow
 
-        if (MaxSpeciesID == 807) // USUM
+        if (MaxSpeciesID >= 807) // USUM
         {
             if (L) list.AddRange(Enumerable.Range(803, 4)); // Poipole, Naganadel, Stakataka, Blacephalon
             if (E) list.Add(807); // Zeraora
@@ -296,13 +304,51 @@ public class SpeciesRandomizer
     private void AddGen8Species(List<int> list)
     {
         if (MaxSpeciesID >= 905)
-            list.AddRange(Enumerable.Range(808, 905 - 808 + 1));
+        {
+            // Standard / regular species
+            list.AddRange(Enumerable.Range(810, 887 - 810 + 1)); // Grookey to Dragapult
+            list.AddRange(Enumerable.Range(899, 904 - 899 + 1)); // Wyrdeer to Overqwil
+
+            if (L)
+            {
+                list.AddRange(Enumerable.Range(888, 892 - 888 + 1)); // Zacian, Zamazenta, Eternatus, Kubfu, Urshifu
+                list.AddRange(Enumerable.Range(894, 898 - 894 + 1)); // Regieleki, Regidrago, Glastrier, Spectrier, Calyrex
+                list.Add(905); // Enamorus
+            }
+            if (E)
+            {
+                list.AddRange(Enumerable.Range(808, 809 - 808 + 1)); // Meltan, Melmetal
+                list.Add(893); // Zarude
+            }
+        }
     }
 
     private void AddGen9Species(List<int> list)
     {
         if (MaxSpeciesID >= 1025)
-            list.AddRange(Enumerable.Range(906, 1025 - 906 + 1));
+        {
+            // Standard / regular species
+            list.AddRange(Enumerable.Range(906, 983 - 906 + 1)); // Sprigatito to Kingambit
+            list.AddRange(Enumerable.Range(996, 1000 - 996 + 1)); // Frigibax to Gholdengo
+            list.AddRange(Enumerable.Range(1011, 1013 - 1011 + 1)); // Dipplin, Poltchageist, Sinistcha
+            list.AddRange(Enumerable.Range(1018, 1019 - 1018 + 1)); // Archaludon, Hydrapple
+
+            if (L)
+            {
+                list.AddRange(Enumerable.Range(984, 995 - 984 + 1)); // Paradox Gen 9 (Past/Future)
+                list.AddRange(Enumerable.Range(1001, 1004 - 1001 + 1)); // Treasures of Ruin
+                list.AddRange(Enumerable.Range(1005, 1006 - 1005 + 1)); // Roaring Moon, Iron Valiant
+                list.AddRange(Enumerable.Range(1007, 1008 - 1007 + 1)); // Koraidon, Miraidon
+                list.AddRange(Enumerable.Range(1009, 1010 - 1009 + 1)); // Walking Wake, Iron Leaves
+                list.AddRange(Enumerable.Range(1014, 1017 - 1014 + 1)); // Loyal Three + Ogerpon
+                list.AddRange(Enumerable.Range(1020, 1023 - 1020 + 1)); // DLC Paradox
+                list.Add(1024); // Terapagos
+            }
+            if (E)
+            {
+                list.Add(1025); // Pecharunt
+            }
+        }
     }
 
     public int[] RandomSpeciesList => Enumerable.Range(1, MaxSpeciesID).ToArray();

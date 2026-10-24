@@ -38,6 +38,10 @@ public sealed class ResearchCenter7 : Form
 
     // Chrome
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
+    // The Create and Research groups are expert tools; they stay out of the strip until "Advanced" is ticked.
+    private readonly CheckBox _advanced = new() { Text = "Advanced tools", AutoSize = true, Margin = new Padding(16, 2, 0, 0) };
+    private TabPage _createPage = null!;
+    private TabPage _researchPage = null!;
     private readonly ToolStripStatusLabel _status = new("No binary loaded.");
     private readonly ComboBox _target = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 170 };
 
@@ -84,15 +88,26 @@ public sealed class ResearchCenter7 : Form
             "Finished things you can install. Pick one, choose its id, dry run, add.",
             BuildRecipesTab()));
 
-        _tabs.TabPages.Add(Group("Create",
+        _createPage = Group("Create",
             "Build something new. Not sure which page you want? Start on \"Where do I start?\".",
-            BuildStartHereTab(), BuildCustomFunctionTab(), BuildInstallTab(), BuildHookTab()));
+            BuildStartHereTab(), BuildCustomFunctionTab(), BuildInstallTab(), BuildHookTab());
 
-        _tabs.TabPages.Add(Group("Research",
+        _researchPage = Group("Research",
             "What this ROM contains and what the notes record. Nothing here writes to the ROM.",
-            BuildOverviewTab(), BuildMechanicsTab(), BuildNotesTab(), BuildPortTab()));
+            BuildOverviewTab(), BuildMechanicsTab(), BuildNotesTab(), BuildPortTab());
+
+        _advanced.CheckedChanged += (_, _) => ShowAdvanced(_advanced.Checked);
 
         Shown += (_, _) => Analyze();
+    }
+
+    private void ShowAdvanced(bool on)
+    {
+        foreach (TabPage page in new[] { _createPage, _researchPage })
+        {
+            if (on && !_tabs.TabPages.Contains(page)) _tabs.TabPages.Add(page);
+            else if (!on) _tabs.TabPages.Remove(page);
+        }
     }
 
     /// <summary>
@@ -156,9 +171,12 @@ public sealed class ResearchCenter7 : Form
         reload.Click += (_, _) => Analyze();
 
         var verify = new Button { Text = "Verify", Width = 80 };
-        verify.Click += (_, _) => { RunVerify(); _tabs.SelectedIndex = 0; };
+        verify.Click += (_, _) => { RunVerify(); _advanced.Checked = true; _tabs.SelectedTab = _researchPage; };
 
         _version.Items.AddRange(["Auto", .. ResearchVersion.Known]);
+        // The box opens on Auto, so the static override must too: setting the index below runs before
+        // the handler is attached, and a choice left over from an earlier ROM would otherwise stick.
+        ResearchVersion.Override = null;
         _version.SelectedIndex = 0;
         _version.SelectedIndexChanged += (_, _) =>
         {
@@ -172,7 +190,7 @@ public sealed class ResearchCenter7 : Form
         top.Controls.AddRange([new Label { Text = "Binary:", AutoSize = true, Padding = new Padding(0, 4, 0, 0) },
                                _target,
                                new Label { Text = "Game:", AutoSize = true, Padding = new Padding(8, 4, 0, 0) },
-                               _version, reload, verify]);
+                               _version, reload, verify, _advanced]);
 
         var credit = new ToolStripStatusLabel("Battle research by ABZB")
         {
@@ -704,14 +722,22 @@ public sealed class ResearchCenter7 : Form
     private readonly TextBox _noteDetail = Mono(readOnly: true);
     private readonly Label _noteSummary = new() { AutoSize = true, Padding = new Padding(12, 6, 0, 0), ForeColor = Color.Gray };
 
-    private readonly ListBox _recipeList = new()
+    /// <summary>
+    /// Recipes to browse (highlight drives the detail pane) and recipes to batch-apply (the check
+    /// boxes) are two different things now, so this is a <see cref="CheckedListBox"/> rather than a
+    /// plain <see cref="ListBox"/> with Ctrl/Shift multi-select. <see cref="CheckedListBox"/> only
+    /// accepts <see cref="SelectionMode.One"/> or <see cref="SelectionMode.MultiSimple"/> for
+    /// highlighting - One is exactly what the single-item detail pane already assumes.
+    /// </summary>
+    private readonly CheckedListBox _recipeList = new()
     {
         Dock = DockStyle.Fill,
         IntegralHeight = false,
-        SelectionMode = SelectionMode.MultiExtended,
+        SelectionMode = SelectionMode.One,
+        CheckOnClick = true,
     };
     private readonly TextBox _recipeDetail = Mono(readOnly: true);
-    private readonly TextBox _recipeIds = new() { Width = 220 };
+    private readonly TextBox _recipeIds = new() { Width = 220, ReadOnly = true, BackColor = SystemColors.Control };
     private readonly Label _recipeIdLabel = new() { AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
     private readonly Label _recipeIdHint = new() { AutoSize = true, ForeColor = Color.Gray, Padding = new Padding(8, 6, 0, 0) };
 
@@ -767,6 +793,12 @@ public sealed class ResearchCenter7 : Form
             ShowRecipe();
         };
 
+        // A heading is a divider, not a recipe - never let it end up checked.
+        _recipeList.ItemCheck += (_, e) =>
+        {
+            if (_recipeList.Items[e.Index] is CategoryHeading) e.NewValue = CheckState.Unchecked;
+        };
+
         var bDry = new Button { Text = "Dry run", Width = 100 };
         var bAdd = new Button { Text = "Add to ROM", Width = 110 };
         var bRemove = new Button { Text = "Remove / Revert", Width = 130 };
@@ -774,7 +806,7 @@ public sealed class ResearchCenter7 : Form
         bAdd.Click += (_, _) => RunRecipe(commit: true);
         bRemove.Click += (_, _) => RevertRecipe();
 
-        _recipeIdLabel.Text = "First id:";
+        _recipeIdLabel.Text = "Assigned id:";
 
         _bLevelCaps.Text = "Level caps…";
         _bLevelCaps.Width = 110;
@@ -796,6 +828,11 @@ public sealed class ResearchCenter7 : Form
             new Label { Text = "Show:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _recipeCategory,
             new Label { Text = "Find:", AutoSize = true, Padding = new Padding(8, 6, 0, 0) }, _recipeSearch,
             _recipeCount,
+            new Label
+            {
+                Text = "Check several to apply them together (ids are assigned automatically)",
+                AutoSize = true, ForeColor = Color.Gray, Padding = new Padding(16, 6, 0, 0),
+            },
         ]);
 
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 32 };
@@ -923,8 +960,8 @@ public sealed class ResearchCenter7 : Form
         _recipeIdHint.Text = r.SlotCount switch
         {
             0 => "no id needed - this recipe only changes behaviour",
-            1 => "one id",
-            _ => $"{r.SlotCount} consecutive ids, starting here",
+            1 => "one id, found automatically",
+            _ => $"{r.SlotCount} consecutive ids, found automatically",
         };
 
         var lines = new List<string>
@@ -993,6 +1030,7 @@ public sealed class ResearchCenter7 : Form
         var log = new List<string> { $"{(commit ? "Add" : "Dry run")}: {patches.Count} .ips patches", "" };
 
         string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.Config.ExeFS);
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(codePath) is { } uhuruIps) { _recipeDetail.Text = uhuruIps; return; }
         if (!File.Exists(codePath))
         {
             _recipeDetail.Text = "ExeFS/.code.bin was not found - open the ExeFS in pk3DS first.";
@@ -1014,10 +1052,33 @@ public sealed class ResearchCenter7 : Form
             return;
         }
 
+        // PC Anywhere overwrites a live pristine code.bin function at its own injection site (not
+        // free space), corrupting the base game even installed completely alone - this is the actual
+        // path a lone PC Anywhere apply takes (it's an .ips-kind recipe), so the guard belongs here,
+        // not just in RunRecipeBatch/RunRecipe. See RecipeConflicts.TryFindUnsafe.
+        var unsafeHere = patches.Where(p => RecipeConflicts.TryFindUnsafe(p.Name, out _)).ToList();
+        if (unsafeHere.Count > 0)
+        {
+            foreach (var p in unsafeHere)
+            {
+                RecipeConflicts.TryFindUnsafe(p.Name, out string unsafeReason);
+                log.Add($"  {p.Name}: unsafe on its own - {unsafeReason}");
+            }
+            log.Add("");
+            log.Add("Refused; nothing was written.");
+            _recipeDetail.Text = ErrorWindow.Redact(string.Join(Environment.NewLine, log));
+            return;
+        }
+
         var parsed = new List<(string Name, List<IpsRecord> Records)>();
         foreach (var p in patches)
         {
-            try { parsed.Add((p.Name, IpsPatch.Read(File.ReadAllBytes(p.IpsPath!)))); }
+            try
+            {
+                var rawRecords = IpsPatch.Read(File.ReadAllBytes(p.IpsPath!));
+                var translatedRecords = CodeBinExpansionJournal.TranslateIpsRecords(rawRecords, codePath);
+                parsed.Add((p.Name, translatedRecords));
+            }
             catch (Exception ex) { log.Add($"  {p.Name}: unreadable - {ex.Message}"); }
         }
         if (parsed.Count != patches.Count)
@@ -1076,76 +1137,115 @@ public sealed class ResearchCenter7 : Form
     }
 
     /// <summary>
-    /// The name table a package parameter's ids live in. A package can claim a move (Scale Shot,
-    /// Terrain Pulse) or an ability, not only an item, so the free-slot search has to look in the
-    /// right table - offering a free ITEM id for a move parameter just moves the collision.
+    /// Applies several package/data/corpus recipes as one operation. Unlike the .ips batch above,
+    /// these go through <see cref="RecipeInstaller"/> one at a time (its own dry-run/backup/verify
+    /// discipline per recipe), but ids are assigned automatically via <see cref="RecipeIdAllocator"/>
+    /// instead of asking for them one at a time in the parameter boxes - the whole point of checking
+    /// more than one box together, and consistent with new items already auto-claiming free slots.
     /// </summary>
-    private static string[] TableForParameterType(string type) => (type ?? "").ToLowerInvariant() switch
+    private void RunRecipeBatch(List<Recipe> recipes, bool commit)
     {
-        "move" => Main.Config?.GetText(TextName.MoveNames),
-        "ability" => Main.Config?.GetText(TextName.AbilityNames),
-        _ => Main.Config?.GetText(TextName.ItemNames),
-    };
+        var log = new List<string> { $"{(commit ? "Add" : "Dry run")}: {recipes.Count} patches together", "" };
 
-    /// <summary>Whether an id is unnamed or a placeholder in the given table.</summary>
-    private static bool IsFreeId(string[] names, int id)
-    {
-        if (names == null || id < 0 || id >= names.Length) return false;
-        string n = names[id]?.Trim() ?? "";
-        return n.Length == 0 || n is "???" or "-----" or "—" or "———"
-            || n.All(c => c is '?' or '？' or '(' or ')');
-    }
+        string cro = ResolveTargetPath();
+        bool targetsCro = cro != null && cro.EndsWith(".cro", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// Lowest id the given table is not already using, or -1.
-    /// </summary>
-    private static int NextFreeId(string[] names) => NextFreeId(names, null);
-
-    /// <summary>
-    /// Lowest free id not already handed out in <paramref name="taken"/>, or -1.
-    /// </summary>
-    private static int NextFreeId(string[] names, HashSet<int> taken)
-    {
-        if (names == null) return -1;
-        bool Available(int i) => taken == null || !taken.Contains(i);
-
-        for (int i = 1; i < names.Length; i++)
-            if (string.IsNullOrWhiteSpace(names[i]) && Available(i)) return i;
-
-        for (int i = 1; i < names.Length; i++)
-            if (IsFreeId(names, i) && Available(i)) return i;
-
-        return -1;
-    }
-
-    /// <summary>
-    /// Start of the lowest run of <paramref name="count"/> consecutive free ids, or -1.
-    /// </summary>
-    private static int NextFreeRun(string[] names, int count)
-    {
-        if (names == null || count <= 0) return -1;
-        if (count == 1) return NextFreeId(names);
-
-        for (int i = 1; i + count <= names.Length; i++)
+        // Ids this call has handed out but that have not yet reached the on-disk name table (a dry
+        // run never writes one; a commit does, but only after RecipeInstaller.Apply returns) - shared
+        // across every recipe in the batch so two checked recipes never get offered the same "free"
+        // slot just because neither has been written yet.
+        var reserved = new HashSet<int>();
+        var installedNames = new List<string>();
+#nullable enable
+        byte[]? batchCodeBinNow = null;
+        try
         {
-            bool ok = true;
-            for (int k = 0; k < count && ok; k++)
-                if (!IsFreeId(names, i + k)) ok = false;
-            if (ok) return i;
+            string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.Config.ExeFS);
+            if (File.Exists(codePath)) batchCodeBinNow = File.ReadAllBytes(codePath);
         }
-        return -1;
+        catch { /* best-effort; a failed read just skips the on-disk half of the check */ }
+#nullable restore
+
+        int installed = 0, refused = 0;
+        foreach (var r in recipes)
+        {
+            // PC Anywhere and Move Relearner Replaces Cafe each overwrite live pristine code.bin
+            // functions at their own injection site, so each corrupts the base game even alone.
+            if (RecipeConflicts.TryFindUnsafe(r.Name, out string unsafeReason))
+            {
+                log.Add($"  {r.Name}: refused - unsafe on its own: {unsafeReason}");
+                refused++;
+                continue;
+            }
+
+            // Same guard as UniversalRandomizer.InstallSelectedRecipes: a recipe can pass every
+            // byte-range/branch-target check on its own and still corrupt a sibling already in this
+            // batch, if it patches the body of a vanilla function the sibling calls into by address
+            // (see RecipeConflicts - confirmed for PC Anywhere + Move Relearner Replaces Cafe).
+            if (RecipeConflicts.TryFindConflict(r.Name, installedNames, batchCodeBinNow, out string conflictReason))
+            {
+                log.Add($"  {r.Name}: refused - {conflictReason}");
+                refused++;
+                continue;
+            }
+
+            var problems = new List<string>();
+            var values = RecipeIdAllocator.AssignIds(r, Main.Config, problems, reserved);
+            if (problems.Count > 0)
+            {
+                log.Add($"  {r.Name}: refused - {problems[0]}");
+                refused++;
+                continue;
+            }
+
+            var result = commit
+                ? RecipeInstaller.Apply(r, Main.Config, cro, _db, _map, values)
+                : RecipeInstaller.Plan(r, Main.Config, cro, _db, _map, values);
+
+            if (!result.Ok)
+            {
+                log.Add($"  {r.Name}: refused - {result.Errors.FirstOrDefault() ?? "unknown"}");
+                refused++;
+                continue;
+            }
+            installedNames.Add(r.Name);
+
+            // Re-read the relocation map after every real write, not just once at the end: the next
+            // recipe's own reserve/free-space search has to see this one's writes, or two recipes in
+            // the same batch can be handed overlapping relocation slots (the exact corruption class
+            // fixed earlier this session in CodeRelocator/PortInstaller). A dry run never writes, so
+            // there is nothing to re-read; a code.bin-only recipe has no CRO relocation map at all.
+            if (commit && targetsCro)
+            {
+                try { _map = BattleMechanicMap.Build(File.ReadAllBytes(cro), _db, cro); }
+                catch (Exception ex) { log.Add($"    (warning: could not refresh the relocation map: {ex.Message})"); }
+            }
+
+            log.Add($"  {r.Name}: {(commit ? "installed" : "clean")}");
+            installed++;
+        }
+
+        if (commit && installed > 0)
+        {
+            try { Main.Config.InitializeGameText(); } catch { }
+        }
+
+        log.Add("");
+        log.Add($"{installed}/{recipes.Count} {(commit ? "installed" : "clean")}, " +
+                $"{refused}/{recipes.Count} refused (nothing written for those).");
+        log.Add(commit
+            ? (installed > 0 ? "Done. Save the ROM from the main window." : "Nothing was written.")
+            : "Nothing was written - this was a dry run.");
+
+        _recipeDetail.Text = ErrorWindow.Redact(string.Join(Environment.NewLine, log));
     }
 
-    /// <summary>The name table a recipe's own slots live in.</summary>
-    private static string[] TableForRecipe(Recipe r) => r?.Kind switch
-    {
-        CustomMechanicKind.Move => Main.Config?.GetText(TextName.MoveNames),
-        CustomMechanicKind.Ability => Main.Config?.GetText(TextName.AbilityNames),
-        _ => Main.Config?.GetText(TextName.ItemNames),
-    };
-
     /// <summary>
-    /// Shows one id box per parameter for a multi-parameter package; hides the row otherwise.
+    /// Shows the id(s) this recipe will actually use - one read-only row per package parameter, or
+    /// a single "assigned id" row for a plain multi-slot recipe. Nothing here is typed in: the value
+    /// comes straight from <see cref="RecipeIdAllocator.AssignIds"/>, the exact call <see
+    /// cref="RunRecipe"/> makes again at Apply time, so what is shown is guaranteed to match what
+    /// gets written rather than being a separate, possibly-stale guess.
     /// </summary>
     private void BuildRecipeParamBoxes(Recipe r)
     {
@@ -1154,52 +1254,40 @@ public sealed class ResearchCenter7 : Form
         _recipeParamBoxes.Clear();
 
         var ps = r.Package?.Parameters;
-        bool multi = ps is { Count: > 1 };
+        bool packageDriven = ps is { Count: > 0 };
+        bool needsId = r.SlotCount > 0 || packageDriven;
 
-        bool needsId = r.SlotCount > 0 || multi;
+        _recipeParams.Visible = packageDriven;
+        _recipeIds.Visible = !packageDriven && needsId;
+        _recipeIdLabel.Visible = !packageDriven && needsId;
 
-        _recipeParams.Visible = multi;
-        _recipeIds.Visible = !multi && needsId;
-        _recipeIdLabel.Visible = !multi && needsId;
-
-        if (!multi && needsId)
+        if (Main.Config == null || !needsId)
         {
-            int wanted = r.Package != null ? 1 : r.SlotCount;
-            int start = NextFreeRun(TableForRecipe(r), wanted);
-            _recipeIds.Text = start > 0 ? start.ToString() : "";
+            if (!packageDriven) _recipeIds.Text = "";
+            return;
         }
 
-        if (!multi) return;
+        var problems = new List<string>();
+        var values = RecipeIdAllocator.AssignIds(r, Main.Config, problems);
 
-        // Ids already offered in this pass, so two parameters are never handed the same slot.
-        var offered = new HashSet<int>();
-
-        foreach (var (_, p) in ps!)
+        if (!packageDriven)
         {
-            if (!string.Equals(p?.Type, "list", StringComparison.OrdinalIgnoreCase)) continue;
-            foreach (string part in (p?.Default ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                if (int.TryParse(part, out int listId)) offered.Add(listId);
+            _recipeIds.Text = problems.Count > 0
+                ? $"(none free - {problems[0]})"
+                : r.Entries.Count > 0 ? r.Entries[0].Id.ToString() : "";
+            return;
         }
 
         foreach (var (key, p) in ps!)
         {
-            // A "list" parameter holds an ordered run of ids (the mints' twenty-one), so it needs
-            // room for the whole list rather than a single-number box.
             bool isList = string.Equals(p?.Type, "list", StringComparison.OrdinalIgnoreCase);
+            string shown = values != null && values.TryGetValue(key, out string v) ? v : "(none free)";
 
-            string initial = p?.Default ?? "";
-            if (!isList && (p?.AllowUnnamed ?? true) && int.TryParse(initial, out int def))
+            var box = new TextBox
             {
-                var table = TableForParameterType(p?.Type);
-                if (!IsFreeId(table, def) || offered.Contains(def))
-                {
-                    int free = NextFreeId(table, offered);
-                    if (free > 0) initial = free.ToString();
-                }
-            }
-            if (int.TryParse(initial, out int claimed)) offered.Add(claimed);
-
-            var box = new TextBox { Width = isList ? 320 : 70, Text = initial };
+                Width = isList ? 320 : 70, Text = shown,
+                ReadOnly = true, BackColor = SystemColors.Control,
+            };
             _recipeParamBoxes[key] = box;
 
             string label = string.IsNullOrWhiteSpace(p?.ExpectName) ? key : p!.ExpectName;
@@ -1212,11 +1300,18 @@ public sealed class ResearchCenter7 : Form
             _recipeParams.Controls.Add(box);
         }
 
+        // A "list" parameter's box holds several ids under one key (Tera Shard's eighteen, the
+        // mints' twenty-one), so the count shown here is ids overall, not parameter boxes.
+        int idCount = ps.Values.Sum(p => string.Equals(p?.Type, "list", StringComparison.OrdinalIgnoreCase)
+            ? (p?.Default ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length
+            : 1);
         _recipeParams.Controls.Add(new Label
         {
-            Text = $"  ({ps.Count} ids; each needs its own free slot)",
+            Text = problems.Count > 0
+                ? $"  ! {problems[0]}"
+                : $"  ({idCount} id{(idCount == 1 ? "" : "s")}, assigned automatically from unused slots)",
             AutoSize = true,
-            ForeColor = Color.Gray,
+            ForeColor = problems.Count > 0 ? Color.Firebrick : Color.Gray,
             Padding = new Padding(8, 6, 0, 0),
         });
     }
@@ -1424,73 +1519,76 @@ public sealed class ResearchCenter7 : Form
 
     private void RunRecipe(bool commit)
     {
-        if (_recipeList.SelectedItem is not Recipe r) return;
         if (Main.Config == null) { _recipeDetail.Text = "Load a ROM first."; return; }
 
-        var picked = _recipeList.SelectedItems.OfType<Recipe>().ToList();
-        if (picked.Count == 0) return;
-        if (picked.Count > 1)
+        // More than one box checked: batch-apply the checked recipes, not whatever is highlighted.
+        var checkedRecipes = _recipeList.CheckedItems.OfType<Recipe>().ToList();
+        if (checkedRecipes.Count > 1)
         {
-            var ips = picked.Where(x => x.EffectKind == RecipeEffectKind.IpsPatch).ToList();
-            if (ips.Count != picked.Count)
+            var ips = checkedRecipes.Where(x => x.EffectKind == RecipeEffectKind.IpsPatch).ToList();
+            var others = checkedRecipes.Where(x => x.EffectKind != RecipeEffectKind.IpsPatch).ToList();
+            if (ips.Count > 0 && others.Count > 0)
             {
                 _recipeDetail.Text =
-                    "Only .ips patches can be applied together. Deselect the others, or run them one at a time.";
+                    "Checked patches mix .ips patches with other kinds - they go through different " +
+                    "install pipelines and can't be batched together. Check only one kind at a time.";
                 return;
             }
-            RunIpsBatch(ips, commit);
+            if (ips.Count > 0) { RunIpsBatch(ips, commit); return; }
+            RunRecipeBatch(others, commit);
             return;
         }
 
-        // A multi-parameter package is driven by its own boxes; everything else by "First id".
-        Dictionary<string, string> values = null;
-        int first = 0;
+        // Exactly one box checked: run that one. None checked: fall back to whatever is highlighted.
+        var r = checkedRecipes.Count == 1 ? checkedRecipes[0] : _recipeList.SelectedItem as Recipe;
+        if (r == null) return;
 
-        bool needsId = r.SlotCount > 0 || _recipeParamBoxes.Count > 0;
-
-        if (!needsId)
+        // PC Anywhere and Move Relearner Replaces Cafe each overwrite live pristine code.bin
+        // functions at their own injection site, so each corrupts the base game even alone.
+        if (RecipeConflicts.TryFindUnsafe(r.Name, out string unsafeReason))
         {
-            // No id to collect; Entries is empty, so the assignment loop below does nothing.
-        }
-        else if (_recipeParamBoxes.Count > 0)
-        {
-            values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var allIds = new List<int>();
-            foreach (var (key, box) in _recipeParamBoxes)
-            {
-                string text = box.Text.Trim();
-                var parts = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (parts.Length == 0) { _recipeDetail.Text = $"'{key}' needs at least one item id."; return; }
-
-                var parsed = new List<int>();
-                foreach (string part in parts)
-                {
-                    if (!int.TryParse(part, out int v) || v <= 0)
-                    {
-                        _recipeDetail.Text = $"'{key}': '{part}' is not a positive item id.";
-                        return;
-                    }
-                    parsed.Add(v);
-                }
-                values[key] = string.Join(",", parsed);
-                allIds.AddRange(parsed);
-            }
-            first = allIds.Min();
-        }
-        else if (!int.TryParse(_recipeIds.Text.Trim(), out first) || first <= 0)
-        {
-            _recipeDetail.Text = "Enter the first id to use.";
+            _recipeDetail.Text = $"Refused - unsafe on its own: {unsafeReason}";
             return;
         }
 
-        // Ids are assigned here rather than typed one per slot: every multi-slot recipe needs a
-        // consecutive block anyway, so one number is the whole decision.
-        for (int i = 0; i < r.Entries.Count; i++) r.Entries[i].Id = first + i;
+        // This is the path a single PC Anywhere / Move Relearner Replaces Cafe apply actually takes:
+        // the "mixed .ips + other kinds" refusal above forces that pair to be installed as two
+        // separate single-recipe applies (possibly in different sessions), never one RunRecipeBatch
+        // call - so the check here also reads current code.bin bytes, not just this session's memory.
+#nullable enable
+        byte[]? codeBinNow = null;
+        try
+        {
+            string codePath = pk3DS.Core.CTR.ExeFS.ResolveCodeBin(Main.Config.ExeFS);
+            if (File.Exists(codePath)) codeBinNow = File.ReadAllBytes(codePath);
+        }
+        catch { /* best-effort; a failed read just skips the on-disk half of the check */ }
+#nullable restore
+        if (RecipeConflicts.TryFindConflict(r.Name, Array.Empty<string>(), codeBinNow, out string singleConflictReason))
+        {
+            _recipeDetail.Text = $"Refused - {singleConflictReason}";
+            return;
+        }
+
+        // Ids are never typed in: the same automatic search that picks a batch's ids picks a single
+        // recipe's, too - the boxes above only display what this call resolves to.
+        var problems = new List<string>();
+        var values = RecipeIdAllocator.AssignIds(r, Main.Config, problems);
+        if (problems.Count > 0)
+        {
+            _recipeDetail.Text = $"Could not find a free slot: {problems[0]}";
+            return;
+        }
 
         string cro = ResolveTargetPath();
         var result = commit
             ? RecipeInstaller.Apply(r, Main.Config, cro, _db, _map, values)
             : RecipeInstaller.Plan(r, Main.Config, cro, _db, _map, values);
+
+        if (commit && result.Ok)
+        {
+            try { Main.Config.InitializeGameText(); } catch { }
+        }
 
         _recipeDetail.Text = ErrorWindow.Redact(
             $"{(commit ? "Add" : "Dry run")}: {r.Name}{Environment.NewLine}{Environment.NewLine}" +
@@ -1513,12 +1611,17 @@ public sealed class ResearchCenter7 : Form
         string cro = ResolveTargetPath();
         var result = RecipeInstaller.Revert(r, Main.Config, cro, _db, _map);
 
+        if (result.Ok)
+        {
+            try { Main.Config.InitializeGameText(); } catch { }
+        }
+
         _recipeDetail.Text = ErrorWindow.Redact(
             $"Revert: {r.Name}{Environment.NewLine}{Environment.NewLine}" +
             result.Describe() + Environment.NewLine + Environment.NewLine +
-            (result.Ok
-                ? "Done. The original bytes/backup have been restored."
-                : "Reverting encountered issues - see above."));
+            (!result.Ok ? "Reverting encountered issues - see above."
+             : result.Warnings.Count > 0 ? "Done, with warnings - see the WARNING lines above."
+             : "Done. The original bytes/backup have been restored."));
     }
 
     private TabPage BuildNotesTab()
@@ -2320,6 +2423,7 @@ public sealed class ResearchCenter7 : Form
     private void DoInstall(bool commit)
     {
         if (_map?.Cro == null) { _installLog.Text = "Load a CRO first."; return; }
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(_romPath ?? "") is { } uhuruInstall) { _installLog.Text = uhuruInstall; return; }
         if (!TryParseNumber(_newId.Text, out uint id)) { _installLog.Text = "Game id is not a number."; return; }
         if (!TryParseNumber(_newTiming.Text, out uint timing)) { _installLog.Text = "Timing is not a number."; return; }
 
@@ -2485,6 +2589,7 @@ public sealed class ResearchCenter7 : Form
     /// <summary>Backs up, writes, then re-verifies. A CRO that fails verification is rolled back.</summary>
     private void Commit(byte[] bytes, List<string> log)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(_romPath ?? "") is { } uhuruCommit) { log.Insert(0, uhuruCommit); return; }
         string backup = Backup(_romPath);
         File.WriteAllBytes(_romPath, bytes);
         log.Insert(0, $"WROTE {Path.GetFileName(_romPath)} (previous state saved as {Path.GetFileName(backup)})");

@@ -181,7 +181,19 @@ namespace pk3DS.Core.CTR
             Segments[3]?.Start ?? 0
         };
 
-        public uint CodeEnd => Header.CodeStart + Header.CodeSize;
+        // Header.CodeStart + Header.CodeSize covers .text AND .rodata combined (plus alignment
+        // padding) for USUM Battle.cro - it is NOT the real end of any one segment. Segment 1's
+        // declared size in the real segment table (0xC8) ends well before that: on Battle.cro,
+        // codeStart+codeSize = 0x12C000 while segment 1 (rodata) really ends at 0x12B694. The gap
+        // between them is genuine blank padding that FindReserve/FindTailReserve used to offer as
+        // usable reserve - code placed there got registered as segment-1 relocations at offsets
+        // past segment 1's declared size, which Citra's CRO loader rejects outright
+        // (cro_helper.cpp Rebase: "Error applying internal relocations"), corrupting Battle.cro and
+        // crashing on the first battle. Prefer the real segment 1 end when the segment table parsed
+        // successfully; only fall back to the inline-header guess if it did not.
+        public uint CodeEnd => Segments[1] != null && Segments[1].Start > 0
+            ? Segments[1].Start + Segments[1].Size
+            : Header.CodeStart + Header.CodeSize;
         public uint RodataStart => CodeEnd;
         public uint RodataEnd => Header.DataStart;
 

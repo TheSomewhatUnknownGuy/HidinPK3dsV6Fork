@@ -73,6 +73,42 @@ namespace pk3DS.WinForms.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ExpandedAbilities {
+            get {
+                return ((bool)(this["ExpandedAbilities"]));
+            }
+            set {
+                this["ExpandedAbilities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool PassiveAbilities {
+            get {
+                return ((bool)(this["PassiveAbilities"]));
+            }
+            set {
+                this["PassiveAbilities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AllowGrowth {
+            get {
+                return ((bool)(this["AllowGrowth"]));
+            }
+            set {
+                this["AllowGrowth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool IsCyberSlate {
             get {
@@ -152,6 +188,18 @@ namespace pk3DS.WinForms.Properties {
             }
             set {
                 this["ShowOWSEWarning"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool HideLowConfidenceGifts {
+            get {
+                return ((bool)(this["HideLowConfidenceGifts"]));
+            }
+            set {
+                this["HideLowConfidenceGifts"] = value;
             }
         }
     }

@@ -237,7 +237,6 @@ partial class LevelUpEditor7
         this.B_RandAll.Text = "Randomize All";
         this.B_RandAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
         this.B_RandAll.ForeColor = System.Drawing.Color.Orange;
-        this.B_RandAll.Click += new System.EventHandler(this.B_RandAll_Click);
         // 
         // B_Dump
         // 
@@ -246,7 +245,6 @@ partial class LevelUpEditor7
         this.B_Dump.Size = new System.Drawing.Size(165, 25);
         this.B_Dump.Text = "Dump All";
         this.B_Dump.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-        this.B_Dump.Click += new System.EventHandler(this.B_Dump_Click);
         // 
         // B_Goto
         // 
@@ -255,7 +253,6 @@ partial class LevelUpEditor7
         this.B_Goto.Size = new System.Drawing.Size(44, 23);
         this.B_Goto.Text = "Go to";
         this.B_Goto.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-        this.B_Goto.Click += new System.EventHandler(this.B_Goto_Click);
         // 
         // NUD_FormTable
         // 
@@ -270,7 +267,6 @@ partial class LevelUpEditor7
         this.B_AddMove.Name = "B_AddMove";
         this.B_AddMove.Size = new System.Drawing.Size(80, 25);
         this.B_AddMove.Text = "+ Add";
-        this.B_AddMove.Click += new System.EventHandler(this.B_AddMove_Click);
         // 
         // B_RemoveMove
         // 
@@ -278,7 +274,6 @@ partial class LevelUpEditor7
         this.B_RemoveMove.Name = "B_RemoveMove";
         this.B_RemoveMove.Size = new System.Drawing.Size(80, 25);
         this.B_RemoveMove.Text = "- Remove";
-        this.B_RemoveMove.Click += new System.EventHandler(this.B_RemoveMove_Click);
         // 
         // B_Import
         // 
@@ -286,7 +281,6 @@ partial class LevelUpEditor7
         this.B_Import.Name = "B_Import";
         this.B_Import.Size = new System.Drawing.Size(165, 25);
         this.B_Import.Text = "Import Learnsets";
-        this.B_Import.Click += new System.EventHandler(this.B_Import_Click);
         // L_TotalMoves
         // 
         this.L_TotalMoves.AutoSize = true;

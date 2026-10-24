@@ -120,6 +120,11 @@ public class CRO(byte[] data)
 
         // Weed out anything that isn't a .cro
         CROFiles = CROFiles.Where(t => Path.GetExtension(t) == ".cro").ToArray();
+        if (saveCRO && CROFiles.Any(f => pk3DS.Core.Modding.UhuruGuard.RefusalFor(f) != null))
+        {
+            UpdateTB(TB_Progress, pk3DS.Core.Modding.UhuruGuard.RefusalFor("Battle.cro") + " Did not modify files. Aborting.");
+            return false;
+        }
         // Open the CRR
         byte[] CRR = File.ReadAllBytes(PATH_CRR);
         int hashTableOffset = BitConverter.ToInt32(CRR, 0x350);

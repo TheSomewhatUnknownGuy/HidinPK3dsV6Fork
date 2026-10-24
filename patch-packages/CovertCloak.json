@@ -90,5 +90,14 @@
   },
   "ItemNames": {
     "${itemId}": "Covert Cloak"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Covert Cloaks"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Covert Cloak[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis cloak protects the holder from the\nadditional effects of moves."
   }
 }

@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using pk3DS.Core.Structures.PersonalInfo;
 
 namespace pk3DS.Core.Randomizers;
@@ -10,8 +10,8 @@ public class FormRandomizer(GameConfig game)
 
     public int GetRandomForme(int species, PersonalInfo[] stats = null)
     {
-        stats ??= game.Personal.Table;
-        if (stats[species].FormeCount <= 1)
+        stats ??= game?.Personal?.Table;
+        if (stats == null || species < 0 || species >= stats.Length || stats[species] == null || stats[species].FormeCount <= 1)
             return 0;
 
         switch (species)

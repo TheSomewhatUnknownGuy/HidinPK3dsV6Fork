@@ -31,6 +31,7 @@ partial class MoveEditor7
         this.L_Type = new System.Windows.Forms.Label();
         this.B_RenameFlags = new System.Windows.Forms.Button();
         this.B_FlagBindings = new System.Windows.Forms.Button();
+        this.B_SetSlicingWindFlags = new System.Windows.Forms.Button();
         this.CB_Move = new System.Windows.Forms.ComboBox();
         this.L_Move = new System.Windows.Forms.Label();
         this.CB_Type = new System.Windows.Forms.ComboBox();
@@ -113,6 +114,7 @@ partial class MoveEditor7
         this.L_CopyAnim = new System.Windows.Forms.Label();
         this.B_CopyAnim = new System.Windows.Forms.Button();
         this.B_ChampionsPP = new System.Windows.Forms.Button();
+        this.B_FixZMoves = new System.Windows.Forms.Button();
         this.L_AnimID = new System.Windows.Forms.Label();
         this.L_AnimName = new System.Windows.Forms.Label();
         this.NUD_AnimID = new System.Windows.Forms.NumericUpDown();
@@ -808,7 +810,21 @@ partial class MoveEditor7
         this.B_RenameFlags.Text = "Bind Flag to Ability (F18-F32)";
         this.B_RenameFlags.UseVisualStyleBackColor = true;
         this.B_RenameFlags.Click += new System.EventHandler(this.B_RenameFlags_Click);
-        // 
+        //
+        // B_SetSlicingWindFlags
+        //
+        // GB_Expansion is a full-height column at x=655..795 (y=10..500) - the original x=650
+        // placement sat almost entirely inside its footprint, hidden behind/under it. The real gap
+        // is x=490..655 (CLB_Flags ends at 490, GB_Expansion starts at 655), empty for its whole
+        // y=10..464 height since the flag-rename/binding buttons below only occupy y=472..500.
+        this.B_SetSlicingWindFlags.Location = new System.Drawing.Point(500, 10);
+        this.B_SetSlicingWindFlags.Name = "B_SetSlicingWindFlags";
+        this.B_SetSlicingWindFlags.Size = new System.Drawing.Size(145, 28);
+        this.B_SetSlicingWindFlags.TabIndex = 111;
+        this.B_SetSlicingWindFlags.Text = "Set Slicing/Wind";
+        this.B_SetSlicingWindFlags.UseVisualStyleBackColor = true;
+        this.B_SetSlicingWindFlags.Click += new System.EventHandler(this.B_SetSlicingWindFlags_Click);
+        //
         // B_RandAll
         // 
         this.B_RandAll.Location = new System.Drawing.Point(500, 10);
@@ -899,6 +915,16 @@ partial class MoveEditor7
         this.B_PasteData.Text = "Paste Data";
         this.B_PasteData.UseVisualStyleBackColor = true;
         this.B_PasteData.Click += new System.EventHandler(this.B_PasteData_Click);
+        // 
+        // B_FixZMoves
+        // 
+        this.B_FixZMoves.Location = new System.Drawing.Point(500, 225);
+        this.B_FixZMoves.Name = "B_FixZMoves";
+        this.B_FixZMoves.Size = new System.Drawing.Size(145, 26);
+        this.B_FixZMoves.TabIndex = 102;
+        this.B_FixZMoves.Text = "Fix Expansion Z-Moves";
+        this.B_FixZMoves.UseVisualStyleBackColor = true;
+        this.B_FixZMoves.Click += new System.EventHandler(this.B_FixZMoves_Click);
         // 
         // GB_Expansion
         // 
@@ -1072,6 +1098,7 @@ partial class MoveEditor7
         this.tpEditor.Controls.Add(this.NUD_ZPower);
         this.tpEditor.Controls.Add(this.B_FlagBindings);
         this.tpEditor.Controls.Add(this.B_RenameFlags);
+        this.tpEditor.Controls.Add(this.B_SetSlicingWindFlags);
         this.tpEditor.Controls.Add(this.CLB_Flags);
         this.tpEditor.Controls.Add(this.B_Table);
         this.tpEditor.Controls.Add(this.B_Metronome);
@@ -1123,6 +1150,7 @@ partial class MoveEditor7
         this.tpEditor.Controls.Add(this.B_ChampionsPP);
         this.tpEditor.Controls.Add(this.B_CopyData);
         this.tpEditor.Controls.Add(this.B_PasteData);
+        this.tpEditor.Controls.Add(this.B_FixZMoves);
         this.tpEditor.Location = new System.Drawing.Point(4, 22);
         this.tpEditor.Name = "tpEditor";
         this.tpEditor.Padding = new System.Windows.Forms.Padding(3);
@@ -1301,8 +1329,10 @@ partial class MoveEditor7
     private System.Windows.Forms.Button B_ChampionsPP;
     private System.Windows.Forms.Button B_RenameFlags;
     private System.Windows.Forms.Button B_FlagBindings;
+    private System.Windows.Forms.Button B_SetSlicingWindFlags;
 
     private System.Windows.Forms.Button B_CopyData;
     private System.Windows.Forms.Button B_PasteData;
+    private System.Windows.Forms.Button B_FixZMoves;
     private System.Windows.Forms.Label L_SaveReminder;
 }

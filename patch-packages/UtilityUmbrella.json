@@ -57,5 +57,14 @@
   },
   "ItemNames": {
     "${itemId}": "Utility Umbrella"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Utility Umbrellas"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Utility Umbrella[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis sturdy umbrella protects the holder\nfrom the effects of sun and rain."
   }
 }

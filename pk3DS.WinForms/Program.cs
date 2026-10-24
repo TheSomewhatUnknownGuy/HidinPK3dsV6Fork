@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 #if !DEBUG
@@ -13,7 +16,7 @@ internal static class Program
     /// The main entry point for the application.
     /// </summary>
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
 #if !DEBUG
             // Add the event handler for handling UI thread exceptions to the event.

@@ -1,0 +1,26 @@
+{
+  "Name": "Good as Gold",
+  "Description": "Good as Gold (Ability 283). Makes the Pokémon completely immune to other Pokémon's status moves (timing 0x3A, checking category 0 via parameter 0x1E, blocking via effect 0x45, and flashing the ability banner via 0x89E28).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 283,
+      "Name": "Good as Gold",
+      "Slots": [
+        {
+          "Timing": "0x3A",
+          "Code": "70402DE90140A0E10250A0E10400A0E3D01EFAEB050050E11000001A0300A0E3CC1EFAEB050050E10C00000A1E00A0E3C81EFAEB000050E30800001A4500A0E30110A0E33E0BFAEB000050E30300000A0400A0E10110A0E30520A0E17127FAEB7080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

@@ -57,5 +57,14 @@
   },
   "ItemNames": {
     "${itemId}": "Punching Glove"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Punching Gloves"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Punching Glove[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThis glove boosts punching moves and\nstops them making contact."
   }
 }

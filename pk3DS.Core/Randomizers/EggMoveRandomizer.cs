@@ -1,4 +1,5 @@
-﻿using pk3DS.Core.Structures;
+using System;
+using pk3DS.Core.Structures;
 
 namespace pk3DS.Core.Randomizers;
 
@@ -19,20 +20,34 @@ public class EggMoveRandomizer(GameConfig config, EggMoves[] sets) : IRandomizer
 
     public void Execute()
     {
+        if (sets == null || sets.Length == 0 || sets[0] == null) return;
+
         if (sets[0] is EggMoves6)
         {
             for (int i = 0; i < sets.Length; i++)
-                Randomize(sets[i], i);
+            {
+                if (sets[i] != null)
+                    Randomize(sets[i], i);
+            }
         }
         else if (sets[0] is EggMoves7)
         {
-            for (int i = 0; i <= config.MaxSpeciesID; i++)
+            int max = Math.Min(config.MaxSpeciesID, Math.Min(sets.Length - 1, (config.Personal?.Table?.Length ?? 1) - 1));
+            for (int i = 1; i <= max; i++)
             {
+                if (sets[i] == null || config.Personal?[i] == null) continue;
                 Randomize(sets[i], i);
                 int formoff = ((EggMoves7)sets[i]).FormTableIndex;
                 int count = config.Personal[i].FormeCount;
-                for (int j = 1; j < count; j++)
-                    Randomize(sets[formoff + j - 1], config.Personal.GetFormIndex(i, j));
+                if (formoff > 0)
+                {
+                    for (int j = 1; j < count; j++)
+                    {
+                        int targetIdx = formoff + j - 1;
+                        if (targetIdx < sets.Length && sets[targetIdx] != null)
+                            Randomize(sets[targetIdx], config.Personal.GetFormIndex(i, j));
+                    }
+                }
             }
         }
     }

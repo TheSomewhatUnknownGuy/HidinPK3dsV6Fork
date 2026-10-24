@@ -39,6 +39,7 @@ namespace pk3DS.Core.CTR
         /// </summary>
         public static void SaveToFile(DecompiledCRO cro, string path)
         {
+            if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(path) is { } refusal) throw new InvalidOperationException(refusal);
             byte[] data = Compile(cro);
             File.WriteAllBytes(path, data);
         }

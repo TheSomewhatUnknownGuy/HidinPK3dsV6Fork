@@ -54,5 +54,14 @@
   },
   "ItemNames": {
     "${itemId}": "Eject Pack"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Eject Packs"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Eject Pack[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nIt switches the holder out when any\nof its stats are lowered."
   }
 }

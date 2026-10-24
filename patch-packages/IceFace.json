@@ -1,0 +1,42 @@
+{
+  "Name": "Ice Face",
+  "Description": "Ice Face (Ability 248). The Pok\u00E9mon\u0027s ice head can take a physical attack as a substitute, but the attack also changes the Pok\u00E9mon\u0027s appearance (Noice Face).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 248,
+      "Name": "Ice Face",
+      "Slots": [
+        {
+          "Timing": "0x5A",
+          "Code": "70402DE90240A0E10150A0E10400A0E3D01EFAEB040050E11000001A1E00A0E3CC1EFAEB010050E30C00001A0500A0E10410A0E19748FAEB3902D0E5000050E30600001A0500A0E10110A0E30420A0E17427FAEB3C00A0E30010A0E3380BFAEB7080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 90,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QJAoOEBUKDhBACg49Ae+usEAFDhEAAAGh4AoOPMHvrrAQBQ4wwAABoFAKDhBBCg4ZdI+us5AtDlAABQ4wYAABoFAKDhARCg4wQgoOF0J/rrPACg4wAQoOM4C/rrcIC96A=="
+        },
+        {
+          "Timing": "0x60",
+          "Code": "70402DE90140A0E10250A0E10400A0E3D01EFAEB050050E10C00001A1E00A0E3CC1EFAEB010050E30800001A0400A0E10510A0E19748FAEB0060A0E13902D6E5000050E30100001A0100A0E33902C6E57080BDE8",
+          "SourceBase": "0x200000",
+          "TimingByte": 96,
+          "SourceBaseValue": 2097152,
+          "CodeBytes": "cEAt6QFAoOECUKDhBACg49Ae+usFAFDhDAAAGh4AoOPMHvrrAQBQ4wgAABoEAKDhBRCg4ZdI+usAYKDhOQLW5QAAUOMBAAAaAQCg4zkCxuVwgL3o"
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

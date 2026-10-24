@@ -19,29 +19,35 @@ public class MoveRandomizer : IRandomizer
 
     public MoveRandomizer(GameConfig config)
     {
-        //Config = config;
-        var MaxMoveID = config.Info.MaxMoveID;
-        MoveData = config.Moves;
-        SpeciesStat = config.Personal.Table;
+        var MaxMoveID = config?.Info?.MaxMoveID ?? 720;
+        MoveData = config?.Moves ?? [];
+        SpeciesStat = config?.Personal?.Table ?? [];
 
-        var moveNames = config.GetText(TextName.MoveNames);
-        for (int i = 1; i < moveNames.Length && i < MaxMoveID; i++)
+        string[] moveNames = Array.Empty<string>();
+        try { moveNames = config?.GetText(TextName.MoveNames) ?? Array.Empty<string>(); } catch { }
+        for (int i = 1; i < moveNames.Length && i <= MaxMoveID; i++)
         {
-            if (moveNames[i] == "—" || moveNames[i] == "———")
-                DefaultBannedMoves.Add(i);
-
             // Flag 1 PP special moves so they cannot be randomized onto movesets/trainers
-            if (MoveData != null && i < MoveData.Length && MoveData[i].PP == 1)
+            if (MoveData != null && i < MoveData.Length && MoveData[i] != null && MoveData[i].PP == 1)
                 DefaultBannedMoves.Add(i);
         }
 
-        // Explicitly ban all Z-Moves from randomized learnsets & movesets
-        foreach (int zm in Legal.Z_Moves)
+        // Ban every id the usable-move rule rejects: Z, Max, G-Max, unnamed placeholders, ids past the names.
+        // With no names loaded, fall back to the Z-move list alone, as before.
+        for (int i = 1; i <= MaxMoveID; i++)
         {
-            DefaultBannedMoves.Add(zm);
+            if (moveNames.Length > 0 && !Legal.IsUsableMove(i, moveNames))
+                DefaultBannedMoves.Add(i);
+        }
+        if (moveNames.Length == 0)
+        {
+            foreach (int zm in Legal.Z_Moves)
+            {
+                DefaultBannedMoves.Add(zm);
+            }
         }
 
-        RandMove = new GenericRandomizer(Enumerable.Range(1, MaxMoveID - 1).Where(i => !DefaultBannedMoves.Contains(i)).ToArray());
+        RandMove = new GenericRandomizer(Enumerable.Range(1, MaxMoveID).Where(i => !DefaultBannedMoves.Contains(i)).ToArray());
     }
 
     public void Execute()
@@ -59,7 +65,12 @@ public class MoveRandomizer : IRandomizer
 
     private int loopctr;
 
-    public int[] GetRandomLearnset(int index, int movecount) => GetRandomLearnset(SpeciesStat[index].Types, movecount);
+    private int[] GetSpeciesTypes(int index) =>
+        (index >= 0 && index < SpeciesStat.Length && SpeciesStat[index]?.Types != null)
+            ? SpeciesStat[index].Types
+            : [0];
+
+    public int[] GetRandomLearnset(int index, int movecount) => GetRandomLearnset(GetSpeciesTypes(index), movecount);
 
     public int[] GetRandomLearnset(int[] Types, int movecount)
     {
@@ -70,7 +81,7 @@ public class MoveRandomizer : IRandomizer
         return moves;
     }
 
-    public int[] GetRandomMoveset(int index, int movecount = 4) => GetRandomMoveset(SpeciesStat[index].Types, movecount);
+    public int[] GetRandomMoveset(int index, int movecount = 4) => GetRandomMoveset(GetSpeciesTypes(index), movecount);
 
     public int[] GetRandomMoveset(int[] Types, int movecount = 4)
     {
@@ -109,13 +120,13 @@ public class MoveRandomizer : IRandomizer
             move = RandMove.Next();
             if (++tries > 1000)
                 return move;
-        } while (!types.Contains(MoveData[move].Type) || IsMoveBanned(move));
+        } while (move >= MoveData.Length || MoveData[move] == null || !types.Contains(MoveData[move].Type) || IsMoveBanned(move));
         return move;
     }
 
     private bool IsMovesetMeetingRequirements(int[] moves, int count)
     {
-        if (rDMG && rDMGCount > moves.Count(move => MoveData[move].Category != 0))
+        if (rDMG && rDMGCount > moves.Count(move => move >= 0 && move < MoveData.Length && MoveData[move] != null && MoveData[move].Category != 0))
             return false;
 
         if (moves.Any(IsMoveBanned))
@@ -128,8 +139,8 @@ public class MoveRandomizer : IRandomizer
 
     public void ReorderMovesPower(IList<int> moves)
     {
-        var data = moves.Select((Move, Index) => new { Index, Move, Data = MoveData[Move] });
-        var powered = data.Where(z => z.Data.Power > 1).ToList();
+        var data = moves.Select((Move, Index) => new { Index, Move, Data = (Move >= 0 && Move < MoveData.Length) ? MoveData[Move] : null });
+        var powered = data.Where(z => z.Data != null && z.Data.Power > 1).ToList();
         var indexes = powered.ConvertAll(z => z.Index);
         var order = powered.OrderBy(z => z.Data.Power * Math.Max(1, (z.Data.HitMin + z.Data.HitMax) / 2m)).ToList();
 
@@ -160,7 +171,7 @@ public class MoveRandomizer : IRandomizer
         return first.Next();
     }
 
-    public int GetRandomFirstMove(int index) => GetRandomFirstMove(SpeciesStat[index].Types);
+    public int GetRandomFirstMove(int index) => GetRandomFirstMove(GetSpeciesTypes(index));
 
     public int GetRandomFirstMove(int[] types)
     {
@@ -172,7 +183,7 @@ public class MoveRandomizer : IRandomizer
             move = first.Next();
             if (++ctr == firstMoves.Length)
                 return move;
-        } while (!types.Contains(MoveData[move].Type));
+        } while (move >= MoveData.Length || MoveData[move] == null || !types.Contains(MoveData[move].Type));
         return move;
     }
 

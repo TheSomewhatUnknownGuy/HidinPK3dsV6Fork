@@ -1,6 +1,6 @@
 {
   "Name": "Ability Patch and Nature Mints",
-  "Description": "Bag items that change a Pokemon\u0027s ability slot or nature. Ability Patch toggles between the hidden slot and slot 1; each mint sets one nature.",
+  "Description": "Ability Patch switches between the regular ability slot and the hidden ability (no effect if the species has none); each Mint sets its nature. REBUILT 2026-09-26 on the bag's real use path, replacing the FlipTokuseiIndex/Ability-Capsule design, which could never run for these items: Bag.cro 0x99D4 sends only item 645 to the Ability Capsule flow, so the old 0x099DC/0x0DCBC hooks forced every custom id into the 'change Ability?' prompt instead. Now the item is an ordinary non-645 clone: Use goes 0x977C -> 0x9C50 -> 0xC2F0, where one shared block (bag-item-effects) hooks both ITEM_RCV_RecoverCheck calls (0xC318 use, 0xDDC8 ABLE label), the no-handler branch (0xC358) and the message fallback (0x80DC). Handlers call code.bin directly (ChangeTalentPower / ChangeEffortPower / SetTokuseiIndex recalc stats themselves; nature is written where GetSeikaku reads it and stats refreshed), with the Ultra Moon +8 drift of 0x4A____ functions probed at runtime. Success plays the stock use sound and a message (bag text file 1, lines 159-164, added by this package); no effect shows 'It won't have any effect.' Consumption follows the item's own UseKeep flag.",
   "Category": "Bag item",
   "Requires": [],
   "Parameters": {
@@ -8,7 +8,6 @@
       "Description": "Item id for Ability Patch. The code.bin dispatcher compares against this directly.",
       "Type": "item",
       "Default": "867",
-      "ExpectName": "Ability Patch",
       "AllowUnnamed": true
     },
     "mintIds": {
@@ -25,153 +24,143 @@
     "Bag.cro": {
       "Blocks": [
         {
-          "Name": "bag-dispatch-region",
-          "Code": "0000000010C09FE500108CE527D7FF0ADE0050E325D7FF0A33D7FFEA1080010010C09FE500108CE568C6FF0ADE0050E366C6FF0A81C6FFEA1080010004C09FE500209CE5C9A2FFEA10800100000000007100720073007B007C007D007E007F00800081008200830084008500AA01AB016E024503460347034803000008402DE928C09FE5B030DCE1000053E30500000A010053E10100001A0100A0E30880BDE802C08CE2F6FFFFEA0000A0E30880BDE8608001001CC09FE500108CE5FBD6FF0ADE0050E3F9D6FF0AEBFFFFEB000050E3F6D6FF1A04D7FFEA108001001CC09FE500108CE539C6FF0ADE0050E337C6FF0AE1FFFFEB000050E334C6FF1A4FC6FFEA10800100000000000000000000000000",
-          "SourceBase": "0x018010",
-          "CodeBytes": "AAAAABDAn+UAEIzlJ9f/Ct4AUOMl1/8KM9f/6hCAAQAQwJ/lABCM5WjG/wreAFDjZsb/CoHG/+oQgAEABMCf5QAgnOXJov/qEIABAAAAAABxAHIAcwB7AHwAfQB+AH8AgACBAIIAgwCEAIUAqgGrAW4CRQNGA0cDSAMAAAhALekowJ/lsDDc4QAAU+MFAAAKAQBT4QEAABoBAKDjCIC96ALAjOL2///qAACg4wiAvehggAEAHMCf5QAQjOX71v8K3gBQ4/nW/wrr///rAABQ4/bW/xoE1//qEIABABzAn+UAEIzlOcb/Ct4AUOM3xv8K4f//6wAAUOM0xv8aT8b/6hCAAQAAAAAAAAAAAAAAAAA=",
-          "SourceBaseValue": 98320
+          "Name": "bag-item-effects",
+          "Code": "1F402DE93B0000EB000050E30600000A00009DE50210A0E3B4A1FFEB010000E2010020E204D08DE21E80BDE81F40BDE8D4A1FFEA0510A0E12E0000EB000050E301D2FF0A0010A0E144009DE5320000EB000050E31ED2FF0A020050E30D00000A0160A0E10030A0E388039FE50020E0E30310A0E161A0FFEB000056E3F2D1FF0A700094E5011C86E244209DE50030A0E3FFBFFFEBECD1FFEA08D04DE200908DE50000A0E304008DE50400A0E10410A0E30520A0E10030A0E318C5FFEB08D08DE20400A0E16AC4FFEBF9D1FFEA010C55E3DAC0FF3A0720A0E10010A0E30900A0E140A1FFEB012C45E20810A0E10900A0E1DAA0FFEBD5C0FFEAE32F8FE20000A0E1040092E4000050E31EFF2F010038A0E1230851E1F9FFFF1A1EFF2FE1F0412DE90040A0E1215CA0E12168A0E1FF6006E2C4029FE5000090E5C0129FE5010050E10080A0030880A013080056E306F18F30070000EA0C0000EA170000EA3E0000EA550000EA6B0000EA7A0000EA8A0000EA9D0000EA0000A0E30010A0E3F081BDE80100A0E30710A0E1F081BDE8190055E3F7FFFF2A0400A0E15CC29FE508C08CE03CFF2FE1050050E1F1FFFF0A0510A0E10B0000EB9F70A0E3F0FFFFEA0400A0E134C29FE508C08CE03CFF2FE1011080E2190051E30010A023010000EB9F70A0E3E6FFFFEAE0402DE90150A0E10C6094E50600A0E108C29FE53CFF2FE10600A0E10010A0E3FCC19FE508C08CE03CFF2FE11450C0E50600A0E1ECC19FE53CFF2FE10150A0E30400A0E10510A0E1DCC19FE508C08CE03CFF2FE10020A0E10400A0E10510A0E1C8C19FE53CFF2FE1015085E2060055E3F2FFFF3AE080BDE80400A0E1B0C19FE508C08CE03CFF2FE10060A0E1020050E30010A0030210A0130400A0E194C19FE53CFF2FE10400A0E18CC19FE508C08CE03CFF2FE1000050E30400001A0400A0E10610A0E16CC19FE53CFF2FE1AFFFFFEAA070A0E3B0FFFFEA1F0055E3ABFFFF8A0060A0E30070A0E30400A0E10610A0E134C19FE508C08CE03CFF2FE1050050E10170A0130400A0E10610A0E10520A0E118C19FE53CFF2FE1016086E2060056E3F0FFFF3A000057E398FFFF0AA170A0E399FFFFEA060055E394FFFF2A0400A0E10510A0E1E0C09FE508C08CE03CFF2FE1000050E38DFFFF0A0400A0E10510A0E10020A0E3C4C09FE53CFF2FE1A270A0E389FFFFEA100055E384FFFF2AC4708FE20000A0E1857087E0057187E00060A0E30620D7E70400A0E10610A0E18CC09FE53CFF2FE1016086E2060056E3F7FFFF3AA370A0E378FFFFEA0060A0E30070A0E30400A0E10610A0E170C09FE508C08CE03CFF2FE1007087E10400A0E10610A0E10020A0E358C09FE53CFF2FE1016086E2060056E3F1FFFF3A000057E363FFFF0AA470A0E364FFFFEA0200A0E30010A0E3F081BDE821000500E0E04A0010402DE98C25320088D54A00142532001CEA4A00844D32000CE84A00804832000CD04A00FCE54A000C4C32001F1F1E1E1E1E1F1F1F1E1E1E1F1F1E1E1E1F1F1F1F1E1E1F1F1F1E1F1E1E1F1F1F1F1E1E1F1E1F1F1E1F1F1F1F1F1E1F1F1E1F1E1F1E1F1F1F1E1F1E1F1E1F1E1F1F1F1F1F1E1F1F1F1E1F1F1F1E1F1F1F1F1F1E1F1E1F1F1F1F1F1F1F1F1F1F00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "SourceBase": "0x018010"
         }
       ],
       "SitePatches": [
         {
-          "Offset": "0x0DCBC",
-          "Original": "0E00001A",
-          "Patched": "002900EA",
+          "Offset": "0x0C318",
+          "Original": "1ED1FFEB",
+          "Patched": "3C2F00EB",
           "IsHook": true,
-          "HookTarget": "bag-usable-test",
-          "OffsetValue": 56508,
-          "OriginalBytes": "DgAAGg==",
-          "PatchedBytes": "ACkA6g=="
+          "HookTarget": "bag-item-effects:recover"
         },
         {
-          "Offset": "0x099DC",
-          "Original": "1B00001A",
-          "Patched": "C23900EA",
+          "Offset": "0x0DDC8",
+          "Original": "72CAFFEB",
+          "Patched": "902800EB",
           "IsHook": true,
-          "HookTarget": "bag-text-test",
-          "OffsetValue": 39388,
-          "OriginalBytes": "GwAAGg==",
-          "PatchedBytes": "wjkA6g=="
+          "HookTarget": "bag-item-effects:recover"
         },
         {
-          "Offset": "0x12464",
-          "Original": "C5B9FFEB",
-          "Patched": "F81600EB",
+          "Offset": "0x0C358",
+          "Original": "3F0100EA",
+          "Patched": "392F00EA",
           "IsHook": true,
-          "HookTarget": "bag-marker",
-          "OffsetValue": 74852,
-          "OriginalBytes": "xbn/6w==",
-          "PatchedBytes": "+BYA6w=="
+          "HookTarget": "bag-item-effects:dispatch"
+        },
+        {
+          "Offset": "0x080DC",
+          "Original": "DB0000EA",
+          "Patched": "FE3F00EA",
+          "IsHook": true,
+          "HookTarget": "bag-item-effects:message"
         }
       ]
     }
   },
-  "CodeBin": {
-    "LoadBase": 1048576,
-    "Blocks": [
-      {
-        "Name": "ability-and-mint-routines",
-        "Code": "10402DE90040A0E1AF1FF9EB020050E30400A0E10010A0030210A0131040BDE8C4F7F2EA03CC42E263005CE3F3FFFF0A000052E33500001A70402DE93AEBF2EA000000000000000070402DE90050A0E150408FE21520A0E3B030D4E1010053E10400000A044084E2012052E2F9FFFF1A0000A0E37080BDE80260D4E50C5095E50500A0E1EEEEF2EB0010A0E30500A0E1EC1AF9EB1460C0E50500A0E1CAEEF2EB0100A0E37080BDE87100010072000300730004007B0002007C0005007D0008007E0009007F00070080000F008100100082001300830011008400140085001500AA011700AB0116006E020A0045030B0046030D0047030E0048030C00AB0452E30000000A3F0000EA000000EA0000A0E1F0402DE90070A0E17C408FE21520A0E3B030D4E1010053E10400000A044084E2012052E2F9FFFF1A0000A0E3F080BDE80260D4E50C5097E50500A0E1BCEEF2EB0010A0E30500A0E1BA1AF9EB1460C0E50500A0E198EEF2EB0040A0E30700A0E10410A0E1D01EF9EB0020A0E10700A0E10410A0E14EF8F2EB014084E2060054E3F5FFFF3A160000EAF080BDE87100010072000300730004007B0002007C0005007D0008007E0009007F00070080000F008100100082001300830011008400140085001500AA011700AB0116006E020A0045030B0046030D0047030E0048030C000000000008309FE50100A0E3000083E5F080BDE8A09B5B001CC09FE500309CE5000053E30200000A0030A0E300308CE51EFF2FE170402DE9BFEAF2EAA09B5B0000000000000000000000000000000000",
-        "SourceBase": "0x00666948",
-        "CallsSymbols": [
-          "_ZNK3pml8pokepara9CoreParam15GetTokuseiIndexEv",
-          "_ZN3pml8pokepara9CoreParam15SetTokuseiIndexEh"
-        ],
-        "CodeBytes": "EEAt6QBAoOGvH/nrAgBQ4wQAoOEAEKADAhCgExBAvejE9/LqA8xC4mMAXOPz//8KAABS4zUAABpwQC3pOuvy6gAAAAAAAAAAcEAt6QBQoOFQQI/iFSCg47Aw1OEBAFPhBAAACgRAhOIBIFLi+f//GgAAoONwgL3oAmDU5QxQleUFAKDh7u7y6wAQoOMFAKDh7Br56xRgwOUFAKDhyu7y6wEAoONwgL3ocQABAHIAAwBzAAQAewACAHwABQB9AAgAfgAJAH8ABwCAAA8AgQAQAIIAEwCDABEAhAAUAIUAFQCqARcAqwEWAG4CCgBFAwsARgMNAEcDDgBIAwwAqwRS4wAAAAo/AADqAAAA6gAAoOHwQC3pAHCg4XxAj+IVIKDjsDDU4QEAU+EEAAAKBECE4gEgUuL5//8aAACg4/CAvegCYNTlDFCX5QUAoOG87vLrABCg4wUAoOG6GvnrFGDA5QUAoOGY7vLrAECg4wcAoOEEEKDh0B756wAgoOEHAKDhBBCg4U748usBQITiBgBU4/X//zoWAADq8IC96HEAAQByAAMAcwAEAHsAAgB8AAUAfQAIAH4ACQB/AAcAgAAPAIEAEACCABMAgwARAIQAFACFABUAqgEXAKsBFgBuAgoARQMLAEYDDQBHAw4ASAMMAAAAAAAIMJ/lAQCg4wAAg+XwgL3ooJtbABzAn+UAMJzlAABT4wIAAAoAMKDjADCM5R7/L+FwQC3pv+ry6qCbWwAAAAAAAAAAAAAAAAAAAAAA",
-        "SourceBaseValue": 6711624
-      }
-    ],
-    "Patches": [
-      {
-        "Name": "flip-dispatcher-hook",
-        "Symbol": "_ZN3pml8pokepara9CoreParam16FlipTokuseiIndexEv",
-        "Offset": 0,
-        "Original": "70402DE9",
-        "BranchTo": "ability-and-mint-routines",
-        "BranchOffset": 36,
-        "Link": false,
-        "OriginalBytes": "cEAt6Q=="
-      }
-    ]
-  },
+  "CodeBin": null,
   "DataTables": [
     {
       "Target": "Bag.cro",
-      "Block": "bag-dispatch-region",
-      "Offset": "0x50",
-      "ElementSize": 2,
-      "Values": "${mintIds}",
+      "Block": "bag-item-effects",
+      "Offset": "0x48C",
+      "ElementSize": 4,
+      "Values": "${abilityPatchId}+0x20000,${mintIds[0]}+0x1000000,${mintIds[1]}+0x3000000,${mintIds[2]}+0x4000000,${mintIds[3]}+0x2000000,${mintIds[4]}+0x5000000,${mintIds[5]}+0x8000000,${mintIds[6]}+0x9000000,${mintIds[7]}+0x7000000,${mintIds[8]}+0xF000000,${mintIds[9]}+0x10000000,${mintIds[10]}+0x13000000,${mintIds[11]}+0x11000000,${mintIds[12]}+0x14000000,${mintIds[13]}+0x15000000,${mintIds[14]}+0x17000000,${mintIds[15]}+0x16000000,${mintIds[16]}+0xA000000,${mintIds[17]}+0xB000000,${mintIds[18]}+0xD000000,${mintIds[19]}+0xE000000,${mintIds[20]}+0xC000000",
       "Terminate": true,
-      "Capacity": 22,
-      "OffsetValue": 80
+      "Capacity": 96
     }
   ],
   "ItemData": {
     "${abilityPatchId}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[0]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[1]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[2]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[3]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[4]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[5]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[6]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[7]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[8]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[9]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[10]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[11]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[12]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[13]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[14]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[15]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[16]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[17]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[18]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[19]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     },
     "${mintIds[20]}": {
-      "CloneFrom": "645"
+      "CloneFrom": "645",
+      "Pocket": "1"
     }
   },
   "ItemNames": {
@@ -198,28 +187,86 @@
     "${mintIds[19]}": "Naive Mint",
     "${mintIds[20]}": "Serious Mint"
   },
+  "ItemNamesPlural": {
+    "${abilityPatchId}": "Ability Patches",
+    "${mintIds[0]}": "Lonely Mints",
+    "${mintIds[1]}": "Adamant Mints",
+    "${mintIds[2]}": "Naughty Mints",
+    "${mintIds[3]}": "Brave Mints",
+    "${mintIds[4]}": "Bold Mints",
+    "${mintIds[5]}": "Impish Mints",
+    "${mintIds[6]}": "Lax Mints",
+    "${mintIds[7]}": "Relaxed Mints",
+    "${mintIds[8]}": "Modest Mints",
+    "${mintIds[9]}": "Mild Mints",
+    "${mintIds[10]}": "Rash Mints",
+    "${mintIds[11]}": "Quiet Mints",
+    "${mintIds[12]}": "Calm Mints",
+    "${mintIds[13]}": "Gentle Mints",
+    "${mintIds[14]}": "Careful Mints",
+    "${mintIds[15]}": "Sassy Mints",
+    "${mintIds[16]}": "Timid Mints",
+    "${mintIds[17]}": "Hasty Mints",
+    "${mintIds[18]}": "Jolly Mints",
+    "${mintIds[19]}": "Naive Mints",
+    "${mintIds[20]}": "Serious Mints"
+  },
+  "ItemNamesPluralAlt": {
+    "${abilityPatchId}": "Ability Patch[VAR NUMBRNCH(00FE,0100)]es",
+    "${mintIds[0]}": "Lonely Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[1]}": "Adamant Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[2]}": "Naughty Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[3]}": "Brave Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[4]}": "Bold Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[5]}": "Impish Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[6]}": "Lax Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[7]}": "Relaxed Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[8]}": "Modest Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[9]}": "Mild Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[10]}": "Rash Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[11]}": "Quiet Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[12]}": "Calm Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[13]}": "Gentle Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[14]}": "Careful Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[15]}": "Sassy Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[16]}": "Timid Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[17]}": "Hasty Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[18]}": "Jolly Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[19]}": "Naive Mint[VAR NUMBRNCH(00FE,0100)]s",
+    "${mintIds[20]}": "Serious Mint[VAR NUMBRNCH(00FE,0100)]s"
+  },
   "ItemDescriptions": {
-    "${abilityPatchId}": "An item that swaps a Pokémon's Ability between its usual first Ability and its rare hidden Ability. Use it again to swap back.",
-    "${mintIds[0]}": "A mint with a sharp aroma. The Pokémon that eats it will grow with a raised Attack stat and a lowered Defense stat.",
-    "${mintIds[1]}": "A mint with a sharp aroma. The Pokémon that eats it will grow with a raised Attack stat and a lowered Sp. Atk stat.",
-    "${mintIds[2]}": "A mint with a sharp aroma. The Pokémon that eats it will grow with a raised Attack stat and a lowered Sp. Def stat.",
-    "${mintIds[3]}": "A mint with a sharp aroma. The Pokémon that eats it will grow with a raised Attack stat and a lowered Speed stat.",
-    "${mintIds[4]}": "A mint with a firm aroma. The Pokémon that eats it will grow with a raised Defense stat and a lowered Attack stat.",
-    "${mintIds[5]}": "A mint with a firm aroma. The Pokémon that eats it will grow with a raised Defense stat and a lowered Sp. Atk stat.",
-    "${mintIds[6]}": "A mint with a firm aroma. The Pokémon that eats it will grow with a raised Defense stat and a lowered Sp. Def stat.",
-    "${mintIds[7]}": "A mint with a firm aroma. The Pokémon that eats it will grow with a raised Defense stat and a lowered Speed stat.",
-    "${mintIds[8]}": "A mint with a rich aroma. The Pokémon that eats it will grow with a raised Sp. Atk stat and a lowered Attack stat.",
-    "${mintIds[9]}": "A mint with a rich aroma. The Pokémon that eats it will grow with a raised Sp. Atk stat and a lowered Defense stat.",
-    "${mintIds[10]}": "A mint with a rich aroma. The Pokémon that eats it will grow with a raised Sp. Atk stat and a lowered Sp. Def stat.",
-    "${mintIds[11]}": "A mint with a rich aroma. The Pokémon that eats it will grow with a raised Sp. Atk stat and a lowered Speed stat.",
-    "${mintIds[12]}": "A mint with a mild aroma. The Pokémon that eats it will grow with a raised Sp. Def stat and a lowered Attack stat.",
-    "${mintIds[13]}": "A mint with a mild aroma. The Pokémon that eats it will grow with a raised Sp. Def stat and a lowered Defense stat.",
-    "${mintIds[14]}": "A mint with a mild aroma. The Pokémon that eats it will grow with a raised Sp. Def stat and a lowered Sp. Atk stat.",
-    "${mintIds[15]}": "A mint with a mild aroma. The Pokémon that eats it will grow with a raised Sp. Def stat and a lowered Speed stat.",
-    "${mintIds[16]}": "A mint with a light aroma. The Pokémon that eats it will grow with a raised Speed stat and a lowered Attack stat.",
-    "${mintIds[17]}": "A mint with a light aroma. The Pokémon that eats it will grow with a raised Speed stat and a lowered Defense stat.",
-    "${mintIds[18]}": "A mint with a light aroma. The Pokémon that eats it will grow with a raised Speed stat and a lowered Sp. Atk stat.",
-    "${mintIds[19]}": "A mint with a light aroma. The Pokémon that eats it will grow with a raised Speed stat and a lowered Sp. Def stat.",
-    "${mintIds[20]}": "A mint with a plain aroma. The Pokémon that eats it will grow evenly, favoring no stat over any other."
+    "${abilityPatchId}": "An item that swaps a Pokémon's Ability\nbetween its regular Ability and its\nrare Hidden Ability.",
+    "${mintIds[0]}": "A mint with a sharp aroma. It raises\nthe holder's Attack and lowers Defense.",
+    "${mintIds[1]}": "A mint with a sharp aroma. It raises\nthe holder's Attack and lowers Sp. Atk.",
+    "${mintIds[2]}": "A mint with a sharp aroma. It raises\nthe holder's Attack and lowers Sp. Def.",
+    "${mintIds[3]}": "A mint with a sharp aroma. It raises\nthe holder's Attack and lowers Speed.",
+    "${mintIds[4]}": "A mint with a firm aroma. It raises\nthe holder's Defense and lowers Attack.",
+    "${mintIds[5]}": "A mint with a firm aroma. It raises\nthe holder's Defense and lowers Sp. Atk.",
+    "${mintIds[6]}": "A mint with a firm aroma. It raises\nthe holder's Defense and lowers Sp. Def.",
+    "${mintIds[7]}": "A mint with a firm aroma. It raises\nthe holder's Defense and lowers Speed.",
+    "${mintIds[8]}": "A mint with a rich aroma. It raises\nthe holder's Sp. Atk and lowers Attack.",
+    "${mintIds[9]}": "A mint with a rich aroma. It raises\nthe holder's Sp. Atk and lowers Defense.",
+    "${mintIds[10]}": "A mint with a rich aroma. It raises\nthe holder's Sp. Atk and lowers Sp. Def.",
+    "${mintIds[11]}": "A mint with a rich aroma. It raises\nthe holder's Sp. Atk and lowers Speed.",
+    "${mintIds[12]}": "A mint with a mild aroma. It raises\nthe holder's Sp. Def and lowers Attack.",
+    "${mintIds[13]}": "A mint with a mild aroma. It raises\nthe holder's Sp. Def and lowers Defense.",
+    "${mintIds[14]}": "A mint with a mild aroma. It raises\nthe holder's Sp. Def and lowers Sp. Atk.",
+    "${mintIds[15]}": "A mint with a mild aroma. It raises\nthe holder's Sp. Def and lowers Speed.",
+    "${mintIds[16]}": "A mint with a light aroma. It raises\nthe holder's Speed and lowers Attack.",
+    "${mintIds[17]}": "A mint with a light aroma. It raises\nthe holder's Speed and lowers Defense.",
+    "${mintIds[18]}": "A mint with a light aroma. It raises\nthe holder's Speed and lowers Sp. Atk.",
+    "${mintIds[19]}": "A mint with a light aroma. It raises\nthe holder's Speed and lowers Sp. Def.",
+    "${mintIds[20]}": "A mint with a plain aroma. It allows\nthe Pokémon to grow evenly across stats."
+  },
+  "GameTextLines": {
+    "1": {
+      "159": "[VAR PKNICK(0000)]’s Nature changed!",
+      "160": "[VAR PKNICK(0000)]’s Ability changed!",
+      "161": "[VAR PKNICK(0000)]’s potential was\\nmaxed out!",
+      "162": "[VAR PKNICK(0000)]’s potential was\\nlowered!",
+      "163": "[VAR PKNICK(0000)]’s Hidden Power\\nchanged!",
+      "164": "[VAR PKNICK(0000)]’s base stats\\nwere reset!"
+    }
   }
 }

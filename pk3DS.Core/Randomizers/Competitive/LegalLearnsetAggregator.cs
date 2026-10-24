@@ -9,6 +9,7 @@ namespace pk3DS.Core.Randomizers.Competitive;
 public class LegalLearnsetAggregator
 {
     private readonly GameConfig Config;
+    public GameConfig GameConfig => Config;
     private readonly Dictionary<int, HashSet<int>> LegalMovePools = new();
     private string[] CachedMoveNames;
 
@@ -90,6 +91,12 @@ public class LegalLearnsetAggregator
         }
     }
 
+    /// <summary>The eight fixed Gen 7 special tutors, in TutorFlags bit order 0-7 (as PersonalEditor7).</summary>
+    private static readonly ushort[] SpecialTutors7 = [520, 519, 518, 338, 307, 308, 434, 620];
+
+    /// <summary>First TutorFlags bit of the beach-tutor lists: word 0x29, the base the tutor ASM expects.</summary>
+    private const int BeachTutorFirstBit = 32;
+
     /// <summary>
     /// Injects tutor move IDs into all species' legal move pools.
     /// </summary>
@@ -103,6 +110,27 @@ public class LegalLearnsetAggregator
             var pi = Config.Personal[species];
             if (pi == null) continue;
             if (!LegalMovePools.TryGetValue(species, out var pool)) continue;
+
+            // SM/USUM keep every tutor bit in TutorFlags; TypeTutors/SpecialTutors are empty there,
+            // so without this no tutor move ever reached a legal pool on Gen 7.
+            if (pi is PersonalInfoSM sm)
+            {
+                for (int t = 0; t < SpecialTutors7.Length && t < sm.TutorFlags.Length; t++)
+                    if (sm.TutorFlags[t]) pool.Add(SpecialTutors7[t]);
+
+                // The beach-tutor lists sit back to back from BeachTutorFirstBit, in list order.
+                int bit = BeachTutorFirstBit;
+                foreach (var list in tutorMoveLists)
+                {
+                    foreach (ushort move in list ?? [])
+                    {
+                        if (bit < sm.TutorFlags.Length && sm.TutorFlags[bit] && move > 0 && !Legal.Z_Moves.Contains(move))
+                            pool.Add(move);
+                        bit++;
+                    }
+                }
+                continue;
+            }
 
             // Type tutors
             if (pi.TypeTutors != null && tutorMoveLists.Length > 0 && tutorMoveLists[0] != null)

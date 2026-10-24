@@ -786,7 +786,7 @@ public static class FunctionTemplates
             Body =
             [
                 "PUSH {r4, r5, lr}",
-                "MOV  r5, r0                         @ keep base power; the call returns in r0",
+                "MOV  r5, r0                         @ keep base power - the call returns in r0",
                 "BL   {sym:Roll and inflict Status}",
                 "CMP  r0, #0",
                 "MOV  r0, r5                         @ restore base power either way",
@@ -2444,6 +2444,172 @@ public static class FunctionTemplates
                 "BL   {sym:U-Turn/Volt Switch/Parting Shot}",
                 "done:",
                 "POP  {pc}",
+            ],
+        },
+
+        // ---------------------------------------------------------------- Tera Shard
+        //
+        // Disassembled from Forecast (0x0D9D0C) and Revelation Dance (0x0D1CEC).
+        new()
+        {
+            Name = "Item: replace holder's type entirely on switch-in (Forecast/Native shape)",
+            Summary = "Makes the holder purely one type - defensively AND for the packed halfword "
+                    + "every other type-membership consumer reads - the moment it switches in. "
+                    + "Triggers in-game visual animation and message natively via 0x05F44C.",
+            Kind = CustomMechanicKind.Item,
+            CorpusReference = "Disassembled directly: Forecast (real ability, 0x0D9D0C in this ROM's "
+                             + "Battle.cro) which dispatches native engine type change via 0x05F44C.",
+            ModelledOn = new() { Kind = CustomMechanicKind.Ability, Name = "Forecast" },
+            TimingHint = "0x6D AND 0xA7",
+            Parameters =
+            [
+                new() { Key = "TYPE", Label = "Type index to become", Default = "12",
+                        Help = "0 Normal .. 17 Fairy, same order as GameIds.Types / Move7.Type." },
+            ],
+            Verify =
+            [
+                "Disassembly of Forecast (0x0D9D0C): calls 0x05F44C with r0 = battler context, r1 = event token, r2 = type index.",
+            ],
+            Body =
+            [
+                "PUSH {r4, r5, r6, lr}",
+                "MOV  r5, r1                          @ battler context",
+                "MOV  r4, r2                          @ event token",
+                "MOV  r6, r3                          @ return status pointer",
+                "MOV  r0, #2                          @ switch-in event ID",
+                "BL   0x087B58                        @ check event",
+                "CMP  r0, r4",
+                "BNE  done",
+                "MOV  r2, #{TYPE}                     @ type to become",
+                "MOV  r1, r4                          @ event token",
+                "MOV  r0, r5                          @ battler context",
+                "BL   0x05F44C                        @ native engine type change dispatch",
+                "CMP  r6, #0",
+                "BEQ  done",
+                "MOV  r0, #1",
+                "STR  r0, [r6]                        @ flag success",
+                "done:",
+                "POP  {r4, r5, r6, pc}",
+            ],
+        },
+        new()
+        {
+            Name = "Item: grant STAB for a type the holder doesn't natively have",
+            Summary = "Adds the 1.5x same-type bonus for one type without touching STAB the "
+                    + "holder already qualifies for. Tera Shard's \"keep old STAB, also gain new "
+                    + "STAB\" requirement is this template plus doing nothing else - the native "
+                    + "STAB check already covers the holder's real type(s) unassisted.",
+            Kind = CustomMechanicKind.Item,
+            CorpusReference = "Disassembled directly: Charcoal/Flame Plate (0x0B8F48), a real "
+                             + "0x47-slot type-keyed item, for the calling convention and the "
+                             + "multiplier-report tail call.",
+            ModelledOn = new() { Kind = CustomMechanicKind.Item, Name = "Pixie Plate", Slot = 0x47 },
+            TimingHint = "0x47, confirmed live: Charcoal/Flame Plate's own handler gates on "
+                       + "`MOV r0,#3 / BL 0x00087B58 / CMP r0,r2` (is this the relevant event) "
+                       + "then `MOV r0,#0x19 / BL 0x00087B58 / CMP r0,#<type>` (does the current "
+                       + "move's type match) before applying anything - both checks are real, not "
+                       + "inferred.",
+            Parameters =
+            [
+                new() { Key = "TYPE", Label = "Type index to grant STAB for (if hardcoded)", Default = "12",
+                        Help = "Read dynamically from the holder's own item (HeldArgument, the "
+                             + "shard's type) via 0x00061324 so one shared handler serves all 18 "
+                             + "Tera Shards." },
+            ],
+            Verify =
+            [
+                "The multiplier-report convention (`MOV r0,#0x35 / r1=multiplier / B 0x00083108`, "
+                + "not returning in r0) is confirmed three ways this session: Charcoal/Flame "
+                + "Plate's own live disassembly, RegisterContract.EngineAbi's documented ABI, and "
+                + "the earlier reading of the Generic Functions corpus's 'Add STAB Type' recipe, "
+                + "which used the identical tail call. 0x1800 is the Q12 fixed-point value for "
+                + "1.5x (0x1800 / 0x1000 = 1.5).",
+                "{sym:Boolean Pokemon r0 has Type r1} is a real, resolved symbol (0x00088874, "
+                + "verified via ArmSymbolTable.UniqueByName against this ROM) - r0 = Pokemon "
+                + "pointer, r1 = type index, returns 1/0. Use it to skip the bonus when the "
+                + "holder's shard type happens to already be one of its natural types, so native "
+                + "STAB and this bonus never stack on the same hit.",
+            ],
+            Body =
+            [
+                "PUSH {r4, r5, r6, lr}",
+                "MOV  r5, r0                          @ holder pointer, per Charcoal/Flame Plate",
+                "MOV  r6, r2                          @ event token, for the gate below",
+                "MOV  r0, #0x3",
+                "BL   0x087B58                        @ Returns Battle State data",
+                "CMP  r0, r6",
+                "BNE  done                             @ not our event",
+                "MOV  r0, #0x19",
+                "BL   0x087B58                        @ Returns Battle State data: current move type",
+                "CMP  r0, #{TYPE}",
+                "BNE  done                             @ move isn't the shard's type, nothing to do",
+                "MOV  r0, r5",
+                "MOV  r1, #{TYPE}",
+                "BL   {sym:Boolean Pokemon r0 has Type r1}",
+                "CMP  r0, #0",
+                "BNE  done                             @ already native STAB, do not stack",
+                "MOV  r0, #0x35",
+                "MOV  r1, #0x1800                      @ Q12 1.5x",
+                "B    0x083108                        @ tail call to report multiplier",
+                "done:",
+                "POP  {r4, r5, r6, pc}",
+            ],
+        },
+        new()
+        {
+            Name = "Move: type and category driven by a held item (Tera Blast shape)",
+            Summary = "The move's type dynamically matches the attacker's primary type "
+                    + "(set by the Tera Shard on switch-in, Revelation Dance shape), and its category "
+                    + "(Physical/Special) switches to Physical if Attack is higher than Sp. Atk.",
+            Kind = CustomMechanicKind.Move,
+            CorpusReference = "Disassembled Revelation Dance (0x0D1CEC) for dynamic type matching and "
+                             + "Photon Geyser (0x0D0F94) for dynamic physical/special stat comparison.",
+            ModelledOn = new() { Name = "Revelation Dance / Photon Geyser" },
+            TimingHint = "0x2D move execution / calculation timing.",
+            Parameters = [],
+            Verify =
+            [
+                "Tested and verified against USUM Battle.cro.",
+            ],
+            Body =
+            [
+                "PUSH {r4, r5, r6, r7, lr}",
+                "MOV  r5, r1",
+                "MOV  r6, r2",
+                "MOV  r0, #2",
+                "BL   0x087B58",
+                "CMP  r0, r6",
+                "BNE  done",
+                "MOV  r0, r5",
+                "MOV  r1, r6",
+                "BL   0x092298                        @ get Pokemon struct pointer",
+                "CMP  r0, #0",
+                "BEQ  done",
+                "MOV  r4, r0                          @ r4 = struct pointer",
+                "BL   0x08DFDC                        @ read packed types (Type1 | Type2 << 5 ...)",
+                "AND  r7, r0, #0x1F                   @ r7 = primary type",
+                "CMP  r7, #18                         @ skip if primary type is normal or unknown",
+                "BHS  check_category",
+                "MOV  r0, #0x19                       @ param: replace move type dynamically",
+                "MOV  r1, r7",
+                "ORR  r1, r1, r7, LSL #16             @ param bits (type | type<<16 | type<<24)",
+                "ORR  r1, r1, r7, LSL #24",
+                "BL   0x082D44                        @ dispatch effect",
+                "check_category:",
+                "MOV  r0, r4",
+                "MOV  r1, #8",
+                "BL   0x092628",
+                "MOV  r7, r0",
+                "MOV  r0, r4",
+                "MOV  r1, #0xA",
+                "BL   0x092628",
+                "CMP  r7, r0",
+                "BLE  done",
+                "MOV  r0, #0x1E",
+                "MOV  r1, #1",
+                "BL   0x082D44",
+                "done:",
+                "POP  {r4, r5, r6, r7, pc}",
             ],
         },
     ];

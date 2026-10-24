@@ -1,0 +1,26 @@
+{
+  "Name": "Take Heart Status Cure Fix",
+  "Description": "OPEN CONCERN ADDED 2026-09-12 - same finding as LunarBlessingFix.json (see that file for full detail): a separate hardcoded detour function at Battle.cro 0xFFE80 has a 9-move literal table (0x100094-0x1000B4) including move 850 (Take Heart, sharing landing block 0xFFF78 with 849/Lunar Blessing), gated on timing 0xBF, calling 0x100030 which queues an event (kind 0xA, effect 0x2A) to a fixed battler range. This is the same class of evidence that got FickleBeam.json deleted for double-firing move 907. Effect 0x2A has not been decoded, so it's unknown whether it duplicates this package's own timing-0xBF entry. Treat as an open double-fire risk, not confirmed safe, until decoded or tested live.\n\nRESOLVED 2026-09-07 - dispatch confirmed by full control-flow trace (see LunarBlessingFix.json/JungleHealingFix.json for the detailed trace of 0x87304, 0x101E00-0x1020B4, 0xFFC80-0xFFD14, 0xFEC00-0xFED44 and 0xFE800-0xFE8F8, which apply identically here). Move Dispatcher 0x87304 matches purely by 16-bit move id against the master table and is called unconditionally with no EffectSequence check; move 850 is not one of the ~32 hardcoded ids the 0x101E00 alias/detour chain special-cases, so it gets the plain default comparison and this timing-0xBF entry is reached exactly as Purify's confirmed-working entry for move 685 is. Take Heart cures the user's status condition at timing 0xBF while Calm Mind EffectSequence 211 boosts SpA and SpD via its own separate, self-contained battle script - two independent mechanisms, not a switch keyed by EffectSequence. Uses verified standalone status-cure routine cloned from Purify (0xC33F8) with the 50% HP-heal tail and status-gated exit removed.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 850,
+      "Name": "Take Heart",
+      "Slots": [
+        {
+          "Timing": "0xBF",
+          "Code": "F05F2DE90300A0E301A0A0E10290A0E1D211FFEB090050E12100001A0080A0E30500A0E3CD11FFEB007050E20040A0E301B0A0831A00009A060084E2FF0000E2C611FFEBFF6000E20610A0E10A00A0E1923BFFEB00F020E300F020E300FBFEEB0050B0E100F020E30A00000A0920A0E10A10A0E30A00A0E1A010FFEB0450C0E511B0C0E50010A0E10560C0E50A00A0E119E6FEEB0180A0E3014084E2040057E1E4FFFF8AF09FBDE8",
+          "SourceBase": "0xC33F8"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

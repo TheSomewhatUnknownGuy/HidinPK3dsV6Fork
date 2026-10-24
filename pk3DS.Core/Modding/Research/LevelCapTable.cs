@@ -135,7 +135,6 @@ public sealed class LevelCapTable
         Entries =
         [
             new("Iki Town (added)",               0x11, 0x08, 10),
-            new("Ride Pager (added)",             0x01, 0x02, 12),
             new("Trainer School",                 0x11, 0x01, 15),
             new("Captain Ilima",                  0x11, 0x02, 17),
             new("Route 2 (added)",                0x11, 0x04, 18),

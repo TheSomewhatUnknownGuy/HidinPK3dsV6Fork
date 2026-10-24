@@ -17,6 +17,16 @@ namespace pk3DS.Core.CTR
 
     public static class CROUtil
     {
+        /// <summary>
+        /// Filler written into space an expansion creates but nothing has claimed yet.
+        /// 0xCC is the project-wide "this is free" marker: every blank-space scanner in the
+        /// codebase (CodeRelocator.IsRangeFree/FindReserve, CodeSpaceAllocator.PaddingBytes,
+        /// MechanicEditor, MartLayout, ResearchEngine.FindFreeExecutableSpace) already accepts
+        /// 0xCC and 0x00 interchangeably, so writing it costs nothing and makes the new arena
+        /// obvious in a hex editor instead of indistinguishable from real zeroed data.
+        /// </summary>
+        public const byte FreeSpaceFill = 0xCC;
+
         public static uint ReadU32(byte[] data, int offset) => BitConverter.ToUInt32(data, offset);
         public static void WriteU32(byte[] data, uint value, int offset) => BitConverter.GetBytes(value).CopyTo(data, offset);
 
@@ -56,7 +66,7 @@ namespace pk3DS.Core.CTR
             return expanded;
         }
 
-        public static byte[] ExpandSegment(byte[] data, char section, int bytesToAdd, int insertionPointRequested = -1, byte fill = 0x00)
+        public static byte[] ExpandSegment(byte[] data, char section, int bytesToAdd, int insertionPointRequested = -1, byte fill = FreeSpaceFill)
         {
             int fileSize = data.Length;
             if (ReadU32(data, 0x80) != 0x304F5243) // "CRO0" magic
@@ -88,6 +98,8 @@ namespace pk3DS.Core.CTR
             if (bytesToAdd > 0)
             {
                 Array.Copy(data, 0, newData, 0, skip);
+                // The whole inserted run is filler; callers that place code/data here overwrite
+                // the head of it and leave the tail as the visible free arena.
                 for (int i = 0; i < bytesToAdd; i++) newData[skip + i] = fill;
                 Array.Copy(data, skip, newData, skip + bytesToAdd, fileSize - skip);
             }
@@ -282,21 +294,52 @@ namespace pk3DS.Core.CTR
 
         public static uint[] GetSegmentStartIndices(byte[] data)
         {
-            // Use inline header fields instead of the segment table at 0xC8,
-            // which can point into string data on some CROs (like USUM Battle.cro).
+            // The real segment table at 0xC8 IS valid for USUM Battle.cro - directly verified this
+            // session by dumping it (id0=.text @0x180 size 0x11C7F4, id1=.rodata @0x11D000 size
+            // 0xE694, id2=.data, id3=.bss, matching the inline header fields exactly). The old
+            // "0xC8 can point into string data" comment here was never re-checked against real
+            // bytes; GetSegmentForAddress already reads the real table directly and has been
+            // correct throughout this session's testing. The bug was elsewhere: this function's own
+            // "starts[1] = codeStart + codeSize" formula assumes rodata starts exactly where the
+            // inline codeSize field ends, but that field covers code+rodata+alignment padding
+            // combined - real rodata (segment 1) actually starts ~0xF000 bytes earlier. Any caller
+            // computing a segment-1 absolute address through this function (ExpandSegment's
+            // relocation-table fixup among them) inherited that same skew. Prefer the real table;
+            // fall back to the inline-derived guess only if the table doesn't look like segments at
+            // all (sanity-checked against the inline fields, which are a separately-sourced value
+            // that should agree with a genuine table).
+            uint segTableOffset = ReadU32(data, 0xC8);
+            uint segCount = ReadU32(data, 0xCC);
             uint codeStart = ReadU32(data, 0xB0);
             uint dataStart = ReadU32(data, 0xB8);
+            if (segCount >= 4 && segTableOffset + 4u * 12u <= (uint)data.Length)
+            {
+                uint seg0Off = ReadU32(data, (int)segTableOffset + 0 * 12);
+                uint seg2Off = ReadU32(data, (int)segTableOffset + 2 * 12);
+                if (seg0Off == codeStart && seg2Off == dataStart)
+                {
+                    return
+                    [
+                        ReadU32(data, (int)segTableOffset + 0 * 12),
+                        ReadU32(data, (int)segTableOffset + 1 * 12),
+                        ReadU32(data, (int)segTableOffset + 2 * 12),
+                        ReadU32(data, (int)segTableOffset + 3 * 12),
+                    ];
+                }
+            }
+
+            // Fallback: derive from inline header fields. Only correct when rodata truly starts
+            // right where code ends, with no gap - not the case for USUM Battle.cro, but kept for
+            // whatever CRO this table genuinely doesn't describe.
             uint codeSize  = ReadU32(data, 0xB4);
             uint dataSize  = ReadU32(data, 0xBC);
-            uint bssSize   = ReadU32(data, 0x94);
-
-            // Segment layout: [0]=code, [1]=rodata (between code+data), [2]=data, [3]=bss
-            uint[] starts = new uint[4];
-            starts[0] = codeStart;                     // .code
-            starts[1] = codeStart + codeSize;           // .rodata (immediately after code)
-            starts[2] = dataStart;                      // .data
-            starts[3] = dataStart + dataSize;            // .bss
-            return starts;
+            return
+            [
+                codeStart,                // .code
+                codeStart + codeSize,     // .rodata (immediately after code - the unverified guess)
+                dataStart,                 // .data
+                dataStart + dataSize,      // .bss
+            ];
         }
 
         public static int GetSegmentForAddress(uint address, byte[] data)
@@ -304,13 +347,22 @@ namespace pk3DS.Core.CTR
             uint segmentTableOffset = ReadU32(data, 0xC8);
             uint codeStart = ReadU32(data, (int)segmentTableOffset);
             uint codeLen = ReadU32(data, (int)segmentTableOffset + 4);
+            uint rodataStart = ReadU32(data, (int)segmentTableOffset + 0xC);
+            uint rodataLen = ReadU32(data, (int)segmentTableOffset + 0x10);
             uint dataStart = ReadU32(data, (int)segmentTableOffset + 0x18);
             uint dataLen = ReadU32(data, (int)segmentTableOffset + 0x1C);
-            
+
             if (address >= dataStart + dataLen) return 3; // BSS
             if (address < codeStart + codeLen) return 0; // Code
-            if (address < dataStart) return 1; // Rodata
-            return 2; // Data
+            // Rodata only up to its own declared end - NOT everything up to dataStart. Between
+            // real rodata's end and dataStart sits CRO structural metadata (the segment table,
+            // pointer tables, the relocation table itself) plus alignment padding; treating all of
+            // that as "segment 1" let CodeRelocator register relocations at offsets past segment
+            // 1's real size, which Citra's loader rejects (see DecompiledCRO.CodeEnd for the full
+            // story - that gap is stock Battle.cro's alignment padding, not free rodata).
+            if (address >= rodataStart && address < rodataStart + rodataLen) return 1; // Rodata
+            if (address >= dataStart && address < dataStart + dataLen) return 2; // Data
+            return -1; // Structural metadata / padding - not a writable/relocatable segment
         }
 
         public static void RelocateTable(byte[] data, uint oldRelativeAddend, int oldSegment, uint newAbsoluteOffset, int tableLengthBytes)
@@ -323,7 +375,7 @@ namespace pk3DS.Core.CTR
                 newAbsoluteOffset + tableLengthBytes <= data.Length)
             {
                 Array.Copy(data, oldAbsoluteOffset, data, newAbsoluteOffset, tableLengthBytes);
-                for (int i = 0; i < tableLengthBytes; i++) data[oldAbsoluteOffset + i] = 0xCC;
+                for (int i = 0; i < tableLengthBytes; i++) data[oldAbsoluteOffset + i] = FreeSpaceFill;
             }
 
             uint patchTableOffset = ReadU32(data, 0x128);

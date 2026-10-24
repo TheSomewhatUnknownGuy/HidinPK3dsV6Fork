@@ -62,10 +62,13 @@ namespace pk3DS.Core.CTR
             // Align to 0x1000 boundary
             newSize = (newSize + 0xFFF) & ~0xFFF;
 
+            int oldSize = data.Length;
             Array.Resize(ref data, newSize);
-            // Fill new space with 0xCC
-            for (int i = data.Length - needed; i < data.Length; i++)
-                data[i] = 0xCC;
+            // Everything past the old end is brand new (Array.Resize zero-fills it), so mark the
+            // whole run - including the 0x1000 alignment slack - as free space, not just the last
+            // "needed" bytes.
+            for (int i = oldSize; i < data.Length; i++)
+                data[i] = CROUtil.FreeSpaceFill;
 
             // Update file size in header
             BitConverter.GetBytes((uint)newSize).CopyTo(data, 0x90);
@@ -282,7 +285,7 @@ namespace pk3DS.Core.CTR
             for (int i = 0; i < oldCount * 8; i++)
             {
                 int oldLoc = (int)(oldTimings.Offset + i);
-                if (oldLoc < data.Length) data[oldLoc] = 0xCC;
+                if (oldLoc < data.Length) data[oldLoc] = CROUtil.FreeSpaceFill;
             }
 
             log($"  Added timing entry (timing=0x{timingByte:X2}) → function at 0x{funcOffset:X}");

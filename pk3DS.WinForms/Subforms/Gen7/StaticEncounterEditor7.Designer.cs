@@ -48,6 +48,15 @@ partial class StaticEncounterEditor7
         this.L_GSpecies = new System.Windows.Forms.Label();
         this.NUD_GLevel = new System.Windows.Forms.NumericUpDown();
         this.LB_Gift = new System.Windows.Forms.ListBox();
+        this.B_AddGift = new System.Windows.Forms.Button();
+        this.B_DupGift = new System.Windows.Forms.Button();
+        this.B_DelGift = new System.Windows.Forms.Button();
+        this.B_AddStatic = new System.Windows.Forms.Button();
+        this.B_DupStatic = new System.Windows.Forms.Button();
+        this.B_DelStatic = new System.Windows.Forms.Button();
+        this.B_AddTrade = new System.Windows.Forms.Button();
+        this.B_DupTrade = new System.Windows.Forms.Button();
+        this.B_DelTrade = new System.Windows.Forms.Button();
         this.Tab_Encounters = new System.Windows.Forms.TabPage();
         this.B_CurrentAttackSE = new System.Windows.Forms.Button();
         this.B_HighAttackSE = new System.Windows.Forms.Button();
@@ -252,6 +261,9 @@ partial class StaticEncounterEditor7
         this.Tab_Gifts.Controls.Add(this.L_GSpecies);
         this.Tab_Gifts.Controls.Add(this.NUD_GLevel);
         this.Tab_Gifts.Controls.Add(this.LB_Gift);
+        this.Tab_Gifts.Controls.Add(this.B_AddGift);
+        this.Tab_Gifts.Controls.Add(this.B_DupGift);
+        this.Tab_Gifts.Controls.Add(this.B_DelGift);
         this.Tab_Gifts.Location = new System.Drawing.Point(4, 25);
         this.Tab_Gifts.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
         this.Tab_Gifts.Name = "Tab_Gifts";
@@ -457,9 +469,42 @@ partial class StaticEncounterEditor7
         this.LB_Gift.Location = new System.Drawing.Point(4, 4);
         this.LB_Gift.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
         this.LB_Gift.Name = "LB_Gift";
-        this.LB_Gift.Size = new System.Drawing.Size(152, 612);
+        this.LB_Gift.Size = new System.Drawing.Size(152, 570);
         this.LB_Gift.TabIndex = 0;
         this.LB_Gift.SelectedIndexChanged += new System.EventHandler(this.LB_Gift_SelectedIndexChanged);
+        // 
+        // B_AddGift
+        // 
+        this.B_AddGift.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_AddGift.Location = new System.Drawing.Point(4, 580);
+        this.B_AddGift.Name = "B_AddGift";
+        this.B_AddGift.Size = new System.Drawing.Size(46, 26);
+        this.B_AddGift.TabIndex = 520;
+        this.B_AddGift.Text = "+";
+        this.B_AddGift.UseVisualStyleBackColor = true;
+        this.B_AddGift.Click += new System.EventHandler(this.B_AddGift_Click);
+        // 
+        // B_DupGift
+        // 
+        this.B_DupGift.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DupGift.Location = new System.Drawing.Point(52, 580);
+        this.B_DupGift.Name = "B_DupGift";
+        this.B_DupGift.Size = new System.Drawing.Size(52, 26);
+        this.B_DupGift.TabIndex = 521;
+        this.B_DupGift.Text = "Clone";
+        this.B_DupGift.UseVisualStyleBackColor = true;
+        this.B_DupGift.Click += new System.EventHandler(this.B_DupGift_Click);
+        // 
+        // B_DelGift
+        // 
+        this.B_DelGift.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DelGift.Location = new System.Drawing.Point(106, 580);
+        this.B_DelGift.Name = "B_DelGift";
+        this.B_DelGift.Size = new System.Drawing.Size(50, 26);
+        this.B_DelGift.TabIndex = 522;
+        this.B_DelGift.Text = "-";
+        this.B_DelGift.UseVisualStyleBackColor = true;
+        this.B_DelGift.Click += new System.EventHandler(this.B_DelGift_Click);
         // 
         // Tab_Encounters
         // 
@@ -491,6 +536,9 @@ partial class StaticEncounterEditor7
         this.Tab_Encounters.Controls.Add(this.L_ESpecies);
         this.Tab_Encounters.Controls.Add(this.NUD_ELevel);
         this.Tab_Encounters.Controls.Add(this.LB_Encounter);
+        this.Tab_Encounters.Controls.Add(this.B_AddStatic);
+        this.Tab_Encounters.Controls.Add(this.B_DupStatic);
+        this.Tab_Encounters.Controls.Add(this.B_DelStatic);
         this.Tab_Encounters.Controls.Add(this.L_Ally2);
         this.Tab_Encounters.Controls.Add(this.L_Ally1);
         this.Tab_Encounters.Location = new System.Drawing.Point(4, 25);
@@ -1249,7 +1297,6 @@ partial class StaticEncounterEditor7
             0});
         // 
         // LB_Encounter
-        // 
         this.LB_Encounter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
                                                                          | System.Windows.Forms.AnchorStyles.Left)));
         this.LB_Encounter.FormattingEnabled = true;
@@ -1257,9 +1304,42 @@ partial class StaticEncounterEditor7
         this.LB_Encounter.Location = new System.Drawing.Point(4, 4);
         this.LB_Encounter.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
         this.LB_Encounter.Name = "LB_Encounter";
-        this.LB_Encounter.Size = new System.Drawing.Size(152, 612);
+        this.LB_Encounter.Size = new System.Drawing.Size(152, 570);
         this.LB_Encounter.TabIndex = 1;
         this.LB_Encounter.SelectedIndexChanged += new System.EventHandler(this.LB_Encounter_SelectedIndexChanged);
+        // 
+        // B_AddStatic
+        // 
+        this.B_AddStatic.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_AddStatic.Location = new System.Drawing.Point(4, 580);
+        this.B_AddStatic.Name = "B_AddStatic";
+        this.B_AddStatic.Size = new System.Drawing.Size(46, 26);
+        this.B_AddStatic.TabIndex = 530;
+        this.B_AddStatic.Text = "+";
+        this.B_AddStatic.UseVisualStyleBackColor = true;
+        this.B_AddStatic.Click += new System.EventHandler(this.B_AddStatic_Click);
+        // 
+        // B_DupStatic
+        // 
+        this.B_DupStatic.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DupStatic.Location = new System.Drawing.Point(52, 580);
+        this.B_DupStatic.Name = "B_DupStatic";
+        this.B_DupStatic.Size = new System.Drawing.Size(52, 26);
+        this.B_DupStatic.TabIndex = 531;
+        this.B_DupStatic.Text = "Clone";
+        this.B_DupStatic.UseVisualStyleBackColor = true;
+        this.B_DupStatic.Click += new System.EventHandler(this.B_DupStatic_Click);
+        // 
+        // B_DelStatic
+        // 
+        this.B_DelStatic.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DelStatic.Location = new System.Drawing.Point(106, 580);
+        this.B_DelStatic.Name = "B_DelStatic";
+        this.B_DelStatic.Size = new System.Drawing.Size(50, 26);
+        this.B_DelStatic.TabIndex = 532;
+        this.B_DelStatic.Text = "-";
+        this.B_DelStatic.UseVisualStyleBackColor = true;
+        this.B_DelStatic.Click += new System.EventHandler(this.B_DelStatic_Click);
         // 
         // L_Ally2
         // 
@@ -1304,6 +1384,9 @@ partial class StaticEncounterEditor7
         this.Tab_Trades.Controls.Add(this.L_TSpecies);
         this.Tab_Trades.Controls.Add(this.NUD_TLevel);
         this.Tab_Trades.Controls.Add(this.LB_Trade);
+        this.Tab_Trades.Controls.Add(this.B_AddTrade);
+        this.Tab_Trades.Controls.Add(this.B_DupTrade);
+        this.Tab_Trades.Controls.Add(this.B_DelTrade);
         this.Tab_Trades.Location = new System.Drawing.Point(4, 25);
         this.Tab_Trades.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
         this.Tab_Trades.Name = "Tab_Trades";
@@ -1757,9 +1840,42 @@ partial class StaticEncounterEditor7
         this.LB_Trade.Location = new System.Drawing.Point(4, 4);
         this.LB_Trade.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
         this.LB_Trade.Name = "LB_Trade";
-        this.LB_Trade.Size = new System.Drawing.Size(152, 612);
+        this.LB_Trade.Size = new System.Drawing.Size(152, 570);
         this.LB_Trade.TabIndex = 2;
         this.LB_Trade.SelectedIndexChanged += new System.EventHandler(this.LB_Trade_SelectedIndexChanged);
+        // 
+        // B_AddTrade
+        // 
+        this.B_AddTrade.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_AddTrade.Location = new System.Drawing.Point(4, 580);
+        this.B_AddTrade.Name = "B_AddTrade";
+        this.B_AddTrade.Size = new System.Drawing.Size(46, 26);
+        this.B_AddTrade.TabIndex = 533;
+        this.B_AddTrade.Text = "+";
+        this.B_AddTrade.UseVisualStyleBackColor = true;
+        this.B_AddTrade.Click += new System.EventHandler(this.B_AddTrade_Click);
+        // 
+        // B_DupTrade
+        // 
+        this.B_DupTrade.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DupTrade.Location = new System.Drawing.Point(52, 580);
+        this.B_DupTrade.Name = "B_DupTrade";
+        this.B_DupTrade.Size = new System.Drawing.Size(52, 26);
+        this.B_DupTrade.TabIndex = 534;
+        this.B_DupTrade.Text = "Clone";
+        this.B_DupTrade.UseVisualStyleBackColor = true;
+        this.B_DupTrade.Click += new System.EventHandler(this.B_DupTrade_Click);
+        // 
+        // B_DelTrade
+        // 
+        this.B_DelTrade.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+        this.B_DelTrade.Location = new System.Drawing.Point(106, 580);
+        this.B_DelTrade.Name = "B_DelTrade";
+        this.B_DelTrade.Size = new System.Drawing.Size(50, 26);
+        this.B_DelTrade.TabIndex = 535;
+        this.B_DelTrade.Text = "-";
+        this.B_DelTrade.UseVisualStyleBackColor = true;
+        this.B_DelTrade.Click += new System.EventHandler(this.B_DelTrade_Click);
         // 
         // Tab_Randomizer
         // 
@@ -2474,4 +2590,13 @@ partial class StaticEncounterEditor7
     private System.Windows.Forms.ComboBox CB_TGender;
     private System.Windows.Forms.Button B_CurrentAttackSE;
     private System.Windows.Forms.Button B_HighAttackSE;
+    private System.Windows.Forms.Button B_AddGift;
+    private System.Windows.Forms.Button B_DupGift;
+    private System.Windows.Forms.Button B_DelGift;
+    private System.Windows.Forms.Button B_AddStatic;
+    private System.Windows.Forms.Button B_DupStatic;
+    private System.Windows.Forms.Button B_DelStatic;
+    private System.Windows.Forms.Button B_AddTrade;
+    private System.Windows.Forms.Button B_DupTrade;
+    private System.Windows.Forms.Button B_DelTrade;
 }

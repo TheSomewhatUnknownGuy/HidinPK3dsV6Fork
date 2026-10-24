@@ -1,4 +1,4 @@
-﻿namespace pk3DS.Core;
+namespace pk3DS.Core;
 
 public enum TextName
 {
@@ -8,6 +8,8 @@ public enum TextName
 
     ItemNames,
     ItemFlavor,
+    ItemNamesPlural,
+    ItemNamesPluralAlt,
 
     SpeciesNames,
     Types,
@@ -27,6 +29,56 @@ public enum TextName
     SpeciesClassifications,
     PokedexEntry1,
     PokedexEntry2,
+
+    // Added from a direct dump of the real USUM ROM's English (lang 2) gametext GARC, cross-checked
+    // against the user's own numbered index list rather than guessed from the SM-vs-USUM offset
+    // pattern alone (that pattern turned out to not be perfectly uniform - see TrainerNames below).
+    BagCategoryNames,
+    SongNames,
+    OnlinePlayMenuText,
+    BattleTeamText,
+    VsRecorderText,
+    BoxNames,
+    MoveActionText,
+    ZMoveActionText,
+    BattleMessages,
+    WeatherFieldEffectText,
+    BattleEncounterText,
+    ZMoveNames,
+    TutorialText,
+    UltraBeastMissionText,
+    MenuText,
+    BlackoutText,
+    GTSText,
+    IntroCutsceneText,
+    FestivalPhrases,
+    FestivalPlazaFacilityNames,
+    SalonText,
+    ColorNames,
+    ClothingCategories,
+    MantineSurfText,
+    GiftText,
+    SpecialTrainerNames,
+    OnlineBattleRulesText,
+    BerryNames,
+    SettingsText,
+    RotoPhotoText,
+    PokePelagoText,
+    IslandScanText,
+    OnlineRulesetText,
+    RibbonNames,
+    RidePokemonNames,
+    RidePokemonNotifications,
+    PlazaGreetingText,
+    CurrencyText,
+    CreditsText,
+    AbilityFlavor,
+    LocationNames,
+    TrainerCardText,
+    NaturesDisplayText,
+    PokemonHeightText,
+    PokemonWeightText,
+    PokedexCompletionText,
 }
 
 public class TextData(string[] lines)
@@ -72,6 +124,8 @@ public sealed class TextReference
         new(072, TextName.metlist_000000),
         new(080, TextName.SpeciesNames),
         new(096, TextName.ItemNames),
+        new(097, TextName.ItemNamesPlural),
+        new(098, TextName.ItemNamesPluralAlt),
         new(099, TextName.ItemFlavor),
         new(130, TextName.MaisonTrainerNames),
         new(131, TextName.SuperTrainerNames),
@@ -92,6 +146,8 @@ public sealed class TextReference
         new(090, TextName.metlist_000000),
         new(098, TextName.SpeciesNames),
         new(114, TextName.ItemNames),
+        new(115, TextName.ItemNamesPlural),
+        new(116, TextName.ItemNamesPluralAlt),
         new(117, TextName.ItemFlavor),
         new(153, TextName.MaisonTrainerNames),
         new(154, TextName.SuperTrainerNames),
@@ -102,6 +158,8 @@ public sealed class TextReference
     [
         new(020, TextName.ItemFlavor),
         new(021, TextName.ItemNames),
+        new(022, TextName.ItemNamesPlural),
+        new(023, TextName.ItemNamesPluralAlt),
         new(026, TextName.SpeciesNames),
         new(030, TextName.metlist_000000),
         new(044, TextName.Forms),
@@ -119,6 +177,8 @@ public sealed class TextReference
     [
         new(035, TextName.ItemFlavor),
         new(036, TextName.ItemNames),
+        new(037, TextName.ItemNamesPlural),
+        new(038, TextName.ItemNamesPluralAlt),
         new(055, TextName.SpeciesNames),
         new(067, TextName.metlist_000000),
         new(086, TextName.BattleRoyalNames),
@@ -139,14 +199,69 @@ public sealed class TextReference
 
     public static readonly TextReference[] GameText_USUM =
     [
+        new(002, TextName.BagCategoryNames),
+        new(003, TextName.SongNames),
+        new(005, TextName.OnlinePlayMenuText),
+        new(006, TextName.BattleTeamText),
+        new(008, TextName.VsRecorderText),
+        new(011, TextName.BoxNames),
+        new(013, TextName.MoveActionText),
+        new(014, TextName.ZMoveActionText),
+        new(015, TextName.BattleMessages),
+        new(016, TextName.WeatherFieldEffectText),
+        new(017, TextName.BattleEncounterText),
+        new(019, TextName.ZMoveNames),
+        new(020, TextName.TutorialText),
+        new(022, TextName.UltraBeastMissionText),
+        new(024, TextName.MenuText),
+        new(030, TextName.BlackoutText),
+        new(033, TextName.GTSText),
+        new(038, TextName.IntroCutsceneText),
         new(039, TextName.ItemFlavor),
         new(040, TextName.ItemNames),
+        new(041, TextName.ItemNamesPlural),
+        new(042, TextName.ItemNamesPluralAlt),
+        new(046, TextName.FestivalPhrases),
+        new(050, TextName.FestivalPlazaFacilityNames),
+        new(052, TextName.SalonText),
+        new(053, TextName.ColorNames),
+        new(054, TextName.ClothingCategories),
+        new(057, TextName.MantineSurfText),
         new(060, TextName.SpeciesNames),
+        new(061, TextName.GiftText),
+        new(063, TextName.SpecialTrainerNames),
+        new(065, TextName.OnlineBattleRulesText),
+        new(070, TextName.BerryNames),
+        new(071, TextName.SettingsText),
         new(072, TextName.metlist_000000),
+        new(076, TextName.RotoPhotoText),
+        new(077, TextName.RotoPhotoText),
+        new(081, TextName.PokePelagoText),
+        new(082, TextName.IslandScanText),
+        new(084, TextName.OnlineRulesetText),
+        new(086, TextName.RibbonNames),
+        new(087, TextName.RidePokemonNames),
+        new(088, TextName.RidePokemonNotifications),
         new(091, TextName.BattleRoyalNames),
         new(092, TextName.Natures),
+        new(093, TextName.PlazaGreetingText),
+        new(095, TextName.CurrencyText),
+        new(096, TextName.CreditsText),
         new(101, TextName.AbilityNames),
+        new(102, TextName.AbilityFlavor),
+        // A prior pass swapped these two based on reading their CONTENT (104 looked like a plain
+        // name pool, 110 looked like a curated cameo-heavy roster) - that reasoning turned out
+        // backwards, confirmed by a real crash (SMTE indexes trName[i] up to trdata.Length-1, which
+        // threw once TrainerNames pointed at the shorter 210-entry list). The real, load-bearing
+        // check is array LENGTH against the actual consumer, not a guess about content: real GARC
+        // file counts are trdata/trpoke=653, maisontrN (Battle Tree roster)=210, maisontrS (Battle
+        // Royal roster)=51 - which line up exactly with gametext index 110 (653), 104 (210), and 91
+        // (51, already correctly BattleRoyalNames) respectively. So 104 is Battle Tree's own name
+        // pool and 110 is the real per-trainer name table SMTE needs - the original mapping, restored.
         new(104, TextName.BattleTreeNames),
+        new(105, TextName.LocationNames),
+        new(107, TextName.TrainerCardText),
+        new(108, TextName.NaturesDisplayText),
         new(109, TextName.TrainerText),
         new(110, TextName.TrainerNames),
         new(111, TextName.TrainerClasses),
@@ -154,7 +269,10 @@ public sealed class TextReference
         new(117, TextName.MoveFlavor),
         new(118, TextName.MoveNames),
         new(119, TextName.Forms),
+        new(120, TextName.PokemonHeightText),
         new(121, TextName.SpeciesClassifications),
+        new(122, TextName.PokemonWeightText),
+        new(123, TextName.PokedexCompletionText),
         new(124, TextName.PokedexEntry1),
         new(125, TextName.PokedexEntry2),
     ];

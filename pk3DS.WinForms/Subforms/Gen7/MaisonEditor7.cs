@@ -9,6 +9,7 @@ using System.Windows.Forms;
 
 using pk3DS.Core;
 using pk3DS.Core.Structures;
+using pk3DS.WinForms.Controls;
 
 namespace pk3DS.WinForms;
 
@@ -18,17 +19,83 @@ public partial class MaisonEditor7 : Form
     {
         trFiles = trd;
         pkFiles = trp;
+        this.royal = royal;
         Array.Resize(ref specieslist, Main.Config.MaxSpeciesID + 1);
         movelist[0] = specieslist[0] = itemlist[0] = "";
 
         trNames = Main.Config.GetText(royal ? TextName.BattleRoyalNames : TextName.BattleTreeNames); Array.Resize(ref trNames, trFiles.Length);
 
         InitializeComponent();
+        BuildStoredSetsHint(); // before Setup, which refreshes the list
         Setup();
         SetupChoiceList();
         RefreshSetList();
         Text = royal ? "Battle Royal Editor" : "Battle Tree Editor";
-        WinFormsUtil.ApplyCyberSlateTheme(this, WinFormsUtil.VisualTheme.Grey);
+
+    }
+
+    /// <summary>
+    /// Appends new, empty-roster trainers past the end of the table - same "Add N slots" shape as
+    /// Item Editor's Add Item Slots. A blank trainer here has <c>Count = 0</c> (no assigned Pokémon
+    /// sets yet); use Assign List/Set to give it a roster once it exists.
+    /// </summary>
+    private void B_AddTrainer_Click(object sender, EventArgs e)
+    {
+        string input = WinFormsUtil.PromptInput("Add Trainers", "How many new Battle Tree/Royal trainers? (1-255)", "1");
+        if (string.IsNullOrWhiteSpace(input)) return;
+        if (!int.TryParse(input.Trim(), out int count) || count <= 0 || count > 255)
+        {
+            WinFormsUtil.Alert("Enter a whole number from 1 to 255.");
+            return;
+        }
+
+        SetTrainer();
+
+        int firstNew = trFiles.Length;
+        Array.Resize(ref trFiles, firstNew + count);
+        Array.Resize(ref trNames, firstNew + count);
+
+        for (int i = firstNew; i < trFiles.Length; i++)
+        {
+            trNames[i] = $"New Trainer {i}";
+            trFiles[i] = new Maison7.Trainer { Class = 0, Count = 0, Choices = [] }.Write();
+            CB_Trainer.Items.Add($"{trNames[i]} - {i:000}");
+        }
+
+        TextName nameTable = royal ? TextName.BattleRoyalNames : TextName.BattleTreeNames;
+        // SetText alone only updates the in-memory GameTextStrings cache - SaveText actually
+        // writes the gametext GARC back to disk (see SMTE's identical Add Trainer(s) for why).
+        Main.Config.SetText(nameTable, trNames);
+        Main.Config.SaveText(nameTable);
+        CB_Trainer.SelectedIndex = firstNew;
+        WinFormsUtil.Alert($"Added {count} trainer(s): ids {firstNew}-{trFiles.Length - 1}.",
+            "Each starts with an empty roster - use Assign List or Set to give it Pokémon sets.");
+    }
+
+    /// <summary>Appends new, blank Pokémon set slots the same way, for Set/Assign List to fill in.</summary>
+    private void B_AddPokemonSet_Click(object sender, EventArgs e)
+    {
+        string input = WinFormsUtil.PromptInput("Add Pokémon Sets", "How many new Pokémon set slots? (1-255)", "1");
+        if (string.IsNullOrWhiteSpace(input)) return;
+        if (!int.TryParse(input.Trim(), out int count) || count <= 0 || count > 255)
+        {
+            WinFormsUtil.Alert("Enter a whole number from 1 to 255.");
+            return;
+        }
+
+        SetPokemon();
+
+        int firstNew = pkFiles.Length;
+        Array.Resize(ref pkFiles, firstNew + count);
+
+        for (int i = firstNew; i < pkFiles.Length; i++)
+        {
+            pkFiles[i] = new byte[16];
+            CB_Pokemon.Items.Add(""); // placeholder - RefreshPokemonName fills in the real label below
+            RefreshPokemonName(i);
+        }
+
+        WinFormsUtil.Alert($"Added {count} Pokémon set slot(s): ids {firstNew}-{pkFiles.Length - 1}.");
     }
 
     /// <summary>
@@ -42,9 +109,16 @@ public partial class MaisonEditor7 : Form
         base.OnFormClosed(e);
     }
 
-    private readonly byte[][] trFiles;
-    private readonly string[] trNames;
-    private readonly byte[][] pkFiles;
+    private byte[][] trFiles;
+    private string[] trNames;
+    private byte[][] pkFiles;
+    private readonly bool royal;
+
+    /// <summary>The (possibly grown-by-<see cref="B_AddTrainer_Click"/>/<see cref="B_AddPokemonSet_Click"/>)
+    /// arrays, read back by the caller after the dialog closes - see SMTE's identical TrData/TrPoke
+    /// getters for why this is necessary rather than relying on the caller's pre-dialog locals.</summary>
+    public byte[][] TrFiles => trFiles;
+    public byte[][] PkFiles => pkFiles;
     private readonly string[] natures = Main.Config.GetText(TextName.Natures);
     private readonly string[] movelist = Main.Config.GetText(TextName.MoveNames);
     private readonly string[] specieslist = Main.Config.GetText(TextName.SpeciesNames);
@@ -56,15 +130,11 @@ public partial class MaisonEditor7 : Form
 
     private void Setup()
     {
-        for (int i = 0; i < trClass.Length; i++)
-            CB_Class.Items.Add($"{trClass[i]} - {i:000}");
+        LazyCombo.Attach(CB_Class, Enumerable.Range(0, trClass.Length).Select(i => (object)$"{trClass[i]} - {i:000}").ToArray());
         CB_Species.Items.AddRange(specieslist);
-        CB_Move1.Items.AddRange(movelist);
-        CB_Move2.Items.AddRange(movelist);
-        CB_Move3.Items.AddRange(movelist);
-        CB_Move4.Items.AddRange(movelist);
+        foreach (var mv in new[] { CB_Move1, CB_Move2, CB_Move3, CB_Move4 }) LazyCombo.Attach(mv, movelist);
         CB_Nature.Items.AddRange(natures);
-        CB_Item.Items.AddRange(itemlist);
+        LazyCombo.Attach(CB_Item, itemlist);
         for (int i = 0; i < trNames.Length; i++)
             CB_Trainer.Items.Add($"{trNames[i] ?? "UNKNOWN"} - {i:000}");
         for (int i = 0; i < pkFiles.Length; i++)
@@ -106,7 +176,7 @@ public partial class MaisonEditor7 : Form
         LB_Choices.Items.Clear();
         var tr = new Maison7.Trainer(trFiles[trEntry]);
 
-        CB_Class.SelectedIndex = tr.Class;
+        LazyCombo.SetIndex(CB_Class, tr.Class);
         GB_Trainer.Enabled = tr.Count > 0;
 
         foreach (ushort Entry in tr.Choices)
@@ -180,7 +250,7 @@ public partial class MaisonEditor7 : Form
         // Gather
         var tr = new Maison7.Trainer
         {
-            Class = (ushort)CB_Class.SelectedIndex,
+            Class = (ushort)LazyCombo.GetIndex(CB_Class),
             Count = (ushort)LB_Choices.Items.Count,
         };
         tr.Choices = new ushort[tr.Count];
@@ -196,10 +266,10 @@ public partial class MaisonEditor7 : Form
         var pkm = new Maison7.Pokemon(pkFiles[pkEntry]);
 
         // Get
-        CB_Move1.SelectedIndex = pkm.Moves[0];
-        CB_Move2.SelectedIndex = pkm.Moves[1];
-        CB_Move3.SelectedIndex = pkm.Moves[2];
-        CB_Move4.SelectedIndex = pkm.Moves[3];
+        LazyCombo.SetIndex(CB_Move1, pkm.Moves[0]);
+        LazyCombo.SetIndex(CB_Move2, pkm.Moves[1]);
+        LazyCombo.SetIndex(CB_Move3, pkm.Moves[2]);
+        LazyCombo.SetIndex(CB_Move4, pkm.Moves[3]);
         CHK_HP.Checked = pkm.HP;
         CHK_ATK.Checked = pkm.ATK;
         CHK_DEF.Checked = pkm.DEF;
@@ -207,7 +277,7 @@ public partial class MaisonEditor7 : Form
         CHK_SpA.Checked = pkm.SPA;
         CHK_SpD.Checked = pkm.SPD;
         CB_Nature.SelectedIndex = pkm.Nature;
-        CB_Item.SelectedIndex = pkm.Item;
+        LazyCombo.SetIndex(CB_Item, pkm.Item);
         NUD_Form.Value = pkm.Form;
 
         CB_Species.SelectedIndex = pkm.Species; // Loaded last in order to refresh the sprite with all info.
@@ -229,11 +299,11 @@ public partial class MaisonEditor7 : Form
             SPA = CHK_SpA.Checked,
             SPD = CHK_SpD.Checked,
             Nature = (byte)CB_Nature.SelectedIndex,
-            Item = (ushort)CB_Item.SelectedIndex,
-            Move1 = CB_Move1.SelectedIndex,
-            Move2 = CB_Move2.SelectedIndex,
-            Move3 = CB_Move3.SelectedIndex,
-            Move4 = CB_Move4.SelectedIndex,
+            Item = (ushort)LazyCombo.GetIndex(CB_Item),
+            Move1 = LazyCombo.GetIndex(CB_Move1),
+            Move2 = LazyCombo.GetIndex(CB_Move2),
+            Move3 = LazyCombo.GetIndex(CB_Move3),
+            Move4 = LazyCombo.GetIndex(CB_Move4),
             Form = (ushort)NUD_Form.Value,
         };
 
@@ -243,7 +313,7 @@ public partial class MaisonEditor7 : Form
 
     private void ChangeSpecies(object sender, EventArgs e)
     {
-        WinFormsUtil.SetImage(PB_PKM, WinFormsUtil.GetSprite(CB_Species.SelectedIndex, (int)NUD_Form.Value, 0, CB_Item.SelectedIndex, Main.Config));
+        WinFormsUtil.SetImage(PB_PKM, WinFormsUtil.GetSprite(CB_Species.SelectedIndex, (int)NUD_Form.Value, 0, LazyCombo.GetIndex(CB_Item), Main.Config));
     }
 
     private void B_Remove_Click(object sender, EventArgs e)
@@ -644,12 +714,36 @@ public partial class MaisonEditor7 : Form
     {
         LB_StoredSets.Items.Clear();
         LB_StoredSets.Items.AddRange(ShowdownSetManager.GetSetListStrings().ToArray());
+        L_StoredEmpty.Visible = LB_StoredSets.Items.Count == 0;
+    }
+
+    private Label L_StoredEmpty;
+
+    /// <summary>
+    /// An empty list is a big featureless rectangle, so say what fills it. A label over the list, because an owner-drawn
+    /// ListBox never calls DrawItem when it has no items. It copies the list's back colour each time the theme changes it,
+    /// otherwise the theme would make it Transparent and the form's colour would show through as a second box.
+    /// </summary>
+    private void BuildStoredSetsHint()
+    {
+        L_StoredEmpty = new Label
+        {
+            Text = "No stored sets yet.\nUse Showdown Storage or Import to add some.",
+            TextAlign = ContentAlignment.MiddleCenter,
+            Bounds = Rectangle.Inflate(LB_StoredSets.Bounds, -2, -2), // keeps the list's own border visible
+            BackColor = LB_StoredSets.BackColor,
+        };
+        LB_StoredSets.BackColorChanged += (_, _) => L_StoredEmpty.BackColor = LB_StoredSets.BackColor;
+        Controls.Add(L_StoredEmpty);
+        L_StoredEmpty.BringToFront();
     }
 
     private void B_ShowdownStorage_Click(object sender, EventArgs e)
     {
         using var storage = new ShowdownSetStorage();
-        if (storage.ShowDialog() != DialogResult.OK) return;
+        var result = storage.ShowDialog();
+        RefreshSetList(); // sets added in the dialog stay stored when it is closed without "Use"
+        if (result != DialogResult.OK) return;
         if (string.IsNullOrWhiteSpace(storage.SelectedSet)) return;
         if (pkEntry < 0) return;
         var newPK = ParseShowdownSet(storage.SelectedSet);

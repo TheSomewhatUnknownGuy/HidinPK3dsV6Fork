@@ -36,28 +36,18 @@ namespace pk3DS.Core.Structures
             for (int a = 0; a < AreaCount; a++)
             {
                 var areaList = new List<OWTrainerEntry>();
-                uint sectionEnd = (a + 1 < AreaCount) ? sectionOffsets[a + 1] : totalSize;
-                if (sectionEnd > RawData.Length) sectionEnd = (uint)RawData.Length;
-
-                if (sectionOffsets[a] < (uint)RawData.Length)
+                if (sectionOffsets[a] + 4 <= (uint)RawData.Length)
                 {
-                    // Scan for magic bytes: 04 (stationary), 07 (trainer), 08 (mobile)
-                    for (int currentOffset = (int)sectionOffsets[a]; currentOffset >= 0; currentOffset += 4)
+                    uint entryCount = BitConverter.ToUInt32(RawData, (int)sectionOffsets[a]);
+                    for (int i = 0; i < entryCount; i++)
                     {
-                        // Hard stop: must have room for the full 84-byte struct in the actual data
+                        int currentOffset = (int)sectionOffsets[a] + 4 + i * OWTrainerEntry.SIZE;
                         if (currentOffset + OWTrainerEntry.SIZE > RawData.Length) break;
-                        // Also stop if we've passed the section boundary
-                        if ((uint)currentOffset + OWTrainerEntry.SIZE > sectionEnd) break;
 
-                        uint magicType = BitConverter.ToUInt32(RawData, currentOffset);
-                        if (magicType == 0x04 || magicType == 0x07 || magicType == 0x08)
+                        var entry = new OWTrainerEntry(RawData, currentOffset);
+                        if (entry.IsValid())
                         {
-                            var entry = new OWTrainerEntry(RawData, currentOffset);
-                            if (entry.IsValid())
-                            {
-                                areaList.Add(entry);
-                                currentOffset += OWTrainerEntry.SIZE - 4; // Skip the rest of the 84-byte struct
-                            }
+                            areaList.Add(entry);
                         }
                     }
                 }
@@ -75,6 +65,126 @@ namespace pk3DS.Core.Structures
                 foreach (var entry in area)
                 {
                     Array.Copy(entry.RawData, 0, newData, entry.Offset, OWTrainerEntry.SIZE);
+                }
+            }
+
+            return newData;
+        }
+
+        /// <summary>
+        /// Appends a brand-new placement entry to the given area, allocating dedicated sub-data
+        /// (motion, talk collision, physical collision, and signal bounding boxes) and correctly
+        /// shifting area-relative offsets for existing entries in the modified area.
+        /// </summary>
+        public byte[] AppendEntry(int areaIndex, OWTrainerEntry newEntry)
+        {
+            if (areaIndex < 0 || areaIndex >= AreaCount)
+                throw new ArgumentOutOfRangeException(nameof(areaIndex));
+
+            int offsetIndex = 0x04;
+            var sectionOffsets = new uint[AreaCount];
+            for (int i = 0; i < AreaCount; i++)
+            {
+                sectionOffsets[i] = BitConverter.ToUInt32(RawData, offsetIndex);
+                offsetIndex += 4;
+            }
+            uint totalSize = BitConverter.ToUInt32(RawData, offsetIndex);
+
+            uint areaStart = sectionOffsets[areaIndex];
+            uint areaEnd = areaIndex + 1 < AreaCount ? sectionOffsets[areaIndex + 1] : totalSize;
+            uint areaLen = areaEnd - areaStart;
+
+            uint count = BitConverter.ToUInt32(RawData, (int)areaStart);
+            uint entriesEndRel = 4 + count * (uint)OWTrainerEntry.SIZE;
+            uint subDataLen = areaLen > entriesEndRel ? areaLen - entriesEndRel : 0;
+
+            // Sub-data size for a new stationary trainer (12 + 28 + 28 + 28 = 96 bytes)
+            const uint NEW_SUBDATA_SIZE = 96;
+            uint addedAreaBytes = (uint)OWTrainerEntry.SIZE + NEW_SUBDATA_SIZE; // 180 bytes
+
+            byte[] newData = new byte[RawData.Length + addedAreaBytes];
+
+            // 1. Copy everything before the new entry insertion position (headers, prior areas, area's existing entries)
+            uint entryInsertPos = areaStart + entriesEndRel;
+            Array.Copy(RawData, 0, newData, 0, (int)entryInsertPos);
+
+            // 2. Prepare sub-data blob (96 bytes) cloned from template (or default stationary bounding boxes)
+            byte[] subDataBlob = new byte[NEW_SUBDATA_SIZE];
+            if (newEntry.MoveDataOffset != 0 && newEntry.MoveDataOffset != 0xFFFFFFFF &&
+                areaStart + newEntry.MoveDataOffset + 12 <= RawData.Length)
+            {
+                Array.Copy(RawData, (int)(areaStart + newEntry.MoveDataOffset), subDataBlob, 0, 12);
+            }
+            if (newEntry.TalkCollisionOffset != 0 && newEntry.TalkCollisionOffset != 0xFFFFFFFF &&
+                areaStart + newEntry.TalkCollisionOffset + 28 <= RawData.Length)
+            {
+                Array.Copy(RawData, (int)(areaStart + newEntry.TalkCollisionOffset), subDataBlob, 12, 28);
+            }
+            if (newEntry.CollisionOffset != 0 && newEntry.CollisionOffset != 0xFFFFFFFF &&
+                areaStart + newEntry.CollisionOffset + 28 <= RawData.Length)
+            {
+                Array.Copy(RawData, (int)(areaStart + newEntry.CollisionOffset), subDataBlob, 40, 28);
+            }
+            if (newEntry.SignalOffset != 0 && newEntry.SignalOffset != 0xFFFFFFFF &&
+                areaStart + newEntry.SignalOffset + 28 <= RawData.Length)
+            {
+                Array.Copy(RawData, (int)(areaStart + newEntry.SignalOffset), subDataBlob, 68, 28);
+            }
+
+            // 3. Configure the new entry's relative sub-data offsets
+            uint newEntryMoveOffset = entriesEndRel + (uint)OWTrainerEntry.SIZE + subDataLen;
+            newEntry.MoveDataOffset = newEntryMoveOffset;
+            newEntry.TalkCollisionOffset = newEntryMoveOffset + 12;
+            newEntry.CollisionOffset = newEntryMoveOffset + 40;
+            newEntry.SignalOffset = newEntryMoveOffset + 68;
+            newEntry.PathCoreOffset = 0;
+            newEntry.PathPointOffset = 0;
+
+            // Insert new entry (84 bytes)
+            Array.Copy(newEntry.RawData, 0, newData, (int)entryInsertPos, OWTrainerEntry.SIZE);
+
+            // 4. Copy existing sub-data of this area (shifted by +84)
+            if (subDataLen > 0)
+            {
+                Array.Copy(RawData, (int)(areaStart + entriesEndRel), newData, (int)(entryInsertPos + OWTrainerEntry.SIZE), (int)subDataLen);
+            }
+
+            // 5. Copy new sub-data blob (96 bytes) right after existing sub-data
+            Array.Copy(subDataBlob, 0, newData, (int)(areaStart + newEntryMoveOffset), (int)NEW_SUBDATA_SIZE);
+
+            // 6. Copy remainder of the file (subsequent areas)
+            uint restStart = areaEnd;
+            uint restNewStart = areaEnd + addedAreaBytes;
+            if (RawData.Length > restStart)
+            {
+                Array.Copy(RawData, (int)restStart, newData, (int)restNewStart, RawData.Length - (int)restStart);
+            }
+
+            // 7. Update header: count, sectionOffsets, totalSize
+            BitConverter.GetBytes(count + 1).CopyTo(newData, (int)areaStart);
+
+            int hdrOff = 0x04;
+            for (int i = 0; i < AreaCount; i++)
+            {
+                uint off = sectionOffsets[i];
+                if (i > areaIndex) off += addedAreaBytes;
+                BitConverter.GetBytes(off).CopyTo(newData, hdrOff);
+                hdrOff += 4;
+            }
+            BitConverter.GetBytes(totalSize + addedAreaBytes).CopyTo(newData, hdrOff);
+
+            // 8. Shift sub-data offsets of all existing entries in Area `areaIndex` by +84
+            for (int i = 0; i < (int)count; i++)
+            {
+                int ePos = (int)areaStart + 4 + i * OWTrainerEntry.SIZE;
+                int[] subOffFields = [0x3C, 0x40, 0x44, 0x48, 0x4C, 0x50];
+                foreach (int fOff in subOffFields)
+                {
+                    uint val = BitConverter.ToUInt32(newData, ePos + fOff);
+                    if (val != 0 && val != 0xFFFFFFFF)
+                    {
+                        BitConverter.GetBytes(val + (uint)OWTrainerEntry.SIZE).CopyTo(newData, ePos + fOff);
+                    }
                 }
             }
 

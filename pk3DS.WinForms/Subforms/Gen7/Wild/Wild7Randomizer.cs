@@ -261,7 +261,7 @@ public class Wild7Randomizer
                 }
                 else if (AllCanCallAllies)
                 {
-                    weatherEnc.Species = (uint)GetSpecies(1);
+                    weatherEnc.Species = (uint)RandSpec.GetEvenDistributionSpecies();
                     weatherEnc.Forme = (uint)RandForm.GetRandomForme((int)weatherEnc.Species);
                 }
             }

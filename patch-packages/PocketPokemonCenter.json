@@ -1,0 +1,37 @@
+{
+  "Name": "Pocket Pokemon Center",
+  "Description": "A reusable whole-party healing item: a clone of Sacred Ash (44), which already revives and fully heals the ENTIRE party through one flag in its own record (ReviveAll), with the flutes' UseKeep flag added so it is not consumed. MINIMISED 2026-09-02 after an in-game failure. The first data version stacked ReviveAll + RestorePPAll + PPGain=255 + HealAmount together, a combination NO vanilla item carries. That was a real mistake: ITEM_UTIL_GetHealingItemType does not read one 'what does this do' field, it classifies an item by the PATTERN of many fields and returns an effect index 0..0x1B, so inventing a new pattern can land on a different handler - or on 0x1C, which is out of the 28-entry jump table's range and silently does nothing. The safe rule for a data-only item is therefore to clone a vanilla item and change as LITTLE as possible, ideally only flags that are already known not to affect classification. So this now changes exactly one thing versus real Sacred Ash. NOTE: Sacred Ash only has an effect when a party member is FAINTED - ITEM_RCV_RecoverCheck returns 0 otherwise, which is the game's own 'It won't have any effect!' path. Test it with a fainted Pokemon.",
+  "Category": "Medicine",
+  "Requires": [],
+  "Parameters": {
+    "pocketCenterId": {
+      "Description": "Item ID for the Pocket Center (default: 876).",
+      "Type": "item",
+      "Default": "876",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {
+    "${pocketCenterId}": {
+      "CloneFrom": "44",
+      "ItemKind": "1",
+      "Pocket": "1",
+      "Fields": {
+        "UseKeep": "true"
+      }
+    }
+  },
+  "ItemNames": {
+    "${pocketCenterId}": "Pocket Center"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${pocketCenterId}": "A portable healing machine. Revives and fully restores your whole party, and is never used up."
+  }
+}

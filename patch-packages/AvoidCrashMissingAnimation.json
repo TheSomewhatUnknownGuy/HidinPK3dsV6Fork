@@ -1,0 +1,36 @@
+{
+  "Name": "Avoid Crash Missing Animation",
+  "Description": "Guards against crash when an animation sequence for a custom or unmapped move is null/invalid.",
+  "Category": "Engine Fix",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [],
+  "Blocks": [
+    {
+      "Name": "battle-avoid-crash-animation",
+      "Code": "10402DE9000052E30C4092150000541308409415000054131040BD18E90EFC1A1080BDE8",
+      "SourceBase": "0x00FD2E8",
+      "CodeBytes": "EEAt6QAAUuMMQJIVAABUEwhAlBUAAFQTEEC9GOkO/BoQgL3o",
+      "SourceBaseValue": 1037032
+    }
+  ],
+  "SitePatches": [
+    {
+      "Offset": "0x0006637C",
+      "Original": "CB6AFEEB",
+      "Patched": "000000EB",
+      "IsHook": true,
+      "HookTarget": "battle-avoid-crash-animation",
+      "OffsetValue": 418684,
+      "OriginalBytes": "y2r+6w==",
+      "PatchedBytes": "AAAA6w=="
+    }
+  ],
+  "OtherCros": {},
+  "DataTables": [],
+  "ItemData": {},
+  "ItemNames": {},
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {}
+}

@@ -78,6 +78,20 @@ public sealed class PortedSitePatch
     /// <summary>For a hook: where it should land, expressed as the ported routine's name.</summary>
     public string HookTarget { get; set; }
 
+    /// <summary>
+    /// Explicit byte offset within the hook target block of the fallback branch to re-aim when chaining.
+    /// If negative (-1, default), the installer scans for a branch targeting near <see cref="OffsetValue"/>.
+    /// </summary>
+    [JsonIgnore]
+    public int FallbackBranchOffset { get; set; } = -1;
+
+    [JsonPropertyName("fallbackBranchOffset")]
+    public string FallbackBranchOffsetStr
+    {
+        get => FallbackBranchOffset >= 0 ? $"0x{FallbackBranchOffset:X}" : null;
+        set => FallbackBranchOffset = string.IsNullOrWhiteSpace(value) ? -1 : (int)Convert.ToUInt32(value.Trim(), value.Trim().StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16 : 10);
+    }
+
     public uint OffsetValue => Convert.ToUInt32(Offset, 16);
     public byte[] OriginalBytes => Convert.FromHexString(Original);
     public byte[] PatchedBytes => Convert.FromHexString(Patched);

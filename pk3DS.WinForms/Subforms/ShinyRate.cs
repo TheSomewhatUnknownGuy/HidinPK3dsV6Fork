@@ -11,12 +11,11 @@ public partial class ShinyRate : Form
     public ShinyRate()
     {
         InitializeComponent();
-        if (Main.ExeFSPath == null) { WinFormsUtil.Alert("No exeFS code to load."); Close(); }
-        string[] files = Directory.GetFiles(Main.ExeFSPath);
-        if (!File.Exists(files[0]) || !Path.GetFileNameWithoutExtension(files[0]).Contains("code")) { WinFormsUtil.Alert("No .code.bin detected."); Close(); }
-        codebin = files[0];
+        string codePath = Main.ExeFSPath == null ? null : Core.CTR.ExeFS.ResolveCodeBin(Main.ExeFSPath);
+        if (codePath == null || !File.Exists(codePath)) { WinFormsUtil.Alert("No .code.bin detected."); Close(); return; }
+        codebin = codePath;
         exefsData = File.ReadAllBytes(codebin);
-        if (exefsData.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); }
+        if (exefsData.Length % 0x200 != 0) { WinFormsUtil.Alert(".code.bin not decompressed. Aborting."); Close(); return; }
 
         // Load instruction set
         byte[] raw = Core.Properties.Resources.asm_mov;
@@ -114,6 +113,7 @@ public partial class ShinyRate : Form
 
     private void B_Save_Click(object sender, EventArgs e)
     {
+        if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(codebin) is { } uhuru) { WinFormsUtil.Alert(uhuru); Close(); return; }
         WriteCodePatch();
         if (CHK_EverythingShiny.Enabled)
             exefsData[alwaysIndex] = CHK_EverythingShiny.Checked ? (byte)0xEA : (byte)0x0A;
@@ -149,7 +149,7 @@ public partial class ShinyRate : Form
 
     private void B_RestoreOriginal_Click(object sender, EventArgs e)
     {
-        if (modified)
+        if (modified && pk3DS.Core.Modding.UhuruGuard.RefusalFor(codebin) == null)
         {
             new byte[] { 0x23, 0x00, 0xD4, 0xE5 }.CopyTo(exefsData, offset);
             File.WriteAllBytes(codebin, exefsData);

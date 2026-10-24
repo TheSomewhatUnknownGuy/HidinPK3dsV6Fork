@@ -1,0 +1,33 @@
+{
+  "Name": "Gorilla Tactics Fix",
+  "Description": "Gorilla Tactics boosts Attack 50% but never locks the user into their first move. Verified against the Expansion build's Battle.cro (built with BattleMechanicMap, id-fingerprint table location, not guessed offsets): Gorilla Tactics is ability id 255 in this build's ability name table, and it has NO entry at all in the Ability master table (226 entries present, ids 1-233 plus gaps; nothing at 255) - so its Attack boost must be produced by a hardcoded stat-calc check elsewhere, outside the master-mechanic-dispatch system this tool can see, and adding an ability master-table entry here cannot clobber anything because none exists yet. The choice-lock behaviour lives on Choice Band (item id 220), which carries three verified timing slots (0x27 -> 0xBECB4, 0xBB -> 0xBF100, 0x4A -> 0xBE8CC); timing 0xBB -> function 0xBF100 is confirmed to be the shared lock routine because Choice Specs (item id 297) and Choice Scarf (item id 287) both also carry a 0xBB slot pointing at the exact same function 0xBF100, while their other two slots (the stat-boost and boost-amount slots) differ per item. This package adds one new Ability master-table entry for Gorilla Tactics (id 255) whose only slot is timing 0xBB, reusing Choice Band's 0xBB routine (Kind Item, Id 220) to lock the user into their move on use, the same way holding a Choice item does. KNOWN ACCEPTED CONSEQUENCE: the reused routine's own message/text is Choice Band's ('tightened its focus' / choice-lock text), not bespoke Gorilla Tactics text - this is a deliberate tradeoff, not a bug, and is not being fixed here. Because Gorilla Tactics has zero existing master-table entries in this build, MechanicInstaller.AddMechanic takes the brand-new-entry path (not UpdateExistingMechanic), so there is no existing timing table being wholesale-replaced and nothing needs to be re-declared as self-Reuse to survive the install.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 255,
+      "Name": "Gorilla Tactics",
+      "Slots": [
+        {
+          "Timing": "0xBB",
+          "Reuse": {
+            "Kind": "Item",
+            "Id": 220,
+            "Timing": "0xBB",
+            "Name": "Choice Band"
+          },
+          "TimingByte": 187,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 1
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

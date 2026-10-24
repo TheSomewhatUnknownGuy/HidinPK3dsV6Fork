@@ -1,0 +1,52 @@
+{
+  "Name": "Stone Axe / Ceaseless Edge Fix",
+  "Description": "Stone Axe (move id 830) and Ceaseless Edge (move id 845) don't work at all. Verified against the Expansion build's Battle.cro (BattleMechanicMap, id-fingerprint table location): both ids have NO entry whatsoever in the Move master table (343 entries present, ids 6-728; nothing at 830 or 845), so neither move runs any effect on hit. NOTE ON THE REQUESTED DONOR TIMING: the brief that produced this task named timing 0x61 as the 'set entry hazard on hit' slot, but that does not match what is actually in this ROM - every move whose master-table entry carries timing 0x61 in this build (Destiny Bond id 194, Incinerate id 510, King's Shield id 588, Spiky Shield id 596, Baneful Bunker id 661) is an on-being-hit / retaliation move, not a hazard-setter. The real hazard-on-hit timing, confirmed by four independently-verified donors that all share it with four different effect functions, is 0xC0: Stealth Rock (move id 446) -> function 0xCA1DC, Spikes (move id 191) -> function 0xC4E48, Toxic Spikes (move id 390) -> function 0xC45F4, Sticky Web (move id 564) -> function 0xC9DA8, all at timing 0xC0. This package therefore reuses timing 0xC0 rather than 0x61. Stone Axe sets a single non-stacking rock hazard on the target's side, matching Stealth Rock's own effect exactly, so its new master-table entry Reuses Stealth Rock's (move id 446) timing-0xC0 slot. Ceaseless Edge sets a stacking Spikes-shaped hazard, matching Spikes' own effect, so its new master-table entry Reuses Spikes' (move id 191) timing-0xC0 slot. Both moves currently have zero master-table entries, so both installs take MechanicInstaller.AddMechanic's brand-new-entry path, not the wholesale-replacing UpdateExistingMechanic path - nothing existing is at risk of being dropped. KNOWN ACCEPTED CONSEQUENCE: the reused routine's own message text is the donor's ('pointed stones float in the air' / 'spikes scatter'), not bespoke Stone Axe / Ceaseless Edge text - this is the same class of tradeoff as the Gorilla Tactics fix and is not being addressed here. Neither move's own damage roll, type, or other move-data fields are touched by this package; only the missing on-hit hazard effect is added.",
+  "Category": "Battle mechanic",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Move",
+      "Id": 830,
+      "Name": "Stone Axe",
+      "Slots": [
+        {
+          "Timing": "0xC0",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 446,
+            "Timing": "0xC0",
+            "Name": "Stealth Rock"
+          },
+          "TimingByte": 192,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 0
+    },
+    {
+      "Kind": "Move",
+      "Id": 845,
+      "Name": "Ceaseless Edge",
+      "Slots": [
+        {
+          "Timing": "0xC0",
+          "Reuse": {
+            "Kind": "Move",
+            "Id": 191,
+            "Timing": "0xC0",
+            "Name": "Spikes"
+          },
+          "TimingByte": 192,
+          "SourceBaseValue": 0
+        }
+      ],
+      "KindValue": 0
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

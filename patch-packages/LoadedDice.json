@@ -51,5 +51,14 @@
   },
   "ItemNames": {
     "${itemId}": "Loaded Dice"
+  },
+  "ItemNamesPlural": {
+    "${itemId}": "Loaded Dice"
+  },
+  "ItemNamesPluralAlt": {
+    "${itemId}": "Loaded Dice[VAR NUMBRNCH(00FE,0100)]s"
+  },
+  "ItemDescriptions": {
+    "${itemId}": "An item to be held by a Pokémon.\nThese tricky dice make multistrike moves\nhit more times than usual."
   }
 }

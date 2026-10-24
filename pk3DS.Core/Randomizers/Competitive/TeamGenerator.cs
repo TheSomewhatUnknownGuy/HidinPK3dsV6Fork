@@ -102,12 +102,35 @@ public class TeamGenerator
 
     /// <summary>
     /// Returns the required roles for each member of a team for the given archetype.
+    /// In Doubles/VGC, roles are adjusted for field dynamics (Speed Control, Redirection, Bulky Attackers).
     /// </summary>
-    public CompetitiveRole[] GetRolesForArchetype(TeamArchetype archetype, int teamSize = 6)
+    public CompetitiveRole[] GetRolesForArchetype(TeamArchetype archetype, int teamSize = 6, bool isDoubles = false)
     {
         if (teamSize <= 0) teamSize = 1;
         CompetitiveRole[] roles = new CompetitiveRole[teamSize];
         void SetRole(int idx, CompetitiveRole r) { if (idx >= 0 && idx < teamSize) roles[idx] = r; }
+
+        if (isDoubles)
+        {
+            // VGC / Doubles team composition (Smogon Doubles & VGC guide)
+            if (archetype == TeamArchetype.TrickRoom)
+            {
+                SetRole(0, CompetitiveRole.BulkyLead); // TR Setter
+                SetRole(1, CompetitiveRole.BulkyUtility); // Redirection / Fake Out support
+                for (int i = 2; i < teamSize; i++)
+                    SetRole(i, i % 2 == 0 ? CompetitiveRole.TankySweeper : CompetitiveRole.BulkyAttacker);
+            }
+            else
+            {
+                SetRole(0, CompetitiveRole.SpeedControl); // Tailwind or Icy Wind speed controller
+                if (teamSize > 1) SetRole(1, CompetitiveRole.BulkyAttacker); // Heavy STAB / Spread attacker
+                if (teamSize > 2) SetRole(2, CompetitiveRole.BulkyUtility); // Redirection (Follow Me) or Fake Out
+                if (teamSize > 3) SetRole(3, CompetitiveRole.OffensiveBreaker); // Wallbreaker
+                if (teamSize > 4) SetRole(4, CompetitiveRole.BulkySweeper); // Setup sweeper (WP / Swords Dance)
+                if (teamSize > 5) SetRole(5, CompetitiveRole.SpeedControl); // Secondary speed control
+            }
+            return roles;
+        }
 
         switch (archetype)
         {
@@ -115,7 +138,7 @@ public class TeamGenerator
             case TeamArchetype.HyperOffenseScreens:
                 SetRole(0, CompetitiveRole.OffensiveLead);
                 for (int i = 1; i < teamSize - 1; i++) SetRole(i, CompetitiveRole.OffensiveSweeper);
-                SetRole(teamSize - 1, CompetitiveRole.OffensiveCleaner);
+                if (teamSize > 1) SetRole(teamSize - 1, CompetitiveRole.OffensiveCleaner);
                 break;
 
             // Structure 2: Hyper Offense with Hazards
@@ -124,7 +147,7 @@ public class TeamGenerator
                 SetRole(1, CompetitiveRole.OffensiveSweeper);
                 SetRole(2, CompetitiveRole.OffensiveBreaker);
                 for (int i = 3; i < teamSize - 1; i++) SetRole(i, CompetitiveRole.OffensiveSweeper);
-                SetRole(teamSize - 1, CompetitiveRole.SpeedControl);
+                if (teamSize >= 4) SetRole(teamSize - 1, CompetitiveRole.SpeedControl);
                 break;
 
             // Structure 3: Balanced Offense
@@ -211,7 +234,7 @@ public class TeamGenerator
             case TeamArchetype.Stall:
                 SetRole(0, CompetitiveRole.BulkyLead);
                 for (int i = 1; i < teamSize - 1; i++) SetRole(i, CompetitiveRole.DefensiveWall);
-                SetRole(teamSize - 1, CompetitiveRole.DefensivePivot);
+                if (teamSize > 1) SetRole(teamSize - 1, CompetitiveRole.DefensivePivot);
                 break;
 
             // Structure 12: Trick Room
@@ -235,7 +258,7 @@ public class TeamGenerator
             case TeamArchetype.SemiStall:
                 SetRole(0, CompetitiveRole.BulkyLead);
                 for (int i = 1; i < teamSize - 1; i++) SetRole(i, CompetitiveRole.DefensiveWall);
-                SetRole(teamSize - 1, CompetitiveRole.BulkySweeper);
+                if (teamSize > 1) SetRole(teamSize - 1, CompetitiveRole.BulkySweeper);
                 break;
 
             // Structure 15: Type Spam
@@ -252,8 +275,8 @@ public class TeamGenerator
             case TeamArchetype.Fat:
                 SetRole(0, CompetitiveRole.BulkyLead);
                 for (int i = 1; i < teamSize - 2; i++) SetRole(i, CompetitiveRole.DefensiveWall);
-                SetRole(teamSize - 2, CompetitiveRole.SpeedControl);
-                SetRole(teamSize - 1, CompetitiveRole.BulkySweeper);
+                if (teamSize >= 3) SetRole(teamSize - 2, CompetitiveRole.SpeedControl);
+                if (teamSize >= 2) SetRole(teamSize - 1, CompetitiveRole.BulkySweeper);
                 break;
 
             // Structure 17: Terrain Team
@@ -396,12 +419,12 @@ public class TeamGenerator
     {
         if (pi == null) return false;
 
-        int atk = pi.Stats[CompetitiveDatabase.ATK];
-        int spa = pi.Stats[CompetitiveDatabase.SPA];
-        int spe = pi.Stats[CompetitiveDatabase.SPE];
-        int hp = pi.Stats[CompetitiveDatabase.HP];
-        int def = pi.Stats[CompetitiveDatabase.DEF];
-        int spd = pi.Stats[CompetitiveDatabase.SPD];
+        int atk = pi.ATK;
+        int spa = pi.SPA;
+        int spe = pi.SPE;
+        int hp = pi.HP;
+        int def = pi.DEF;
+        int spd = pi.SPD;
 
         // Trick Room: speed must be <= MaxSpeed
         if (spec != null && spec.IsTrickRoom && spe > spec.MaxSpeed) return false;
@@ -414,7 +437,7 @@ public class TeamGenerator
                 return (atk >= 80 || spa >= 80) && spe >= 70;
 
             case CompetitiveRole.OffensivePivot:
-                return (atk >= 70 || spa >= 70);
+                return (atk >= 70 || spa >= 70) && spe >= 70;
 
             case CompetitiveRole.OffensiveLead:
                 return spe >= 80 || atk >= 80 || spa >= 80;

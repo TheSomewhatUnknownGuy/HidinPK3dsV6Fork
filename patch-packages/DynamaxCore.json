@@ -1,0 +1,91 @@
+{
+  "Name": "Dynamax Core",
+  "Description": "A held item that DOUBLES the holder's maximum HP. Rebuilt from scratch 2026-09-02; the previous version was marked BROKEN because its Mechanics block was a verbatim copy of BoosterEnergy's and had nothing to do with HP. The reason it could never have worked in that shape: Battle.cro's held-item hooks are damage-calculation multipliers (Eviolite and friends scale Def/SpD at calc time), but maximum HP is not a damage-calc quantity - it is read back through an accessor. So this hooks that accessor instead. pml::pokepara::CoreParam::GetMaxHp is exported at 0x4AEE74 and CoreParam::GetItem at 0x4AEE4C, both at the SAME address on Ultra Sun and Ultra Moon (verified), so no per-version handling is needed. GetMaxHp's first instruction is replaced with a branch to the injected routine, which asks GetItem what the Pokemon is holding, calls the real GetMaxHp through a trampoline that replays the displaced prologue, and shifts the result left by one when the held item matches. Because every consumer goes through this accessor, the HP bar, healing caps and damage percentages all agree. TWO HONEST LIMITS. First, this doubles MAXIMUM HP only - current HP is stored separately and is not scaled, so a Pokemon that already has the item equipped reads as roughly half full until it is next healed, after which it fills to the new doubled maximum. Doubling GetHp as well was deliberately NOT done: damage is written back through SetHp with real values, so reporting an inflated current HP would desynchronise the arithmetic. Second, the 'cannot be removed in battle' half of the original Dynamax concept is NOT implemented here; that lives in item data flags (the Mega Stone / Z-Crystal lock), not in this accessor. NOTE 2026-09-02: Ultra Sun and Ultra Moon ship a BYTE-IDENTICAL static.crs (same MD5), so the symbol table is only correct for Ultra Sun - every function above roughly 0x4A0000 sits 8 bytes later on Ultra Moon while the table still reports the Sun address. Calls into that region are therefore declared as symbol Retargets with the expected prologue word, and the installer re-finds the real entry by that signature instead of trusting the table. FIX 2026-09-03: the item is cloned from Leftovers (234) purely to inherit a valid HELD-item shape, but cloning also copied Leftovers' HeldEffect (68) and HeldArgument (10), so the Core was silently restoring 1/16 max HP every turn on top of doubling the maximum. HeldEffect/HeldArgument are now explicitly zeroed so the ONLY behaviour is the GetMaxHp doubling.",
+  "Category": "Held item",
+  "Requires": [],
+  "Parameters": {
+    "dynamaxCoreId": {
+      "Description": "Item ID for the Dynamax Core (default: 870).",
+      "Type": "item",
+      "Default": "870",
+      "AllowUnnamed": true
+    }
+  },
+  "Mechanics": [],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "CodeBin": {
+    "LoadBase": 1048576,
+    "Blocks": [
+      {
+        "Name": "dynamax-core-maxhp",
+        "Code": "30402DE90040A0E18FD3FBEB24509FE5050050E10150A0030050A0130400A0E1020000EB000055E38000A0113080BDE8F8432DE98FD3FBEA00000000",
+        "SourceBase": "0x005BA000",
+        "CallsSymbols": [
+          "_ZNK3pml8pokepara9CoreParam7GetItemEv",
+          "_ZNK3pml8pokepara9CoreParam8GetMaxHpEv"
+        ],
+        "CodeBytes": "MEAt6QBAoOGP0/vrJFCf5QUAUOEBUKADAFCgEwQAoOECAADrAABV44AAoBEwgL3o+EMt6Y/T++oAAAAA",
+        "SourceBaseValue": 6004736,
+        "Retargets": [
+          {
+            "At": "0x8",
+            "Symbol": "_ZNK3pml8pokepara9CoreParam7GetItemEv",
+            "Verify": "E92D4010",
+            "Link": true,
+            "SearchWindow": 64
+          },
+          {
+            "At": "0x34",
+            "Symbol": "_ZNK3pml8pokepara9CoreParam8GetMaxHpEv",
+            "Verify": "E92D43F8",
+            "Link": false,
+            "SearchWindow": 64,
+            "Offset": 4
+          }
+        ]
+      }
+    ],
+    "Patches": [
+      {
+        "Name": "getmaxhp-hook",
+        "Symbol": "_ZNK3pml8pokepara9CoreParam8GetMaxHpEv",
+        "Offset": 0,
+        "Original": "F8432DE9",
+        "BranchTo": "dynamax-core-maxhp",
+        "BranchOffset": 0,
+        "Link": false,
+        "OriginalBytes": "+EMt6Q=="
+      }
+    ]
+  },
+  "DataTables": [
+    {
+      "Target": "code.bin",
+      "Block": "dynamax-core-maxhp",
+      "Offset": "0x38",
+      "ElementSize": 4,
+      "Values": "${dynamaxCoreId}",
+      "Terminate": false,
+      "Capacity": 1,
+      "OffsetValue": 56
+    }
+  ],
+  "ItemData": {
+    "${dynamaxCoreId}": {
+      "CloneFrom": "234",
+      "Pocket": "0",
+      "HeldEffect": "0",
+      "HeldArgument": "0"
+    }
+  },
+  "ItemNames": {
+    "${dynamaxCoreId}": "Dynamax Core"
+  },
+  "ItemNamesPlural": {},
+  "ItemNamesPluralAlt": {},
+  "ItemDescriptions": {
+    "${dynamaxCoreId}": "An item brimming with Power Spot energy. Doubles the maximum HP of the Pokémon holding it."
+  }
+}

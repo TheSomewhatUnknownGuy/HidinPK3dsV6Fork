@@ -36,16 +36,17 @@ public static class RecipeIdAllocator
     /// <summary>
     /// Start of the lowest run of <paramref name="count"/> consecutive free ids, or -1.
     /// </summary>
-    public static int NextFreeRun(string[]? names, int count)
+    public static int NextFreeRun(string[]? names, int count, ISet<int>? taken = null)
     {
         if (names == null || count <= 0) return -1;
-        if (count == 1) return NextFree(names);
+        if (count == 1) return NextFree(names, taken);
 
+        bool Free(int i) => IsFree(names, i) && (taken == null || !taken.Contains(i));
         for (int i = 1; i + count <= names.Length; i++)
         {
             bool all = true;
             for (int k = 0; k < count && all; k++)
-                if (!IsFree(names, i + k)) all = false;
+                if (!Free(i + k)) all = false;
             if (all) return i;
         }
         return -1;
@@ -70,7 +71,14 @@ public static class RecipeIdAllocator
     /// <summary>
     /// Assigns every id a recipe needs, and reports what could not be placed.
     /// </summary>
-    public static Dictionary<string, string>? AssignIds(Recipe recipe, GameConfig config, List<string> problems)
+    /// <param name="reserved">
+    /// Ids already spoken for elsewhere - typically by other recipes in the same batch, whose own
+    /// writes have not reached the id-name table on disk yet (a dry run never does; a commit does,
+    /// but only after this call returns). Every id this call claims is added to it, so passing the
+    /// same set into consecutive calls keeps a whole batch from handing out the same "free" id twice.
+    /// </param>
+    public static Dictionary<string, string>? AssignIds(
+        Recipe recipe, GameConfig config, List<string> problems, ISet<int>? reserved = null)
     {
         if (recipe == null || config == null) return null;
 
@@ -79,15 +87,51 @@ public static class RecipeIdAllocator
 
         if (ps is { Count: > 0 })
         {
-            var taken = new HashSet<int>();
+            var taken = reserved ?? new HashSet<int>();
+            // IsFree treats a blank or "???" name as free, but Uhuru keeps data in some of those item ids.
+            if (UhuruGuard.Active)
+            {
+                taken.UnionWith(UhuruGuard.ProtectedPocketItems);
+                taken.UnionWith(UhuruGuard.ProtectedBattleBagItems);
+            }
 
-            // List parameters first: their ids cannot move.
+            // List parameters first: each position's MEANING is fixed (the recipe's own code/data
+            // indexes slot 0, slot 1, ... positionally - TeraShard's slot 0 is baked in as the
+            // Normal-type handler, slot 1 Fighting, and so on), but the actual id VALUE at each
+            // position does not have to be the literal authored default - only genuinely free and
+            // distinct from everything else this install claims. Trusting the authored default
+            // outright went stale for real: HiddenPowerItems and TeraShard both hardcoded 885+ as
+            // "a free run," but this ROM's own Expansion Pack content already occupies part of that
+            // range (885 = Fighting Pulse Shard) - the package failed outright instead of simply
+            // using different, actually-free slots. Keep the authored id per-position when it is
+            // still genuinely free and unclaimed (preserves existing saves/behavior when nothing
+            // conflicts); fall back to the next real free id, slot by slot, otherwise.
             foreach (var (key, p) in ps)
             {
                 if (!string.Equals(p?.Type, "list", StringComparison.OrdinalIgnoreCase)) continue;
-                values[key] = p?.Default ?? "";
-                foreach (string part in (p?.Default ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    if (int.TryParse(part, out int id)) taken.Add(id);
+
+                // Same rule as single ids below: AllowUnnamed = false means the values are fixed
+                // references, not slots to fill (CenterMoveTutor's script ids are not item ids, and
+                // swapping them for free item numbers points every Center NPC at a garbage script).
+                if (p?.AllowUnnamed == false)
+                {
+                    values[key] = p.Default ?? "";
+                    continue;
+                }
+
+                var table = TableForParameter(config, p?.Type);
+                var parts = (p?.Default ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var resolved = new List<string>(parts.Length);
+                foreach (string part in parts)
+                {
+                    int.TryParse(part, out int authored);
+                    int id = (authored > 0 && IsFree(table, authored) && !taken.Contains(authored))
+                        ? authored : NextFree(table, taken);
+                    if (id <= 0) { problems.Add($"no free slot for '{key}'"); return null; }
+                    taken.Add(id);
+                    resolved.Add(id.ToString());
+                }
+                values[key] = string.Join(",", resolved);
             }
 
             foreach (var (key, p) in ps)
@@ -122,13 +166,23 @@ public static class RecipeIdAllocator
         // Not package-driven: the recipe's own entries need a consecutive run.
         if (recipe.SlotCount > 0)
         {
-            int start = NextFreeRun(TableFor(config, recipe.Kind), recipe.SlotCount);
+            if (UhuruGuard.Active && recipe.Kind == CustomMechanicKind.Item)
+            {
+                reserved ??= new HashSet<int>();
+                reserved.UnionWith(UhuruGuard.ProtectedPocketItems);
+                reserved.UnionWith(UhuruGuard.ProtectedBattleBagItems);
+            }
+            int start = NextFreeRun(TableFor(config, recipe.Kind), recipe.SlotCount, reserved);
             if (start <= 0)
             {
                 problems.Add($"no run of {recipe.SlotCount} consecutive free id(s)");
                 return null;
             }
-            for (int i = 0; i < recipe.Entries.Count; i++) recipe.Entries[i].Id = start + i;
+            for (int i = 0; i < recipe.Entries.Count; i++)
+            {
+                recipe.Entries[i].Id = start + i;
+                reserved?.Add(start + i);
+            }
         }
 
         return values;

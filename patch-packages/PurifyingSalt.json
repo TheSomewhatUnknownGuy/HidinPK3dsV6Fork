@@ -1,0 +1,23 @@
+{
+  "Name": "Purifying Salt",
+  "Description": "Ability id 272 (verified via cfg.GetText(TextName.AbilityNames) against the real ROM, not guessed; no existing ability-master-table entry before this package). Byte-for-byte transcription of ABZB's own verified ARM research (Purifying Salt.xlsx). Two independent timing-slot functions, both re-disassembled cleanly against the real Battle.cro with every branch landing on a real instruction boundary and every BL target confirmed as a live function with many independent callers elsewhere in this exact ROM (0x87B58 GetBattleVar: 2070 callers; 0x82D44 status-apply helper: 185 callers, and its own function body starts with a clean PUSH right after a 'POP.../NOP' boundary; 0x83108 power/stat multiplier dispatcher: 34 callers, independently confirmed as this ROM's real damage/stat-multiplier engine by the already-shipped, native-verified Fickle Beam proc per walkthrough.md). No PC-relative literal loads in either function, so CodeRelocator.RebaseCode's branch-only fixups are sufficient - no CudChew-style ADD-PC fix needed. No deviation from the donor bytes was required for this ability.\n\nTiming 0x7C ('Immune to Status conditions'): if self is the intended target of the status-infliction attempt (GetBattleVar(0x4)==self), calls the status-apply helper (0x82D44) with r1=1 (negate/cancel) and r0=0x46 (status-effect code), blocking the status.\n\nTiming 0x4A ('Half Damage from Ghost'): if self is the defender (GetBattleVar(0x4)==self) and the attacking move's type is Ghost (GetBattleVar(0x19)==7), applies a Q12.4 0x800 (=0.5x) multiplier via the confirmed-live 0x83108 dispatcher with r0=0x39 (the same 'operation code' Ruin Abilities uses for its own stat/damage multiplier call, and the same one Fickle Beam's native 2.0x power double uses via the same dispatcher, just a different r1 multiplier).",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 272,
+      "Name": "Purifying Salt",
+      "Slots": [
+        { "Timing": "0x7C", "Code": "10402DE90240A0E10400A0E3D1FEFDEB040050E10200001A0110A0E34600A0E347EBFDEB1080BDE8", "SourceBase": "0x108000" },
+        { "Timing": "0x4A", "Code": "10402DE90240A0E10400A0E3C7FEFDEB040050E10500001A1900A0E3C3FEFDEB070050E3021BA0033900A0E32BECFDEB1080BDE8", "SourceBase": "0x108028" }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

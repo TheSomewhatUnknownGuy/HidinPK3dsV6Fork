@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -8,6 +9,7 @@ using pk3DS.Core;
 using pk3DS.Core.Modding.Research;
 using pk3DS.Core.Randomizers;
 using pk3DS.Core.Structures;
+using CompetitiveWeights = pk3DS.Core.Randomizers.Competitive.CompetitiveWeights;
 
 namespace pk3DS.WinForms.Subforms;
 
@@ -93,7 +95,7 @@ public class UniversalRandomizerForm : Form
     private CheckBox CHK_DiverseBoss, CHK_DiverseImportant, CHK_DiverseRegular;
     private RadioButton RB_StyleUnchanged, RB_StyleRandom, RB_StyleSingle;
     private ComboBox CB_BattleStyle;
-    private CheckBox CHK_TrainerDoubleBattle, CHK_TrainerBetterMovesets, CHK_RivalCarriesStarter, CHK_TrainerSimilarStrength, CHK_TrainerWeightTypes, CHK_TrainerNoLegendaries, CHK_TrainerNoEarlyWonderGuard, CHK_TrainerAllowAltFormes, CHK_TrainerSwapMega, CHK_TrainerRandomShiny, CHK_RandomizeTrainerNames, CHK_RandomizeTrainerClassNames, CHK_TrainerNoMegaEvolution, CHK_TrainerNoZMoves, CHK_TrainerFullIVs;
+    private CheckBox CHK_TrainerDoubleBattle, CHK_TrainerBetterMovesets, CHK_RivalCarriesStarter, CHK_TrainerSimilarStrength, CHK_TrainerWeightTypes, CHK_TrainerNoLegendaries, CHK_TrainerNoEarlyWonderGuard, CHK_TrainerAllowAltFormes, CHK_TrainerSwapMega, CHK_TrainerRandomShiny, CHK_RandomizeTrainerNames, CHK_RandomizeTrainerClassNames, CHK_TrainerNoMegaEvolution, CHK_TrainerNoZMoves, CHK_TrainerFullIVs, CHK_UpgradeVanillaTrainers, CHK_UhuruOneTeam, CHK_UhuruKeepPwt, CHK_UhuruShufflePwt;
     private CheckBox CHK_AddBossPk, CHK_AddImportantPk, CHK_AddRegularPk;
     private NumericUpDown NUD_AddBossCount, NUD_AddImportantCount, NUD_AddRegularCount;
     private CheckBox CHK_ItemBossPk, CHK_ItemImportantPk, CHK_ItemRegularPk, CHK_ItemConsumableOnly, CHK_ItemSensibleOnly, CHK_ItemHighestLevelOnly;
@@ -247,8 +249,22 @@ public class UniversalRandomizerForm : Form
             string preset = Clipboard.GetText();
             if (preset.StartsWith("UPRZX3DS_"))
             {
-                LoadSettingsToUI(UniversalSettings.ImportSettingsString(preset));
-                WinFormsUtil.Alert("Settings loaded from clipboard!");
+                var imported = UniversalSettings.ImportSettingsString(preset);
+                LoadSettingsToUI(imported);
+                string note = "";
+                if (imported.Weights != null) // older presets carry none and leave the file alone
+                {
+                    try
+                    {
+                        imported.Weights.Save(CompetitiveWeights.DefaultPath);
+                        note = "\nThe preset's competitive weights were written to competitive_weights.json.";
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        note = "\nCouldn't write the preset's competitive weights: " + ex.Message;
+                    }
+                }
+                WinFormsUtil.Alert("Settings loaded from clipboard!" + note);
             }
             else
             {
@@ -256,7 +272,9 @@ public class UniversalRandomizerForm : Form
             }
         };
         B_SaveSettings.Click += (s, e) => {
-            string str = GetSettingsFromUI().ExportSettingsString();
+            var exported = GetSettingsFromUI();
+            exported.Weights = CompetitiveWeights.Load(CompetitiveWeights.DefaultPath, new List<string>());
+            string str = exported.ExportSettingsString();
             Clipboard.SetText(str);
             WinFormsUtil.Alert("Settings string copied to clipboard!\n" + str);
         };
@@ -275,6 +293,7 @@ public class UniversalRandomizerForm : Form
         BuildTabStartersStaticsTrades();
         BuildTabMovesMovesets();
         BuildTabFoePokemon();
+        BuildTabCompetitive();
         BuildTabWildPokemon();
         BuildTabTMsHMsTutors();
         BuildTabItems();
@@ -629,8 +648,18 @@ public class UniversalRandomizerForm : Form
         CHK_TrainerNoMegaEvolution = new CheckBox { Text = "No Mega Evolution", Location = new Point(580, 218), AutoSize = true };
         CHK_TrainerNoZMoves = new CheckBox { Text = "No Z-Moves", Location = new Point(580, 240), AutoSize = true };
         CHK_TrainerFullIVs = new CheckBox { Text = "31 IVs (else random)", Location = new Point(580, 262), AutoSize = true, Checked = true };
+        CHK_UpgradeVanillaTrainers = new CheckBox { Text = "Upgrade unrandomized trainers", Location = new Point(580, 284), AutoSize = true };
+        // Uhuru only (trdata has 5 difficulty blocks): hidden on other ROMs.
+        bool uhuru = Main.Config?.Info is { TrainerBaseCount: > 0 };
+        CHK_UhuruOneTeam = new CheckBox { Text = "Uhuru: one team for all difficulties", Location = new Point(20, 300), AutoSize = true, Checked = true, Visible = uhuru, Enabled = uhuru };
+        CHK_UhuruKeepPwt = new CheckBox { Text = "Keep Uhuru's PWT cast", Location = new Point(20, 318), AutoSize = true, Visible = uhuru, Enabled = uhuru };
+        CHK_UhuruShufflePwt = new CheckBox { Text = "Shuffle PWT pool", Location = new Point(170, 318), AutoSize = true, Visible = uhuru, Enabled = uhuru };
+        new ToolTip().SetToolTip(CHK_UhuruOneTeam, "On: each trainer gets one randomized team, and every difficulty uses the same species at its own levels. Off: every difficulty is randomized separately. This overrides Uhuru's own per-difficulty species choices; Uhuru's new wild tables are randomized like any other.");
+        new ToolTip().SetToolTip(CHK_UhuruKeepPwt, "Leave the Pokemon World Tournament trainers (docs/uhuru/pwt-trainers.txt) untouched in every difficulty.");
+        new ToolTip().SetToolTip(CHK_UhuruShufflePwt, "Shuffle which slot each Pokemon World Tournament trainer sits in (script 217). The same 146 trainers stay in the pool; flag-gated slots keep their gates, so a gated slot can now hold a different trainer.");
+        new ToolTip().SetToolTip(CHK_UpgradeVanillaTrainers, "Trainer Pokemon you did not randomize get competitively better moves, items and EVs. Off: they stay exactly as the game shipped them.");
 
-        GB_Trainers.Controls.AddRange(new Control[] { L_TrainerMode, CB_TrainerMode, CHK_TrainerBetterMovesets, CHK_TrainerAvoidDuplicates, L_AddPk, CHK_AddBossPk, NUD_AddBossCount, CHK_AddImportantPk, NUD_AddImportantCount, CHK_AddRegularPk, NUD_AddRegularCount, L_HeldItems, CHK_ItemBossPk, CHK_ItemImportantPk, CHK_ItemRegularPk, CHK_ItemConsumableOnly, CHK_ItemSensibleOnly, CHK_ItemHighestLevelOnly, CHK_RivalCarriesStarter, CHK_TrainerSimilarStrength, CHK_TrainerWeightTypes, CHK_TrainerNoLegendaries, CHK_TrainerNoEarlyWonderGuard, CHK_TrainerAllowAltFormes, CHK_TrainerSwapMega, CHK_TrainerRandomShiny, L_Diverse, CHK_DiverseBoss, CHK_DiverseImportant, CHK_DiverseRegular, GB_BattleStyle, CHK_RandomizeTrainerNames, CHK_RandomizeTrainerClassNames, CHK_ForceFullyEvolved, TB_ForceFullyEvolvedLevel, L_ForceFullyEvolvedVal, L_TrLevel, TB_TrainerLevelMod, L_TrainerLevelModVal, CHK_PokemonLeagueUnique, NUD_PokemonLeagueCount, CHK_TrainerNoMegaEvolution, CHK_TrainerNoZMoves, CHK_TrainerFullIVs });
+        GB_Trainers.Controls.AddRange(new Control[] { L_TrainerMode, CB_TrainerMode, CHK_TrainerBetterMovesets, CHK_TrainerAvoidDuplicates, L_AddPk, CHK_AddBossPk, NUD_AddBossCount, CHK_AddImportantPk, NUD_AddImportantCount, CHK_AddRegularPk, NUD_AddRegularCount, L_HeldItems, CHK_ItemBossPk, CHK_ItemImportantPk, CHK_ItemRegularPk, CHK_ItemConsumableOnly, CHK_ItemSensibleOnly, CHK_ItemHighestLevelOnly, CHK_RivalCarriesStarter, CHK_TrainerSimilarStrength, CHK_TrainerWeightTypes, CHK_TrainerNoLegendaries, CHK_TrainerNoEarlyWonderGuard, CHK_TrainerAllowAltFormes, CHK_TrainerSwapMega, CHK_TrainerRandomShiny, CHK_UhuruOneTeam, CHK_UhuruKeepPwt, CHK_UhuruShufflePwt, L_Diverse, CHK_DiverseBoss, CHK_DiverseImportant, CHK_DiverseRegular, GB_BattleStyle, CHK_RandomizeTrainerNames, CHK_RandomizeTrainerClassNames, CHK_ForceFullyEvolved, TB_ForceFullyEvolvedLevel, L_ForceFullyEvolvedVal, L_TrLevel, TB_TrainerLevelMod, L_TrainerLevelModVal, CHK_PokemonLeagueUnique, NUD_PokemonLeagueCount, CHK_TrainerNoMegaEvolution, CHK_TrainerNoZMoves, CHK_TrainerFullIVs, CHK_UpgradeVanillaTrainers });
 
         // Totem Pokemon
         var GB_Totems = new GroupBox { Text = "Totem Pokemon (Gen 7)", Location = new Point(10, 358), Size = new Size(815, 136) };
@@ -662,6 +691,62 @@ public class UniversalRandomizerForm : Form
 
         tab.Controls.AddRange(new Control[] { GB_Trainers, GB_Totems });
         TC_Main.TabPages.Add(tab);
+    }
+
+    /// <summary>The competitive engine's tuning file (v2 spec §4).</summary>
+    private void BuildTabCompetitive()
+    {
+        var tab = new TabPage("Competitive");
+        var GB_Weights = new GroupBox { Text = "Competitive Engine Weights", Location = new Point(10, 10), Size = new Size(815, 120) };
+        var L_Weights = new Label
+        {
+            Text = "Every number the competitive engine uses (speed benchmark, move scoring, team synergy) is in\n" +
+                   "competitive_weights.json beside pk3DS. It is re-read on every Randomize, presets carry a copy,\n" +
+                   "and any value it can't use is listed in randomizer_log.txt.",
+            Location = new Point(15, 22), AutoSize = true,
+        };
+        var B_OpenWeights = new Button { Text = "Open weights file", Location = new Point(15, 78), Size = new Size(205, 30) };
+        var B_ResetWeights = new Button { Text = "Reset weights to defaults", Location = new Point(230, 78), Size = new Size(205, 30) };
+        B_OpenWeights.Click += (s, e) => OpenWeightsFile();
+        B_ResetWeights.Click += (s, e) => ResetWeightsFile();
+        GB_Weights.Controls.AddRange(new Control[] { L_Weights, B_OpenWeights, B_ResetWeights });
+        tab.Controls.Add(GB_Weights);
+        TC_Main.TabPages.Add(tab);
+    }
+
+    private void OpenWeightsFile()
+    {
+        CompetitiveWeights.Load(CompetitiveWeights.DefaultPath, new List<string>()); // writes the defaults if missing
+        try { Process.Start(new ProcessStartInfo(CompetitiveWeights.DefaultPath) { UseShellExecute = true }); }
+        catch (Exception ex) { WinFormsUtil.Error("Couldn't open " + CompetitiveWeights.DefaultPath, ex.Message); }
+    }
+
+    private void ResetWeightsFile()
+    {
+        if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo, "Overwrite competitive_weights.json with the default weights?") != DialogResult.Yes)
+            return;
+        try
+        {
+            new CompetitiveWeights().Save(CompetitiveWeights.DefaultPath);
+            WinFormsUtil.Alert("Competitive weights reset to defaults.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            WinFormsUtil.Error("Couldn't write " + CompetitiveWeights.DefaultPath, ex.Message);
+        }
+    }
+
+    private static string RunLogPath => Path.Combine(AppContext.BaseDirectory, "randomizer_log.txt");
+    private readonly List<string> RunLog = [];
+
+    // Writes this run's log; returns a note for the closing message if it couldn't.
+    private string WriteRunLog()
+    {
+        try { File.WriteAllLines(RunLogPath, RunLog); return ""; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "\nCouldn't write randomizer_log.txt: " + ex.Message;
+        }
     }
 
     private void BuildTabWildPokemon()
@@ -1189,7 +1274,13 @@ public class UniversalRandomizerForm : Form
     /// <summary>
     /// Which ids this recipe would claim on the loaded ROM, or why it cannot claim any.
     /// </summary>
-    private static string DescribeIds(Recipe r)
+    /// <param name="reserved">
+    /// Ids already spoken for by other recipes in the same preview pass (see
+    /// <see cref="PreviewPatchIds"/>) - shared across a whole ticked batch so two rows never show the
+    /// same "free" id just because neither has actually been installed yet. Null for a single row
+    /// viewed on its own, where there is no batch to collide with.
+    /// </param>
+    private static string DescribeIds(Recipe r, ISet<int> reserved = null)
     {
         if (r.SlotCount == 0 && r.Package?.Parameters is not { Count: > 0 }) return "";
         if (Main.Config == null) return "  Load a ROM to see which item IDs it would take.";
@@ -1199,7 +1290,7 @@ public class UniversalRandomizerForm : Form
             // Preview on a copy: AssignIds writes into Entries, and the list must not be mutated by
             // merely looking at a row.
             var problems = new List<string>();
-            var values = RecipeIdAllocator.AssignIds(r, Main.Config, problems);
+            var values = RecipeIdAllocator.AssignIds(r, Main.Config, problems, reserved);
             if (problems.Count > 0) return $"  No free IDs: {problems[0]}.";
 
             if (values is { Count: > 0 })
@@ -1234,9 +1325,10 @@ public class UniversalRandomizerForm : Form
         if (Main.Config == null) { WinFormsUtil.Alert("Load a ROM first."); return; }
 
         var lines = new List<string>();
+        var reserved = new HashSet<int>();
         foreach (var r in _patchRows.Where(x => x != null && picked.Contains(x.Name)))
         {
-            string ids = DescribeIds(r).Trim();
+            string ids = DescribeIds(r, reserved).Trim();
             lines.Add(ids.Length == 0 ? $"{r.Name}: no IDs needed" : $"{r.Name}: {ids}");
         }
         WinFormsUtil.Alert("These IDs are assigned automatically when you randomize:\n\n" +
@@ -1407,8 +1499,12 @@ public class UniversalRandomizerForm : Form
             BattleStyleMode = RB_StyleRandom.Checked ? 1 : (RB_StyleSingle.Checked ? 2 : 0),
             BattleStyleChoice = Math.Max(0, CB_BattleStyle.SelectedIndex),
             BetterTrainerMovesets = CHK_TrainerBetterMovesets.Checked,
+            UpgradeVanillaTrainers = CHK_UpgradeVanillaTrainers.Checked,
             RivalCarriesStarter = CHK_RivalCarriesStarter.Checked,
             TrainerTrySimilarStrength = CHK_TrainerSimilarStrength.Checked,
+            UhuruOneTeam = CHK_UhuruOneTeam.Checked,
+            UhuruKeepPwtCast = CHK_UhuruKeepPwt.Checked,
+            UhuruShufflePwtPool = CHK_UhuruShufflePwt.Checked,
             WeightTypesByNumPokemon = CHK_TrainerWeightTypes.Checked,
             TrainerDontUseLegendaries = CHK_TrainerNoLegendaries.Checked,
             NoEarlyWonderGuard = CHK_TrainerNoEarlyWonderGuard.Checked,
@@ -1705,8 +1801,12 @@ public class UniversalRandomizerForm : Form
         CB_BattleStyle.SelectedIndex = Math.Clamp(s.BattleStyleChoice, 0, CB_BattleStyle.Items.Count - 1);
         CB_BattleStyle.Enabled = RB_StyleSingle.Checked;
         CHK_TrainerBetterMovesets.Checked = s.BetterTrainerMovesets;
+        CHK_UpgradeVanillaTrainers.Checked = s.UpgradeVanillaTrainers;
         CHK_RivalCarriesStarter.Checked = s.RivalCarriesStarter;
         CHK_TrainerSimilarStrength.Checked = s.TrainerTrySimilarStrength;
+        CHK_UhuruOneTeam.Checked = s.UhuruOneTeam;
+        CHK_UhuruKeepPwt.Checked = s.UhuruKeepPwtCast;
+        CHK_UhuruShufflePwt.Checked = s.UhuruShufflePwtPool;
         CHK_TrainerWeightTypes.Checked = s.WeightTypesByNumPokemon;
         CHK_TrainerNoLegendaries.Checked = s.TrainerDontUseLegendaries;
         CHK_TrainerNoEarlyWonderGuard.Checked = s.NoEarlyWonderGuard;
@@ -1875,6 +1975,16 @@ public class UniversalRandomizerForm : Form
 
         B_Randomize.Enabled = false;
         var settings = GetSettingsFromUI();
+        RunLog.Clear();
+        int weightProblems = 0;
+        if (settings.CompetitiveRandomizer)
+        {
+            // Read on every run so hand edits are picked up; problems go to the run log (spec §4).
+            var problems = new List<string>();
+            settings.Weights = CompetitiveWeights.Load(CompetitiveWeights.DefaultPath, problems);
+            weightProblems = problems.Count;
+            RunLog.AddRange(problems.Select(p => "competitive_weights.json: " + p));
+        }
         var orchestrator = new UniversalRandomizer(Main.Config, settings, Main.RomFSPath);
 
         Action<SpeciesRandomizer, FormRandomizer> wildAction = null;
@@ -1964,17 +2074,25 @@ public class UniversalRandomizerForm : Form
                     var esg = Main.Config.GetGARCData("encounterstatic");
                     if (esg?.Files != null && esg.Files.Length > 1)
                     {
-                        byte[] data = esg.Files[1]; // File 1: Encounters
-                        if (data != null && data.Length >= EncounterStatic7.SIZE)
+                        // Uhuru: the game reads file 6 + difficulty mode, so 1,6,7,8 (Normal) and 9,10,11 (Hard) are all live.
+                        // One new species per record (picked from the Normal record), written into every live copy; each file keeps its own level.
+                        bool uhuru = Main.Config.Info is { TrainerBaseCount: > 0 } && esg.Files.Length >= 12;
+                        int[] targets = uhuru ? [1, 6, 7, 8, 9, 10, 11] : [1];
+                        var all = esg.Files; // GARCFile.Files returns the cached arrays, so in-place Array.Copy reaches Save()
+                        byte[] baseData = all[1]; // File 1: Encounters
+                        if (baseData != null && baseData.Length >= EncounterStatic7.SIZE)
                         {
-                            for (int i = 0; i < data.Length; i += EncounterStatic7.SIZE)
+                            for (int i = 0; i + EncounterStatic7.SIZE <= baseData.Length; i += EncounterStatic7.SIZE)
                             {
-                                byte[] entry = new byte[EncounterStatic7.SIZE];
-                                Array.Copy(data, i, entry, 0, entry.Length);
-                                var enc = new EncounterStatic7(entry);
-                                if (enc.Species > 0 && enc.Species <= Main.Config.MaxSpeciesID)
+                                var baseEnc = new EncounterStatic7(baseData.AsSpan(i, EncounterStatic7.SIZE).ToArray());
+                                if (baseEnc.Species <= 0 || baseEnc.Species > Main.Config.MaxSpeciesID) continue;
+                                ushort newSpec = (ushort)(settings.StaticsMode == 3 ? rnd.GetMappedSpecies(baseEnc.Species) : rnd.GetRandomSpecies(baseEnc.Species));
+                                foreach (int f in targets)
                                 {
-                                    ushort newSpec = (ushort)(settings.StaticsMode == 3 ? rnd.GetMappedSpecies(enc.Species) : rnd.GetRandomSpecies(enc.Species));
+                                    byte[] data = all[f];
+                                    if (i + EncounterStatic7.SIZE > data.Length) continue;
+                                    var enc = new EncounterStatic7(data.AsSpan(i, EncounterStatic7.SIZE).ToArray());
+                                    if (enc.Species <= 0 || enc.Species > Main.Config.MaxSpeciesID) continue;
                                     enc.Species = newSpec;
                                     if (settings.StaticsLevelModifierPercent != 0)
                                     {
@@ -1983,7 +2101,6 @@ public class UniversalRandomizerForm : Form
                                     Array.Copy(enc.Data, 0, data, i, EncounterStatic7.SIZE);
                                 }
                             }
-                            esg.Files[1] = data;
                             esg.Save();
                         }
                     }
@@ -2005,12 +2122,15 @@ public class UniversalRandomizerForm : Form
                 }
             }, wildAction, staticsAction);
 
-            WinFormsUtil.Alert("Universal Randomization finished successfully!\nAll game files have been updated with UPR-ZX parity.");
+            string logNote = WriteRunLog();
+            string weightNote = weightProblems > 0 ? $"\n{weightProblems} competitive weight problem(s); see randomizer_log.txt." : "";
+            WinFormsUtil.Alert("Universal Randomization finished successfully!\nAll game files have been updated with UPR-ZX parity." + weightNote + logNote);
             this.Close();
         }
         catch (Exception ex)
         {
-            WinFormsUtil.Error("Universal Randomization failed:\n" + ex.Message, ex.StackTrace);
+            RunLog.Add("FAILED: " + ex);
+            WinFormsUtil.Error("Universal Randomization failed:\n" + ex.Message + WriteRunLog(), ex.StackTrace);
         }
         finally
         {
@@ -2159,6 +2279,7 @@ public class UniversalRandomizerForm : Form
 
     private void UpdateProgress(string msg, int pct)
     {
+        RunLog.Add(msg);
         L_Status.Text = msg;
         PB_Progress.Value = Math.Max(0, Math.Min(100, pct));
         Application.DoEvents();

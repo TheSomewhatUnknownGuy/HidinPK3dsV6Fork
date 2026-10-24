@@ -1,0 +1,31 @@
+{
+  "Name": "Orichalcum Pulse",
+  "Description": "Orichalcum Pulse (Ability 288, confirmed via cfg.GetText(TextName.AbilityNames)). Installed as a brand-new Ability master-table entry (no existing entry for id 288, nothing to collide with) with two timing slots, both fresh code in new space per this session's growable-CRO methodology - no in-place edit of the existing, tightly-packed Protosynthesis/Quark Drive splice at 0x113CA0 is made or needed.\n\nSlot 1 (timing 0xA7, switch-in - the same general switch-in hook Drought/Electric Surge/Intimidate use per this project's own tool-generated function-templates.md, dynamically resolved against this exact ROM): sets Sun by calling 0x12C5C (the generic 'Set Weather/Terrain' engine routine) with r0=2 (weather id, taken verbatim from the Drought-modelled template's own dynamically-resolved default - i.e. this is byte-for-byte the same call Drought's own compiled code makes in this ROM) and r1=5 (duration in turns, Gen 6+ ability-set-weather standard). 0x12C5C was independently disassembled in the live target Battle.cro (not just read from docs) and confirmed to be real, coherent weather-state-machine code (Cloud Nine/Air Lock negation check via 0x89D04, a per-weather-id jump table at +0x88).\n\nSlot 2 (timing 0x4A, stat-calculation hook - r0=stat value in/out, r1=stat index, confirmed via three independent doc-generated, dynamically-resolved templates that all agree on this contract: Defeatist/Hustle 'one stat up another down', Blaze 'pinch boost', Eviolite 'damage taken'): when r1==1 (Attack, matching the '1 Attack' convention used consistently across every stat-index template in this corpus), multiplies the incoming stat value by 1.5 (Q12 0x1800/4096) IF the current weather is sunny. Sunny check: BL 0x7B844 (confirmed by direct disassembly to be a plain tail-branch to 0x84D1C, which this project's own function-templates.md independently documents as 'Returns current weather as r0' with zero argument setup required - the Weather Ball template calls it the same bare way) followed by BL 0x7FA64 (confirmed by direct disassembly to be a 5-instruction leaf routine: CMP r0,#1; CMPNE r0,#6; MOVEQ r0,#1; MOVNE r0,#0; BX lr - i.e. returns 1 iff the weather id is 1 or 6, the two sun-family ids, matching its use inside the donor Protosynthesis/Quark-Drive/Orichalcum-Pulse/Hadron-Engine research transcription as the 'check sunny' step). No 'is self' gate is added: every doc-generated template for this exact timing class (Defeatist, Blaze, Swift Swim, Eviolite) omits one too, consistent with the master-table ability-id match already being the only gate needed - the engine only invokes an Ability's registered handler for the battler that actually has that ability. No Booster Energy consumption check is included: the donor's own combined Protosynthesis/Quark-Drive/Orichalcum-Pulse/Hadron-Engine transcription explicitly branches AROUND the Booster Energy code for ability ids >= 0x120 (288 decimal = Orichalcum Pulse) with the comment 'if Engine/Pulse, no Booster energy' - i.e. Booster Energy is a Protosynthesis/Quark-Drive-only mechanic in the real game and Orichalcum Pulse correctly does not gate on it.\n\nVERIFICATION: every BL target used (0x12C5C, 0x7B844, 0x7FA64) was independently disassembled against the real reference Battle.cro and confirmed to be real, non-blank, coherent code. This is NOT a byte-for-byte donor transcription port: two donor-supplied addresses for this same mechanic pair (0xD4290, labelled 'Orichalcum Pulse, Sun' in the donor's own build) were independently disassembled here and found to be UNRELATED stock code in this target ROM (a species+item-specific Primal-Reversion-shaped check, not a generic ability weather setter) - so that address was rejected and 0x12C5C (the doc-tool-verified generic setter, matching Drought's own real compiled call) was used instead. Both authored routines were assembled with pk3DS.Core's own ARMCodec.Assemble, disassembled back to confirm the encoding matches intent, and rebased with CodeRelocator.RebaseCode from placeholder SourceBase 0x200000 to a test address to confirm every external BL keeps its absolute target and every internal branch (the 'done' label) stays correctly relative.\n\nKNOWN GAP (reported, not silently dropped): this does NOT include a persistent 'ability already triggered this switch-in, show the banner once' state the real games have - the stat multiplier is instead recomputed live every time the engine asks for the Attack stat while Sun is active, which matches the ability's user-visible behaviour (boosted Attack exactly when and only when it is sunny) but skips the one-time activation banner/message the donor's fuller (but address-incompatible) implementation shows.",
+  "Category": "Ability",
+  "Requires": [],
+  "Parameters": {},
+  "Mechanics": [
+    {
+      "Kind": "Ability",
+      "Id": 288,
+      "Name": "Orichalcum Pulse",
+      "Slots": [
+        {
+          "Timing": "0xA7",
+          "Code": "00402DE90200A0E30510A0E3124BF8EB0080BDE8",
+          "SourceBase": "0x200000"
+        },
+        {
+          "Timing": "0x4A",
+          "Code": "30402DE90050A0E1010051E30700001A0BEEF9EB92FEF9EB000050E30300000A064BA0E3950404E02406A0E13080BDE80500A0E13080BDE8",
+          "SourceBase": "0x200000"
+        }
+      ]
+    }
+  ],
+  "Blocks": [],
+  "SitePatches": [],
+  "OtherCros": {},
+  "ItemData": {},
+  "ItemNames": {}
+}

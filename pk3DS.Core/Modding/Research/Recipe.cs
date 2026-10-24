@@ -205,6 +205,8 @@ public sealed class RecipeEntry
 {
     public string Name { get; init; } = "";
     public string Description { get; init; } = "";
+    public string? Plural { get; init; }
+    public string? PluralAlt { get; init; }
 
     /// <summary>Id chosen by the author. -1 until assigned.</summary>
     public int Id { get; set; } = -1;
@@ -268,8 +270,10 @@ public static class Recipes
         {
             Name = $"{m.Nature} Mint",
             Description = m.Serious()
-                ? "A mint with a mysterious aroma. When used, it makes a Pokémon's stats grow evenly."
-                : $"A mint with a mysterious aroma. When used, it raises {m.Raises} and lowers {m.Lowers}.",
+                ? "A mint with a mysterious aroma. When\nused, it makes a Pokémon's stats\ngrow evenly."
+                : $"A mint with a mysterious aroma. When\nused, it raises {m.Raises} and lowers\n{m.Lowers}.",
+            Plural = $"{m.Nature} Mints",
+            PluralAlt = $"{m.Nature} Mints",
         })],
         Caveats =
         [
@@ -292,20 +296,55 @@ public static class Recipes
     /// <summary>
     /// The Gen 8/9 competitive items, each labelled by its own name rather than by patch jargon.
     /// </summary>
-    private static readonly (string Item, string Desc)[] CompetitiveItems =
+    private static readonly (string Item, string Desc, string? Plural)[] CompetitiveItems =
     [
-        ("Clear Amulet",     "An item to be held by a Pokémon. This clear, curved charm prevents other Pokémon from lowering the holder's stats."),
-        ("Ability Shield",   "An item to be held by a Pokémon. This sturdy shield prevents the holder's Ability from being changed or suppressed."),
-        ("Loaded Dice",      "An item to be held by a Pokémon. These tricky dice make multistrike moves hit more times than usual."),
-        ("Covert Cloak",     "An item to be held by a Pokémon. This cloak protects the holder from the additional effects of moves."),
-        ("Throat Spray",     "An item to be held by a Pokémon. It raises Sp. Atk when the holder uses a sound-based move."),
-        ("Utility Umbrella", "An item to be held by a Pokémon. This sturdy umbrella protects the holder from the effects of sun and rain."),
-        ("Ability Patch",    "An item that changes a Pokémon with a regular Ability to one with a rare Ability."),
-        ("Room Service",     "An item to be held by a Pokémon. It lowers the holder's Speed when Trick Room takes effect."),
-        ("Punching Glove",   "An item to be held by a Pokémon. This glove boosts punching moves and stops them making contact."),
-        ("Mirror Herb",      "An item to be held by a Pokémon. This herb lets the holder copy an opponent's stat boosts, once."),
-        ("Booster Energy",   "An item to be held by a Pokémon. This capsule activates Protosynthesis or Quark Drive once."),
-        ("Blunder Policy",   "An item to be held by a Pokémon. It sharply raises Speed when the holder misses with a move."),
+        ("Clear Amulet",
+         "An item to be held by a Pokémon.\nThis clear, curved charm prevents other\nPokémon from lowering the holder's stats.",
+         "Clear Amulets"),
+
+        ("Ability Shield",
+         "An item to be held by a Pokémon.\nThis sturdy shield prevents the holder's\nAbility from being changed or suppressed.",
+         "Ability Shields"),
+
+        ("Loaded Dice",
+         "An item to be held by a Pokémon.\nThese tricky dice make multistrike moves\nhit more times than usual.",
+         "Loaded Dice"),
+
+        ("Covert Cloak",
+         "An item to be held by a Pokémon.\nThis cloak protects the holder from the\nadditional effects of moves.",
+         "Covert Cloaks"),
+
+        ("Throat Spray",
+         "An item to be held by a Pokémon.\nIt raises Sp. Atk when the holder uses\na sound-based move.",
+         "Throat Sprays"),
+
+        ("Utility Umbrella",
+         "An item to be held by a Pokémon.\nThis sturdy umbrella protects the holder\nfrom the effects of sun and rain.",
+         "Utility Umbrellas"),
+
+        ("Ability Patch",
+         "An item that changes a Pokémon with a\nregular Ability to one with a rare Ability.",
+         "Ability Patches"),
+
+        ("Room Service",
+         "An item to be held by a Pokémon.\nIt lowers the holder's Speed when\nTrick Room takes effect.",
+         "Room Services"),
+
+        ("Punching Glove",
+         "An item to be held by a Pokémon.\nThis glove boosts punching moves and\nstops them making contact.",
+         "Punching Gloves"),
+
+        ("Mirror Herb",
+         "An item to be held by a Pokémon.\nThis herb lets the holder copy an\nopponent's stat boosts, once.",
+         "Mirror Herbs"),
+
+        ("Booster Energy",
+         "An item to be held by a Pokémon.\nThis capsule activates Protosynthesis\nor Quark Drive once.",
+         "Booster Energies"),
+
+        ("Blunder Policy",
+         "An item to be held by a Pokémon.\nIt sharply raises Speed when the\nholder misses with a move.",
+         "Blunder Policies"),
     ];
 
     private static readonly Lazy<List<Recipe>> All = new(Build);
@@ -315,7 +354,7 @@ public static class Recipes
         var list = new List<Recipe>();
         if (!HasPackageFor("Nature Mints") && !HasPackageFor("Ability Patch")) list.Add(NatureMints());
 
-        foreach (var (item, desc) in CompetitiveItems)
+        foreach (var (item, desc, plural) in CompetitiveItems)
         {
             if (HasPackageFor(item)) continue;
             var build = MapToTemplate(item);
@@ -332,7 +371,13 @@ public static class Recipes
                 TemplateName = build?.Template,
                 TemplateValues = build?.Values ?? [],
                 Timing = build?.Timing,
-                Entries = [new RecipeEntry { Name = item, Description = desc }],
+                Entries = [new RecipeEntry
+                {
+                    Name = item,
+                    Description = desc,
+                    Plural = plural ?? ItemTextUtil.Pluralize(item),
+                    PluralAlt = plural ?? ItemTextUtil.Pluralize(item),
+                }],
                 Caveats = build?.Caveats
                     ?? ["No template covers this one yet: the item and its text are added, but it "
                         + "will have no effect until a routine is written for it."],
@@ -392,17 +437,24 @@ public static class Recipes
     public static List<Recipe> Discover(ResearchDatabase? db, string? version = null)
     {
         var list = new List<Recipe>();
-        list.AddRange(DiscoverIps(version));
-        list.AddRange(ByteEditRecipes(version));
-        list.AddRange(OtherMechanics(version));
 
-        // Packages first: where one exists for an item, it is the real implementation and the
-        // built-in entry for the same name is only its text.
+        // Packages FIRST, for real this time: the old code added DiscoverIps/ByteEditRecipes/
+        // OtherMechanics to `list` before packages were even loaded, so book.FirstOrDefault(name)
+        // always returned the built-in entry whenever a package existed with the same name (the
+        // "claimed" set below only ever protected the later All.Value loop, never these three) -
+        // e.g. a real, verified patch-packages/Frostbite.json never actually got used, because the
+        // hardcoded OtherMechanics() "Frostbite" was already earlier in the list. Where one exists
+        // for an item, it is the real implementation and the built-in entry for the same name is
+        // only its text.
         var packages = LoadPackages(out string? from);
         foreach (var p in packages.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
             list.Add(FromPackage(p, from));
 
         var claimed = new HashSet<string>(list.Select(r => r.Name), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var r in DiscoverIps(version).Concat(ByteEditRecipes(version)).Concat(OtherMechanics(version)))
+            if (claimed.Add(r.Name)) list.Add(r);
+
         foreach (var r in All.Value)
             if (!claimed.Contains(r.Name)) list.Add(r);
 
@@ -662,6 +714,143 @@ public static class Recipes
                 + "and both Expansion builds, so it is offered for every one of them.",
             ],
         };
+
+        // The four ceiling raises below share one shape: each widens a hardcoded id-bounds check in
+        // code.bin from whatever this build's own baseline already is (either stock retail, or the
+        // community Expansion Pack's own already-applied raise) up to 65280 (0xFF00) - the largest
+        // value that is both a single ARM rotated-immediate and safely under 65536, since pk3DS's
+        // own GARC writer (GARC.PackGARC) casts entry counts to ushort and would silently truncate
+        // past that regardless of what code.bin allows. Every ByteEdit's "From" byte is exactly
+        // what this session found live in a real ROM - RecipeInstaller refuses to write (rather than
+        // guessing) if a target ROM's byte does not match either that or the already-applied "To"
+        // value, so a build that genuinely differs is left alone rather than corrupted.
+        // Verified against US only - UM equivalents were not independently found/tested this
+        // session, so these recipes are offered for US builds only.
+        if (v == "US")
+        {
+            yield return new Recipe
+            {
+                Name = "Raise the trainer-battle ceiling",
+                Summary = "Lets overworld trainer battles (trdata indices past the stock 653) resolve "
+                        + "to the real trainer instead of silently falling back to trdata[1].",
+                Kind = CustomMechanicKind.Item,
+                EffectKind = RecipeEffectKind.ByteEdit,
+                Target = ResearchTarget.CodeBin,
+                ForVersion = v,
+                Entries = [],
+                ByteEdits =
+                [
+                    new ByteEdit(0x2D3158, 0xA3, 0xFF), new ByteEdit(0x2D3159, 0x0F, 0x0C),
+                    new ByteEdit(0x330708, 0xA3, 0xFF), new ByteEdit(0x330709, 0x0F, 0x0C),
+                    new ByteEdit(0x3307C4, 0xA3, 0xFF), new ByteEdit(0x3307C5, 0x0F, 0x0C),
+                    new ByteEdit(0x330F48, 0xA3, 0xFF), new ByteEdit(0x330F49, 0x0F, 0x0C),
+                    new ByteEdit(0x3317C0, 0xA3, 0xFF), new ByteEdit(0x3317C1, 0x0F, 0x0C),
+                    new ByteEdit(0x3318B8, 0xA3, 0xFF), new ByteEdit(0x3318B9, 0x0F, 0x0C),
+                    new ByteEdit(0x331990, 0xA3, 0xFF), new ByteEdit(0x331991, 0x0F, 0x0C),
+                    new ByteEdit(0x331A40, 0xA3, 0xFF), new ByteEdit(0x331A41, 0x0F, 0x0C),
+                    new ByteEdit(0x331AC4, 0xA3, 0xFF), new ByteEdit(0x331AC5, 0x0F, 0x0C),
+                ],
+                Caveats =
+                [
+                    "Not community-documented - found this session via a live two-data-point gameplay "
+                    + "test (trainer indices 653 and 654 both fell back to the exact same trainer, "
+                    + "ruling out a modulo/wraparound and confirming a deliberate clamp) followed by a "
+                    + "targeted disassembly for the exact compare-then-clamp-to-1 shape.",
+                    "9 sites in code.bin, all the same shared, likely-templated \"safe array access, "
+                    + "default to element 1\" helper - also used elsewhere in this binary for several "
+                    + "small, unrelated bounds (0/1/2/3/5/11/13); only these 9 specific offsets are "
+                    + "touched.",
+                    "US only - UM offsets were not found/verified this session.",
+                    "Confirmed live in-game: a trdata entry at index 653 and a second one at 654 both "
+                    + "resolved correctly (name, class, team) after this patch, instead of showing as "
+                    + "trdata[1].",
+                ],
+            };
+
+            yield return new Recipe
+            {
+                Name = "Raise the move-ID ceiling further",
+                Summary = "Widens the move-ID bounds checks past whatever this build already allows "
+                        + "(retail 728, or the Expansion Pack's own already-applied 920) up to 65280.",
+                Kind = CustomMechanicKind.Move,
+                EffectKind = RecipeEffectKind.ByteEdit,
+                Target = ResearchTarget.CodeBin,
+                ForVersion = v,
+                Entries = [],
+                ByteEdits =
+                [
+                    new ByteEdit(0x226680, 0xE6, 0xFF), new ByteEdit(0x226681, 0x0F, 0x0C),
+                    new ByteEdit(0x2267D4, 0xE6, 0xFF), new ByteEdit(0x2267D5, 0x0F, 0x0C),
+                    new ByteEdit(0x226B04, 0xE6, 0xFF), new ByteEdit(0x226B05, 0x0F, 0x0C),
+                    new ByteEdit(0x2D2C28, 0xE6, 0xFF), new ByteEdit(0x2D2C29, 0x0F, 0x0C),
+                ],
+                Caveats =
+                [
+                    "Builds on the community's own documented \"MOVE LIMITS\" code_map.csv rows "
+                    + "(the move flag lookup, the move parameter lookup, move-record loading, and move "
+                    + "name text) - this recipe only widens further, from whichever of retail (728) or "
+                    + "the Expansion Pack's already-applied 920 this build currently has.",
+                    "US only - the UM name-text offset (0x2D2C2C, 4 bytes later than the US one, per "
+                    + "the community map) was not independently re-verified this session.",
+                ],
+            };
+
+            yield return new Recipe
+            {
+                Name = "Raise the ability-name ceiling further",
+                Summary = "Widens the ability name-text bounds check past whatever this build already "
+                        + "allows (retail 234, or the Expansion Pack's own already-applied 320) up to 65280.",
+                Kind = CustomMechanicKind.Ability,
+                EffectKind = RecipeEffectKind.ByteEdit,
+                Target = ResearchTarget.CodeBin,
+                ForVersion = v,
+                Entries = [],
+                ByteEdits = [new ByteEdit(0x2D30BC, 0x05, 0xFF), new ByteEdit(0x2D30BD, 0x0D, 0x0C)],
+                Caveats =
+                [
+                    "Builds on the community's own documented \"ABILITY LIMITS\" code_map.csv row - "
+                    + "this only widens the name-text ceiling further, from whichever of retail (234) or "
+                    + "the Expansion Pack's already-applied 320 this build currently has.",
+                    "Ability IDs themselves can only reach 511 even with the separate \"NINTH ABILITY "
+                    + "BIT\" patches applied (one extra bit reserves exactly that much room) - a name "
+                    + "slot raised past 511 would never actually be reachable by a real ability id, so "
+                    + "there is a real, lower practical ceiling here than the other three recipes.",
+                    "US only - the UM offset (0x2D30C0) was not independently re-verified this session.",
+                ],
+            };
+
+            yield return new Recipe
+            {
+                Name = "Raise the item-ID ceiling further",
+                Summary = "Widens the item-ID bounds checks past whatever this build already allows "
+                        + "(retail 960, or the Expansion Pack's own already-applied 1024) up to 65280.",
+                Kind = CustomMechanicKind.Item,
+                EffectKind = RecipeEffectKind.ByteEdit,
+                Target = ResearchTarget.CodeBin,
+                ForVersion = v,
+                Entries = [],
+                ByteEdits =
+                [
+                    new ByteEdit(0x276B90, 0x01, 0xFF), new ByteEdit(0x276B91, 0x0B, 0x0C),
+                    new ByteEdit(0x2D2B60, 0x01, 0xFF), new ByteEdit(0x2D2B61, 0x0B, 0x0C),
+                    new ByteEdit(0x34B428, 0x0F, 0xFF), new ByteEdit(0x34B429, 0x0D, 0x0C),
+                    new ByteEdit(0x3BABFC, 0x01, 0xFF), new ByteEdit(0x3BABFD, 0x0B, 0x0C),
+                ],
+                Caveats =
+                [
+                    "Builds on ItemCeilingPatcher's own already-established documented sites (item "
+                    + "records, item name text, field held items) plus one further site this session "
+                    + "found still sitting at the plain retail ceiling (960) in the reference ROM even "
+                    + "though the other three had already been raised to 1024 - the Expansion Pack's "
+                    + "own item-limit patch is not applied uniformly at every site in every build.",
+                    "One further documented site (a second item-name/field-item pair) exists in code.bin "
+                    + "and is deliberately left untouched here because it sits inside the Expansion "
+                    + "Pack's own added code, where the same comparison selects behaviour rather than "
+                    + "rejecting an out-of-range id - widening it would not raise any real ceiling.",
+                    "US only - UM equivalents were not independently re-verified this session.",
+                ],
+            };
+        }
     }
 
     /// <summary>
@@ -841,8 +1030,13 @@ public static class Recipes
         yield return Path.Combine(baseDir, "other-ips");
         yield return Path.Combine(baseDir, "Resources", "other-ips");
 
-        var up = Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent;
-        if (up != null) yield return Path.Combine(up.FullName, "other-ips");
+        var curr = new DirectoryInfo(baseDir);
+        while (curr != null)
+        {
+            string candidate = Path.Combine(curr.FullName, "other-ips");
+            if (Directory.Exists(candidate)) yield return candidate;
+            curr = curr.Parent;
+        }
     }
 
     /// <summary>Folders searched for packages, nearest first.</summary>
@@ -852,9 +1046,13 @@ public static class Recipes
         yield return Path.Combine(baseDir, "patch-packages");
         yield return Path.Combine(baseDir, "Resources", "patch-packages");
 
-        // One level out of bin\Debug\net8.0-windows, for a working copy.
-        var up = Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent;
-        if (up != null) yield return Path.Combine(up.FullName, "patch-packages");
+        var curr = new DirectoryInfo(baseDir);
+        while (curr != null)
+        {
+            string candidate = Path.Combine(curr.FullName, "patch-packages");
+            if (Directory.Exists(candidate)) yield return candidate;
+            curr = curr.Parent;
+        }
     }
 
     public static List<PatchPackage> LoadPackages(out string? loadedFrom)
@@ -886,7 +1084,19 @@ public static class Recipes
         // A package names its own ids through parameters, so the recipe's id boxes describe those
         // rather than a block of consecutive slots.
         var entries = (p.ItemNames ?? [])
-            .Select(kv => new RecipeEntry { Name = kv.Value, Description = p.Description })
+            .Select(kv => new RecipeEntry
+            {
+                Name = kv.Value,
+                Description = (p.ItemDescriptions != null && p.ItemDescriptions.TryGetValue(kv.Key, out string? d) && !string.IsNullOrWhiteSpace(d))
+                    ? ItemTextUtil.FormatDescription(d)
+                    : ItemTextUtil.FormatDescription(p.Description),
+                Plural = (p.ItemNamesPlural != null && p.ItemNamesPlural.TryGetValue(kv.Key, out string? pl) && !string.IsNullOrWhiteSpace(pl))
+                    ? pl
+                    : ItemTextUtil.Pluralize(kv.Value),
+                PluralAlt = (p.ItemNamesPluralAlt != null && p.ItemNamesPluralAlt.TryGetValue(kv.Key, out string? pa) && !string.IsNullOrWhiteSpace(pa))
+                    ? pa
+                    : ItemTextUtil.PluralAlt(kv.Value),
+            })
             .ToList();
 
         ResearchTarget target = ResearchTarget.BattleCro;

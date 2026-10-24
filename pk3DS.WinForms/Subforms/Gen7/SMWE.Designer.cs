@@ -967,17 +967,7 @@ partial class SMWE
             0,
             0,
             0});
-        // 
-        // B_LevelPlus
-        // 
-        this.B_LevelPlus.Location = new System.Drawing.Point(204, 20);
-        this.B_LevelPlus.Name = "B_LevelPlus";
-        this.B_LevelPlus.Size = new System.Drawing.Size(70, 23);
-        this.B_LevelPlus.TabIndex = 277;
-        this.B_LevelPlus.Text = "x Current";
-        this.B_LevelPlus.UseVisualStyleBackColor = true;
-        this.B_LevelPlus.Click += new System.EventHandler(this.ModifyAllLevelRanges);
-        // 
+        //
         // L_RandOpt
         // 
         this.L_RandOpt.AutoSize = false;
