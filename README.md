@@ -6,11 +6,6 @@
 <h1 align="center">pk3DS (But Extremely Catered Towards USUM)</h1>
 <h2 align="center">(Yes, it works with the Expansion Mod!).</h2>
 
-<p align="center">
-  <img src="screenshots/personal-stats.png" alt="The Personal Stats editor in the Dark theme" width="700"/>
-</p>
-<!-- markdownlint-enable MD033 -->
-
 **pk3DS (But Extremely Catered Towards USUM)** is a customized fork of pk3DS designed to give Ultra Sun & Ultra Moon ROM hackers and randomizer fans the best possible experience they can have. It includes all the features from the base pk3DS, but adds many new features and improvements specifically for USUM.
 
 ---
