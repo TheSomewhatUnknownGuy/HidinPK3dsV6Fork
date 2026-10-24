@@ -30,7 +30,6 @@ public class LearnsetRandomizer : IRandomizer
     public int SpreadTo = 75;
     public bool STABFirst = true;
     public bool Learn4Level1 = false;
-    /// <summary>How many leading moves <see cref="Learn4Level1"/> puts at level 1.</summary>
     public int Level1Count = 4;
     public bool OrderByPower = true;
 

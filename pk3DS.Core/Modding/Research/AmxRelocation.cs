@@ -4,38 +4,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Inserts new words into a decoded AMX instruction stream and fixes up every jump/call/switch
-/// delta so it still points at the same logical destination afterward - the mechanical part of
-/// "add a new instruction sequence to an existing script" that has nothing to do with gifts
-/// specifically, kept separate so any future AMX-editing feature that needs to insert code (not
-/// just edit an existing argument in place, which <see cref="ScriptEditing.SetArgValue"/> already
-/// covers) can reuse it.
-/// <para>
-/// Every jump/call-shaped instruction in this dialect stores its target as a byte delta relative to
-/// one specific word's own position - confirmed directly from <see cref="Scripts.ParseScript"/>'s
-/// source for both shapes that exist: a plain single-target instruction (CallFunc, Jump, BEQ, BNE,
-/// JumpEQ/NEQ/SGeq/SGrtr/SLeq/SLess, and the single-target `Switch`/0x81) stores its delta relative
-/// to its OWN opcode word (`newOfs = (line*4) + delta` in <see cref="Scripts"/>, where `line` is the
-/// opcode word's index); the multi-case `switch`/0x82 stores each case's delta relative to that
-/// CASE'S OWN jmp word instead (`toOffset = ((i-2)*4) + jmp`, confirmed from the same source) - a
-/// real, meaningful difference this class accounts for explicitly rather than assuming one
-/// convention everywhere.
-/// </para>
-/// <para>
-/// Inserting N words at some position shifts everything at or after that position by N words - a
-/// delta only needs adjusting when its own word and its target land on DIFFERENT sides of the
-/// insertion point (both shifting equally leaves their difference, the delta, unchanged); this is
-/// computed directly from each word's absolute position, not inferred from "before/after" as a
-/// separate case, so it's correct regardless of direction.
-/// </para>
-/// </summary>
 public static class AmxRelocation
 {
-    /// <summary>One delta-bearing word: its own word index (what the delta is relative to) and the word index actually holding the raw delta value (the same word for every shape in this dialect, but kept distinct in case that ever changes).</summary>
     public readonly record struct DeltaRef(int SelfWordIndex, int DeltaWordIndex);
 
-    /// <summary>Every delta-bearing word found in <paramref name="decoded"/>, covering both the simple single-target shapes and the multi-case `switch`.</summary>
     public static List<DeltaRef> FindDeltaRefs(List<DecodedInstruction> decoded)
     {
         var refs = new List<DeltaRef>();
@@ -85,18 +57,6 @@ public static class AmxRelocation
         return refs;
     }
 
-    /// <summary>
-    /// Returns a new instruction array with <paramref name="wordsToInsert"/> spliced in at
-    /// <paramref name="insertionWordIndex"/>, with every delta found by <see cref="FindDeltaRefs"/>
-    /// against the ORIGINAL <paramref name="cmd"/>/<paramref name="decoded"/> adjusted to still point
-    /// at the same logical word it did before. <paramref name="extraDeltaRefs"/> covers delta words
-    /// that live INSIDE the newly inserted block itself (e.g. a cloned CallFunc's own delta, which
-    /// needs recomputing for its new position even though it didn't exist in the original array to
-    /// be found by <see cref="FindDeltaRefs"/>) - each extra ref's <c>DeltaWordIndex</c>/`SelfWordIndex`
-    /// are given as ALREADY-POST-INSERTION word indices, and its ORIGINAL (pre-insertion) target word
-    /// index is supplied via <paramref name="extraOriginalTargets"/> (same order), so the same
-    /// shifting rule can be applied to it too.
-    /// </summary>
     public static uint[] InsertWords(
         uint[] cmd,
         List<DecodedInstruction> decoded,

@@ -6,20 +6,12 @@ using System.Text.RegularExpressions;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Which column of the research corpus applies to the ROM in front of you.
-/// </summary>
 public static class ResearchVersion
 {
-    /// <summary>Version strings the corpus is written against.</summary>
     public static readonly string[] Known = ["UM", "US", "SM"];
 
-    /// <summary>Set from the UI to override the inferred value. Null means infer.</summary>
     public static string? Override { get; set; }
 
-    /// <summary>
-    /// Best guess at the corpus version for a loaded game, honouring <see cref="Override"/>.
-    /// </summary>
     public static string Resolve(GameConfig? cfg, string? romfsPath = null)
     {
         if (!string.IsNullOrWhiteSpace(Override)) return Override!;
@@ -47,23 +39,14 @@ public static class ResearchVersion
         return "UM";
     }
 
-    /// <summary>
-    /// Whether the version was inferred rather than chosen, so the UI can say so instead of
-    /// presenting a guess as a fact.
-    /// </summary>
     public static bool IsInferred => string.IsNullOrWhiteSpace(Override);
 
-    /// <summary>Cache file for one version, so two games never share a parsed corpus.</summary>
     public static string CachePathFor(string version) =>
         ResearchDatabase.CacheFile($"research_cache_{version}.json");
 
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// "us"/"um" as a whole token ("_um", "\UM\", "rom-us"), never inside a word: a plain substring
-    /// test for "\us" matched every C:\Users path and sent Ultra Moon ROMs the Ultra Sun patches.
-    /// </summary>
     internal static bool HasToken(string haystack, string token) =>
         Regex.IsMatch(haystack, $"(?<![a-z0-9]){token}(?![a-z0-9])", RegexOptions.IgnoreCase);
 }

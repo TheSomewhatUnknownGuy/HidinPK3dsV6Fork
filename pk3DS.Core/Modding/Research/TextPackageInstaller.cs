@@ -4,14 +4,11 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Writes a TextPackage into its language's game/story text archives through TextFile, all or nothing.</summary>
 public static class TextPackageInstaller
 {
-    /// <summary>Relative to the pk3DS folder; copied there by pk3DS.WinForms.csproj.</summary>
     public const string UhuruEnglishPath = "text-packages/UhuruEnglish.json";
     private const int Korean = 7;
 
-    /// <summary>Lines in one text file of one language, or -1 when the archive or file cannot be read.</summary>
     public static int LineCount(GameConfig config, string garcName, int language, int file)
     {
         int was = config.Language;

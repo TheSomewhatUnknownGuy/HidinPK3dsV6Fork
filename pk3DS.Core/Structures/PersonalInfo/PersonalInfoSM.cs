@@ -93,11 +93,6 @@ public class PersonalInfoSM : PersonalInfoXY
 
     private static readonly int[] PassiveLow = [0x35, 0x36, 0x37];
 
-    /// <summary>
-    /// Rom Nueva + passive ability ids (0 = none): low bytes at 0x35-0x37 (which are also TM bits 104-127), bit 8 of each in 0x52 bits 4-6
-    /// (which ExpandedAbilities would use for ability bit 9; <c>PassiveGuard</c> keeps the two apart).
-    /// <see cref="Write"/> keeps a changed value only while <c>PassiveGuard.Enabled</c>; with it off the TM bits own those bytes.
-    /// </summary>
     public int[] Passives
     {
         get => pk3DS.Core.Modding.PassiveGuard.Unpack(Data, PassiveLow, 0x52, 4);

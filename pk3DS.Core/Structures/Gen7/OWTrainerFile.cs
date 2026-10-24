@@ -71,11 +71,6 @@ namespace pk3DS.Core.Structures
             return newData;
         }
 
-        /// <summary>
-        /// Appends a brand-new placement entry to the given area, allocating dedicated sub-data
-        /// (motion, talk collision, physical collision, and signal bounding boxes) and correctly
-        /// shifting area-relative offsets for existing entries in the modified area.
-        /// </summary>
         public byte[] AppendEntry(int areaIndex, OWTrainerEntry newEntry)
         {
             if (areaIndex < 0 || areaIndex >= AreaCount)

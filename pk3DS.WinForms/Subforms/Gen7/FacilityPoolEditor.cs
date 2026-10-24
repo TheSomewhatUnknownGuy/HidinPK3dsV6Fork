@@ -9,17 +9,6 @@ using pk3DS.Core.Modding;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Editor for Uhuru's trainer pools (Boss Rush, Labyrinth, PWT) inside `amxscript` (a/0/9/2), scripts 26 and 217.
-/// Built on <see cref="FacilityPools"/>, so every edit goes through its guards: trainer ids 1..652, flags 1..4095,
-/// fixed pool sizes, and copies (mirrors) that refuse writes. A refused edit shows the exception message and changes nothing.
-/// <para>
-/// Nothing is written until Save, and Save writes only the scripts whose bytes actually differ, so opening and
-/// closing the form (or editing a cell back to its old value) leaves the archive untouched. Saving goes through the
-/// same GARC path as <see cref="AMXScriptEditor"/>. a/0/9/2 is not code.bin or a CRO, so BinaryWriteGuard and
-/// UhuruGuard.RefusalFor do not apply; the Uhuru check is in Main (Config.Info.TrainerBaseCount).
-/// </para>
-/// </summary>
 public sealed class FacilityPoolEditor : Form
 {
     private readonly GARCFile amxGarc;
@@ -132,7 +121,6 @@ public sealed class FacilityPoolEditor : Form
         L_Info.Text = Describe(d);
     }
 
-    /// <summary>Writes the pool's current values into the existing rows. Needed after an edit because aliases and copies change with their source.</summary>
     private void RefreshValues()
     {
         var d = Current;
@@ -202,7 +190,6 @@ public sealed class FacilityPoolEditor : Form
         if (error != null) BeginInvoke(() => WinFormsUtil.Error("Edit refused.", error));
     }
 
-    /// <summary>True when any script's bytes differ from the archive. Editing a cell back to its old value is not a change.</summary>
     private bool HasChanges() => pools.Any(kv => !kv.Value.ToBytes().AsSpan().SequenceEqual(amxGarc.Files[kv.Key]));
 
     private void B_Save_Click(object sender, EventArgs e)

@@ -4,58 +4,15 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Reads code.bin's OWN icon-lookup ARM routine's data tables directly, instead of guessing a
-/// species/form -> icon-member mapping from filenames or ordinal position. Built after
-/// <see cref="PartyIconCatalog"/>'s filename-derived, best-effort form ordering turned out wrong for
-/// ~12% of stock species when cross-checked against this (Pikachu's costume forms came back in a
-/// completely different order than the catalog's own member-index order suggested, for one) - the
-/// user's "Gen 6/7 forms across the board... messed up" report was this exact class of bug.
-/// <para>
-/// The routine itself lives at code_map.csv's "POKEMON ICONS" section, offset 0x20C88C-0x20C957 (204
-/// bytes, disassembled and traced this session): it takes (species, form, ...) and does, in order:
-/// </para>
-/// <para>
-/// 1. A small early-exit guard for a couple of sentinel species ids near 1026/1027 (unrelated to
-/// normal lookups, not modeled here). 2. A linear scan of a "compact added form icon" table - packed
-/// 16-bit keys (species in the low 11 bits, form in the high 5 bits), each match returning a
-/// SEQUENTIAL member starting at 1372 (the first of the 136 slots the one-time icon-cap raise,
-/// workstream 1f, reserved) - this is what actually backs Gen 8/9 species' alt forms (e.g.
-/// Dudunsparce's second segment, at real entry (982, form 1) -&gt; member 1498) AND extra alt forms
-/// for a handful of stock species whose own per-species array (below) doesn't have room (Pikachu's
-/// 9th costume form, entry (25, form 8) -&gt; member 1372). 3. If species &lt; 808 and not found
-/// above: a direct, 16-byte-per-species table (one record per species 0-807) - <see cref="RecordCount"/>
-/// real alt forms (0 for a species with none at all, in which case its base icon comes straight from
-/// the record's own field-0/field-2 fallback slots instead of a sub-array) plus a pointer to a
-/// per-form u16 member array, AUTHORITATIVE for every stock species' every real form - this is the
-/// data <see cref="PartyIconCatalog"/> was approximating. 4. If species &gt;= 808 and form == 0: the
-/// already-independently-verified 1154+(id-808) formula (<see cref="SpeciesIconLayout.ExpansionRegionMember"/>).
-/// </para>
-/// <para>
-/// Verified against real ROM data: Venusaur/Charizard/Rattata/Raticate/Pikachu's stock-table entries
-/// all read back exactly right (Mega Venusaur=member 4, Mega Charizard X/Y=8/9 in that order,
-/// Alolan Rattata=member 25 vs its own Kantonian form=26, Pikachu's 8 costume forms in their real,
-/// non-sequential member order); the compact table's 136 entries all decode to real, sensible
-/// (species, form) pairs matching this ROM's actual Gen 8/9 alt-form species (Cramorant, Toxtricity,
-/// Zacian, Calyrex, Dudunsparce, Tatsugiri, ...).
-/// </para>
-/// </summary>
 public sealed class SpeciesIconTable
 {
     public bool Success { get; private init; }
     public string Error { get; private init; } = "";
 
-    /// <summary>First icon member the compact table assigns (to its entry 0) - derived from the ARM's own `mov r8,#0x480 / add r8,r8,#1 / add r7,r8,#0xdb` (1153 + 219 = 1372), confirmed against the real, byte-verified routine.</summary>
     public const int CompactTableFirstMember = 1372;
 
-    /// <summary>Number of compact-table entries; members [1372, 1372+CompactCount) belong to them.</summary>
     public int CompactCount => _compact?.Count ?? 0;
 
-    /// <summary>
-    /// The (species, form) whose icon the game draws from <paramref name="member"/> via the compact
-    /// table, or null. 1154+(id-808) reaches 1372 at id 1026, so every species inserted past Gen 9
-    /// lands on one of these; writing there repaints an existing Pokemon's icon.
-    /// </summary>
     public (int Species, int Form)? CompactOwnerOf(int member)
     {
         if (_compact == null) return null;
@@ -68,7 +25,6 @@ public sealed class SpeciesIconTable
     private readonly int _stockTableOffset;
     private readonly Dictionary<(int species, int form), int> _compact;
 
-    /// <summary>Whether the routine carries IconEggSentinelPatcher's past-1025 remap.</summary>
     public bool Remapped { get; private init; }
 
     private SpeciesIconTable(byte[] codeBin, int stockTableOffset, Dictionary<(int species, int form), int> compact, bool success, string error)
@@ -169,12 +125,6 @@ public sealed class SpeciesIconTable
         return BitConverter.ToUInt16(_codeBin, subOffset);
     }
 
-    /// <summary>
-    /// The real icon member for (speciesId, form) - form 0 is a species' own base/default
-    /// appearance, form N (N&gt;=1) its Nth alt form in the SAME order the personal table's own
-    /// FormeCount/form data already uses elsewhere in this codebase. Returns null when this ROM
-    /// genuinely has no icon for that exact (species, form) pair (not every alt form has one).
-    /// </summary>
     public int? ResolveMember(int speciesId, int form)
     {
         if (!Success) return null;

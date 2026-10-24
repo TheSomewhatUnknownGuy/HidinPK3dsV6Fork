@@ -20,9 +20,6 @@ public abstract class BXLIM : IXLIMHeader
     public string Extension { get; set; }
     public int BaseSize => Math.Max(XLIMUtil.NextLargestPow2(Width), XLIMUtil.NextLargestPow2(Height));
 
-    /// <summary>
-    /// ARGB 32bpp
-    /// </summary>
     public byte[] GetImageData(bool crop = true)
     {
         var orienter = new XLIMOrienter(Footer.Width, Footer.Height, Footer.Orientation);

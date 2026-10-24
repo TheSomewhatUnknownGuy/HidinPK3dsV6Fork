@@ -583,9 +583,6 @@ public class RomFS
         return count;
     }
 
-    /// <summary>
-    /// Editor and tooling leftovers that must never be packed into a RomFS.
-    /// </summary>
     private static readonly string[] ExcludedNames =
         [".git", ".vs", ".svn", ".hg", ".idea", ".ds_store", "__macosx", "scratch"];
 

@@ -37,22 +37,12 @@ public partial class ErrorWindow : Form
         WinFormsUtil.TranslateInterface(this, lang);
     }
 
-    /// <summary>
-    /// Gets or sets whether or not the "Continue" button is visible.
-    /// </summary>
-    /// <remarks>For UI exceptions, continuing could be safe.
-    /// For application exceptions, continuing is not possible, so the button should not be shown.</remarks>
     public bool ShowContinue
     {
         get => B_Continue.Visible;
         set => B_Continue.Visible = value;
     }
 
-    /// <summary>
-    /// Friendly, context-specific method shown to the user.
-    /// </summary>
-    /// <remarks>This property is intended to be a user-friendly context-specific message about what went wrong.
-    /// For example: "An error occurred while attempting to automatically load the save file."</remarks>
     public string Message
     {
         get => L_Message.Text;
@@ -103,15 +93,6 @@ public partial class ErrorWindow : Form
         T_ExceptionDetails.Text = details.ToString();
     }
 
-    /// <summary>
-    /// Removes local paths from anything shown or copied out of this dialog.
-    /// <para>
-    /// A report is meant to be pasted into an issue or a chat, and three things in it leak where the
-    /// user keeps their files: the stack trace carries the source paths the build was compiled with,
-    /// every loaded assembly reports its full location, and the message may hold a ROM path. The
-    /// file name and line number are what make a report useful, and both survive this.
-    /// </para>
-    /// </summary>
     internal static string Redact(string text)
     {
         if (string.IsNullOrEmpty(text)) return text;

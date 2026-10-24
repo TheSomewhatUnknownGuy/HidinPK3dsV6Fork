@@ -7,9 +7,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Picks a starting shape for a custom function and fills in the parts that vary.
-/// </summary>
 public sealed class FunctionTemplatePicker : Form
 {
     private readonly ListBox LB_Templates;
@@ -19,15 +16,12 @@ public sealed class FunctionTemplatePicker : Form
     private readonly TextBox TB_Name;
     private readonly Dictionary<string, TextBox> paramBoxes = [];
 
-    /// <summary>Symbols for the loaded ROM, so the preview can show real addresses. May be null.</summary>
     private readonly ArmSymbolTable symbols;
 
-    /// <summary>The resolved ROM, so the timing can be read from the element the shape copies.</summary>
     private readonly BattleMechanicMap map;
 
     private readonly ComboBox CB_Timing;
 
-    /// <summary>The definition built from the chosen template, or null if cancelled.</summary>
     public CustomFunctionDefinition Result { get; private set; }
 
     public FunctionTemplatePicker(ArmSymbolTable symbols = null, BattleMechanicMap map = null)
@@ -228,7 +222,6 @@ public sealed class FunctionTemplatePicker : Form
         UpdatePreview();
     }
 
-    /// <summary>Offers the timings the ROM says are plausible, selecting one when it is unambiguous.</summary>
     private void FillTimingBox(TimingSuggestion s)
     {
         CB_Timing.BeginUpdate();
@@ -242,7 +235,6 @@ public sealed class FunctionTemplatePicker : Form
         CB_Timing.EndUpdate();
     }
 
-    /// <summary>Reads the timing box, accepting `0x47` or a bare `47`, both hexadecimal.</summary>
     private bool TryReadTiming(out byte timing)
     {
         timing = 0;
@@ -251,10 +243,6 @@ public sealed class FunctionTemplatePicker : Form
         return byte.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out timing);
     }
 
-    /// <summary>
-    /// Renders the routine the current settings would produce, with addresses filled in when a ROM
-    /// is loaded.
-    /// </summary>
     private void UpdatePreview()
     {
         if (LB_Templates.SelectedItem is not FunctionTemplate t) { TB_Preview.Clear(); return; }
@@ -293,6 +281,5 @@ public sealed class FunctionTemplatePicker : Form
 
 internal static class TemplateDisplayExtensions
 {
-    /// <summary>The template's mechanic kind, for display.</summary>
     public static string Mechanic(this FunctionTemplate t) => t.Kind.ToString();
 }

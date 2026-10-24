@@ -184,11 +184,6 @@ namespace pk3DS.Core.Modding
             return val;
         }
 
-        /// <summary>
-        /// Extracts patch entries (offset, bytes) from sheet rows.
-        /// Dynamically assembles ARM instructions using Keystone if raw Hex is missing or empty.
-        /// Supports configurable custom Item ID override.
-        /// </summary>
         public static List<(uint Offset, byte[] Bytes)> ExtractPatchEntries(List<Dictionary<string, string>> rows, string target = "Battle.cro", string version = "US", uint overrideItemId = 0)
         {
             var entries = new List<(uint Offset, byte[] Bytes)>();

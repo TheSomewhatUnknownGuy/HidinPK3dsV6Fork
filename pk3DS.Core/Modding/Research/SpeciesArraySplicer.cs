@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Result of splicing new species entries into a per-species GARC file array.</summary>
 public sealed class SpliceResult
 {
     public byte[][] Files { get; set; } = [];
@@ -17,37 +16,8 @@ public sealed class SpliceResult
         (Notes.Count == 0 ? "" : "\n" + string.Join("\n", Notes));
 }
 
-/// <summary>
-/// The shared "insert new base species before the alt-form block, then shift the block and fix up
-/// every pointer into it" operation the user's spec calls for identically across `personal` (a017),
-/// `evolution`, `levelup`, and `megaevo` - insert new species entries at the *same* index in each of
-/// those GARCs, matching how their own data is already laid out (real dex species 0..N, then every
-/// alt form appended after, referenced by a per-species pointer/index field rather than living
-/// inline next to its base species).
-/// <para>
-/// This only does the generic array-splice-and-reindex mechanics; each GARC's own per-record
-/// format (which byte offset holds the alt-form pointer field, if it has one at all - `evolution`
-/// and `levelup` may not reference the alt-form block by index the same way `personal` does, and
-/// should be called with <paramref name="crossRefByteOffset"/> null if so) is the caller's concern.
-/// </para>
-/// </summary>
 public static class SpeciesArraySplicer
 {
-    /// <summary>
-    /// Inserts <paramref name="count"/> new entries at index <paramref name="insertAt"/> (normally
-    /// the current alt-form block's start - i.e. right after the last real base species), pushing
-    /// every entry at or after that index out by <paramref name="count"/> slots. New entries are
-    /// either a caller-supplied template (cloned once per new slot) or a same-length all-zero
-    /// placeholder when no template is given.
-    /// <para>
-    /// If <paramref name="crossRefByteOffset"/> is given, every one of the *original* entries
-    /// before <paramref name="insertAt"/> has the little-endian integer at that offset read; any
-    /// value that already pointed at or past <paramref name="altFormBlockStart"/> (i.e. into the
-    /// alt-form block being pushed out) is increased by <paramref name="count"/> so it still points
-    /// at the same logical alt-form record after the shift. <paramref name="crossRefSize"/> selects
-    /// a 1/2/4-byte field.
-    /// </para>
-    /// </summary>
     public static SpliceResult Insert(byte[][] files, int insertAt, int count, byte[] template = null,
         int altFormBlockStart = -1, int? crossRefByteOffset = null, int crossRefSize = 4)
     {

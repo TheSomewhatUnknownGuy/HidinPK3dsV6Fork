@@ -5,21 +5,16 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// Which items are Z-Crystals, so nothing outside a trainer battle can hand one out.
-/// </summary>
 public sealed class ZCrystalFilter
 {
     private readonly HashSet<int> _banned = [];
 
-    /// <summary>Ids that must not be given out. Empty when the item table could not be read.</summary>
     public IReadOnlySet<int> BannedIds => _banned;
 
     public int Count => _banned.Count;
 
     public bool IsZCrystal(int itemId) => _banned.Contains(itemId);
 
-    /// <summary>Whether a name is a Z-Crystal, independent of any loaded ROM.</summary>
     public static bool IsZCrystalName(string? name)
     {
         string n = (name ?? "").Trim();
@@ -36,7 +31,6 @@ public sealed class ZCrystalFilter
                 _banned.Add(i);
     }
 
-    /// <summary>Picks with <paramref name="roll"/> until it returns something allowed.</summary>
     public int PickAllowed(Func<int> roll, int attempts = 64)
     {
         int last = roll();

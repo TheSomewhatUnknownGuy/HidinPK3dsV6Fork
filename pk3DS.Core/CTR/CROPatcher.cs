@@ -7,10 +7,6 @@ namespace pk3DS.Core.CTR
 {
     public static class CROPatcher
     {
-        /// <summary>
-        /// Applies an IPS patch payload to a CRO file (e.g., Battle.cro).
-        /// Handles expansion if required and updates CRO hashes.
-        /// </summary>
         public static byte[] PatchCRO(byte[] originalCro, byte[] ipsPatch, bool isExpansionPack = false)
         {
             if (originalCro == null || ipsPatch == null || ipsPatch.Length < 8)
@@ -34,9 +30,6 @@ namespace pk3DS.Core.CTR
             return cro;
         }
 
-        /// <summary>
-        /// Injects raw hex bytes directly into a CRO file at a specific offset.
-        /// </summary>
         public static byte[] InjectHexPayload(byte[] originalCro, uint offset, byte[] payload)
         {
             if (originalCro == null || payload == null || payload.Length == 0) return originalCro;
@@ -51,18 +44,12 @@ namespace pk3DS.Core.CTR
             return cro;
         }
 
-        /// <summary>
-        /// Assembles an ARM string and injects the resulting bytecode directly into a CRO file.
-        /// </summary>
         public static byte[] InjectAssemblyPayload(byte[] originalCro, uint offset, uint virtualAddress, string assemblyText)
         {
             byte[] payload = ARMCodec.Assemble(assemblyText, virtualAddress);
             return InjectHexPayload(originalCro, offset, payload);
         }
 
-        /// <summary>
-        /// Patches a CRO file on disk and writes the updated binary.
-        /// </summary>
         public static bool PatchFile(string croPath, string ipsPath, string outputPath = null, bool isExpansionPack = false)
         {
             if (!File.Exists(croPath) || !File.Exists(ipsPath))

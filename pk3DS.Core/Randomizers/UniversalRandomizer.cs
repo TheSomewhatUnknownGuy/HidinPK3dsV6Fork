@@ -17,16 +17,8 @@ public class UniversalRandomizer
     private readonly UniversalSettings Settings;
     public string RomFSPath { get; set; }
 
-    /// <summary>
-    /// Abilities the user banned, resolved once against this ROM's ability text.
-    /// </summary>
     private AbilityBanList AbilityBans { get; set; }
 
-    /// <summary>
-    /// Shared code.bin buffer. Loaded once before the first writer, flushed once after the last.
-    /// Every feature that modifies code.bin MUST use this rather than round-tripping from disk,
-    /// otherwise later writers stomp earlier patches and the game white-screens.
-    /// </summary>
     private byte[] _codeBin;
     private string _codeBinPath;
     private bool _codeBinDirty;
@@ -44,7 +36,6 @@ public class UniversalRandomizer
         AbilityBans = new AbilityBanList(config?.GetText(TextName.AbilityNames), settings);
     }
 
-    /// <summary>Loads code.bin into the shared buffer if not already loaded.</summary>
     private bool EnsureCodeBin()
     {
         if (_codeBin != null) return true;
@@ -56,7 +47,6 @@ public class UniversalRandomizer
         return _codeBin != null && _codeBin.Length > 0;
     }
 
-    /// <summary>Synchronizes the shared in-memory buffer to disk without releasing it.</summary>
     private void SyncCodeBinToDisk()
     {
         if (_codeBin != null && _codeBinDirty && !string.IsNullOrEmpty(_codeBinPath) && pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) == null)
@@ -67,7 +57,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>Writes the item data of a TM expansion whose code.bin has just reached disk.</summary>
     private void WritePendingTMItems()
     {
         if (_pendingTMItemIds == null) return;
@@ -84,7 +73,6 @@ public class UniversalRandomizer
         _pendingTMFirstSlot = 0;
     }
 
-    /// <summary>Reloads the shared in-memory buffer from disk (e.g. after an external recipe write).</summary>
     private void ReloadCodeBinFromDisk()
     {
         // Uhuru: no shared buffer, so the code.bin steps after a package install stay skipped (and say so) instead of
@@ -96,7 +84,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>Flushes the shared code.bin buffer to disk if any writer dirtied it.</summary>
     private void FlushCodeBin()
     {
         if (_codeBin != null && _codeBinDirty && !string.IsNullOrEmpty(_codeBinPath) && pk3DS.Core.Modding.UhuruGuard.RefusalFor(_codeBinPath) == null)
@@ -1273,10 +1260,6 @@ public class UniversalRandomizer
         progressCallback?.Invoke("Universal Randomization finished successfully!", 100);
     }
 
-    /// <summary>
-    /// Shuffles Uhuru's PWT pool in amxscript (a/0/9/2, script 217) with the run's seeded RNG.
-    /// Returns a warning when it could not, else null.
-    /// </summary>
     private string ShufflePwtPool()
     {
         try
@@ -1295,9 +1278,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// The three starters the professor offers.
-    /// </summary>
     private int[] RandomizeStarters(SpeciesRandomizer speciesRand)
     {
         const int stride = 0x14;
@@ -1493,12 +1473,8 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>Whether a trainer is on the game's important-trainer list.</summary>
     private static bool IsImportantTrainer(int index) => TrainerTiers.IsImportant(index);
 
-    /// <summary>
-    /// Sets a trainer's battle format, and gives them enough Pokemon to fight it.
-    /// </summary>
     private void ApplyBattleStyle(TrainerData7 trainer)
     {
         if (trainer == null) return;
@@ -1524,9 +1500,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// The species this trainer slot starts from, before duplicate and diversity refinement.
-    /// </summary>
     private int PickTrainerSpecies(SpeciesRandomizer speciesRand, int original, int theme,
                                    bool isLegendarySlot = false, List<int> allowedLegendaries = null)
     {
@@ -1552,9 +1525,6 @@ public class UniversalRandomizer
         };
     }
 
-    /// <summary>
-    /// Re-picks a trainer's slot when it repeats a species, or a type the team already covers.
-    /// </summary>
     private int RefineTrainerPick(SpeciesRandomizer speciesRand, int original, int chosen,
                                   HashSet<int> placed, HashSet<int> teamTypes, bool diverse, int theme = -1,
                                   bool isLegendarySlot = false, List<int> allowedLegendaries = null)
@@ -1607,9 +1577,6 @@ public class UniversalRandomizer
         return chosen;
     }
 
-    /// <summary>
-    /// The three starters, honouring both the pick mode and the type restriction.
-    /// </summary>
     private int[] PickStarterTrio(SpeciesRandomizer speciesRand, int[] currents)
     {
         int Pick(int current) => Settings.StartersMode == 3
@@ -1698,10 +1665,6 @@ public class UniversalRandomizer
         return [PickAny(currents[0]), PickAny(currents[1]), PickAny(currents[2])];
     }
 
-    /// <summary>
-    /// Picks a species that still has two evolutions ahead of it, so the starter grows the way a
-    /// starter should.
-    /// </summary>
     private int PickStarterWithEvolutions(SpeciesRandomizer speciesRand, int current)
     {
         for (int attempt = 0; attempt < 200; attempt++)
@@ -1712,7 +1675,6 @@ public class UniversalRandomizer
         return speciesRand.GetRandomSpecies(current);
     }
 
-    /// <summary>How many stages a species' evolution line has, counting itself. Depth-capped.</summary>
     private int ChainLength(int species)
     {
         int best = 1;
@@ -1742,9 +1704,6 @@ public class UniversalRandomizer
         return best;
     }
 
-    /// <summary>
-    /// The Pokemon offered and asked for by the in-game trades.
-    /// </summary>
     private void RandomizeTrades(SpeciesRandomizer speciesRand)
     {
         const int stride = 0x34;
@@ -1793,9 +1752,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// Items in the ability Pickup's loot table.
-    /// </summary>
     private void RandomizePickup()
     {
         const int columns = 10;
@@ -1860,9 +1816,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// Items that make no sense as Pickup loot, mirroring <see cref="MartRandomizer"/>'s list.
-    /// </summary>
     private static readonly int[] PickupBannedItems =
         [0x1B, 0x4B, 0x4C, 0x4D, 0x12, 0x121, 0x122, 0x123, 0x124];
 
@@ -2113,9 +2066,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// Drops Rare Candy's price and puts it in every ordinary Poké Mart.
-    /// </summary>
     private string ApplyCheapRareCandies()
     {
         try
@@ -2176,12 +2126,6 @@ public class UniversalRandomizer
         }
     }
 
-    /// <summary>
-    /// Installs the story level caps chosen on the Level Caps tab.
-    /// </summary>
-    /// <summary>
-    /// Installs the battle mechanic patches the randomizer offers, and reports each one.
-    /// </summary>
     private List<string> InstallSelectedRecipes()
     {
         var log = new List<string>();
@@ -2332,12 +2276,6 @@ public class UniversalRandomizer
         return log;
     }
 
-    /// <summary>
-    /// Dynamically scales battle EXP yield in code.bin by hooking the loaded species EXP formula.
-    /// </summary>
-    /// <summary>
-    /// Instance overload: applies the EXP multiplier to the shared code.bin buffer.
-    /// </summary>
     private bool ApplyExpMultiplierShared(int multiplier, List<string> log)
     {
         if (multiplier < 1 || multiplier > 255) return false;
@@ -2349,10 +2287,6 @@ public class UniversalRandomizer
         return ApplyExpMultiplier(_codeBin, Config, multiplier, log, markDirty: () => _codeBinDirty = true);
     }
 
-    /// <summary>
-    /// Applies the EXP multiplier patch to a code.bin buffer. Dynamically locates free space
-    /// for the payload rather than hardcoding an address that collides with Level Cap / TM space.
-    /// </summary>
     public static bool ApplyExpMultiplier(GameConfig config, int multiplier, List<string> log)
     {
         if (config == null || multiplier < 1 || multiplier > 255) return false;
@@ -2417,9 +2351,6 @@ public class UniversalRandomizer
         return true;
     }
 
-    /// <summary>
-    /// Rewrites the 18x18 type chart in code.bin, and says what happened.
-    /// </summary>
     private string InstallTypeEffectiveness()
     {
         try
@@ -2650,7 +2581,6 @@ public class UniversalRandomizer
         return tmlist.Concat(newMoves).ToArray();
     }
 
-    /// <summary>Why the last TM step was skipped (TM table not found, expansion refused), or null.</summary>
     public string LastTMError { get; private set; }
 
     // Finds which ability slot (1, 2, or 3=Hidden) holds the given ability ID on this species,

@@ -5,10 +5,8 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One species-count ceiling site found in a code binary.</summary>
 public sealed class SpeciesCeilingSite
 {
-    /// <summary>"word" (a plain data constant) or "range" (the two-stage CMP construct below).</summary>
     public string Kind { get; init; } = "";
     public int Offset { get; init; }
     public uint OldTotal { get; init; }
@@ -16,9 +14,6 @@ public sealed class SpeciesCeilingSite
     public bool Patched { get; set; }
     public string Purpose { get; init; } = "";
 
-    /// <summary>Only set for Kind == "range": where the main-cutoff CMP/SUBcc/tail-CMP triplet sits
-    /// relative to <see cref="Offset"/>, so <see cref="SpeciesCeilingPatcher"/> can rewrite exactly
-    /// those three words without re-scanning.</summary>
     internal int MainCmpRelOffset, SubRelOffset, TailCmpRelOffset;
     internal uint TailWidth;
 
@@ -28,7 +23,6 @@ public sealed class SpeciesCeilingSite
         (string.IsNullOrEmpty(Purpose) ? "" : $"  [{Purpose}]");
 }
 
-/// <summary>Outcome of a species-ceiling raise.</summary>
 public sealed class SpeciesCeilingResult
 {
     public List<SpeciesCeilingSite> Sites { get; } = [];
@@ -49,48 +43,11 @@ public sealed class SpeciesCeilingResult
     }
 }
 
-/// <summary>
-/// Raises the species-count ceiling in a Gen 7 code binary (and, for the model-group count, in
-/// FinderStudioViewer.cro) so species ids above the currently-applied Expansion Pack limit are
-/// accepted.
-/// <para>
-/// This does not scan the binary blind the way <see cref="ItemCeilingPatcher"/> can for the item
-/// ceiling - the species checks use a two-stage "main range + small tail range" construct (the
-/// Expansion Pack's own rewrite of a pre-existing retail idiom that handled the alt-forme id
-/// block), and 1024/2-style small constants are far too common to attribute to species by value
-/// alone. Every site here is instead read from `code_map.csv` via <see cref="ExpansionCodeMap"/>
-/// (the "SPECIES LIMITS" section) - real, already-verified before/after byte pairs, not a guess -
-/// and byte-verified against the live binary before anything is touched.
-/// </para>
-/// <para>
-/// Two site shapes exist in the map:
-/// </para>
-/// <list type="bullet">
-/// <item>Plain 32-bit words (the two name-lookup bounds at 0x21C948/0x21C9CC, and the model-group
-/// count in FinderStudioViewer.cro) - trivial to raise, just overwrite the literal.</item>
-/// <item>A three-instruction range check - `CMP Rn, #mainCutoff` immediately followed (within a
-/// handful of bytes, verified rather than assumed at a fixed distance) by `SUBcc Rd, Rn,
-/// #mainCutoff` and `CMPcc Rd, #tailWidth`, where cc is HS (unsigned higher-or-same) in every
-/// documented site - total valid ids = mainCutoff + tailWidth. Raising the ceiling grows
-/// mainCutoff by the requested amount and leaves tailWidth exactly as found, so the *current*
-/// tail width is read from the live bytes rather than assumed, keeping this correct even if a
-/// future Expansion Pack build changes it.</item>
-/// </list>
-/// <para>
-/// The redundant, already-NOP'd duplicate checks the map also documents (`mov r0, r0` in place of
-/// a second `cmp Rn, #0x328`) are intentionally left alone - they were retired because an earlier
-/// check in the same function already covers them, not because they still gate anything.
-/// </para>
-/// </summary>
 public static class SpeciesCeilingPatcher
 {
     private const string CodeBin = "code.bin";
     private const string FinderStudio = "FinderStudioViewer.cro";
 
-    /// <summary>Finds every species-ceiling site the code map documents, byte-verified against
-    /// <paramref name="code"/> (must already be in the "current"/Expansion Pack state - retail-state
-    /// binaries are out of scope here, matching how this ROM's own build already carries the
-    /// one-time 807-&gt;1026 raise).</summary>
     public static List<SpeciesCeilingSite> Analyze(byte[] code, GameVersion version = GameVersion.Invalid)
     {
         var sites = new List<SpeciesCeilingSite>();
@@ -144,12 +101,6 @@ public static class SpeciesCeilingPatcher
         return sites.OrderBy(s => s.Offset).ToList();
     }
 
-    /// <summary>
-    /// FinderStudioViewer.cro's model-group entry count needs to grow in lockstep with the species
-    /// ceiling, or newly added species have data but Refresh/photo mode won't know their model
-    /// group exists. Kept as its own pass over its own file/array - never conflated with code.bin's
-    /// offsets, which are a different binary and could coincidentally share a numeric offset.
-    /// </summary>
     public static List<SpeciesCeilingSite> AnalyzeFinderStudio(byte[] finderStudioCro, GameVersion version = GameVersion.Invalid)
     {
         var sites = new List<SpeciesCeilingSite>();
@@ -178,14 +129,6 @@ public static class SpeciesCeilingPatcher
 
     private static bool IsMovR0R0(uint w) => w == 0xE1A00000;
 
-    /// <summary>
-    /// Looks for `CMP Rn,#a` (any condition) followed, within the next 3 words, by `SUBcc Rd,Rn,#a`
-    /// (the same immediate, plain SUB - no flags) and then, within the next 3 words after that, by
-    /// `CMPcc Rd,#b`. Every documented site uses HS for both conditional instructions and keeps the
-    /// pair adjacent, but the search stays a little loose (rather than a fixed relative offset) so a
-    /// harmless instruction-order shuffle in a future build doesn't silently stop this from finding
-    /// the real triplet.
-    /// </summary>
     private static bool TryFindRangeCheck(byte[] bytes, out int mainRel, out int subRel, out int tailRel, out uint mainCutoff, out uint tailWidth)
     {
         mainRel = subRel = tailRel = 0; mainCutoff = tailWidth = 0;
@@ -217,9 +160,6 @@ public static class SpeciesCeilingPatcher
         return false;
     }
 
-    /// <summary>Reads `CMP Rn,#imm` for any condition code (bits 27-20 fixed, condition free).
-    /// Bits 19-16 are Rn - a real register field, not part of the fixed opcode, so the mask must
-    /// stop at bit 20 (0x0FF00000), not swallow the register nibble too.</summary>
     private static bool TryReadCmpImm(uint w, out int rn, out uint imm, out int cond)
     {
         rn = 0; imm = 0; cond = (int)(w >> 28);
@@ -229,7 +169,6 @@ public static class SpeciesCeilingPatcher
         return true;
     }
 
-    /// <summary>Reads `SUBcc Rd,Rn,#imm` (S=0, no flags) for any condition code.</summary>
     private static bool TryReadSubImm(uint w, out int rn, out int rd, out uint imm)
     {
         rn = rd = 0; imm = 0;
@@ -240,21 +179,6 @@ public static class SpeciesCeilingPatcher
         return true;
     }
 
-    /// <summary>
-    /// Raises every located site so <paramref name="requiredMaxSpeciesId"/> is valid. Mutates
-    /// <paramref name="code"/> (code.bin) in place. Sites already covering the requested id are
-    /// left untouched.
-    /// <para>
-    /// The "range" and "word" site kinds don't provably share the same total-valid-count formula
-    /// (the range construct's own documented purpose describes "0 through 1025" - 1026 values -
-    /// while the paired word constant is 1027; whether that's a genuine +1 offset for a distinct
-    /// reason, such as the word specifically being the Egg's own pseudo-id one slot further out,
-    /// or something else isn't worth guessing at). Rather than assume a formula, every site is
-    /// shifted by the same delta relative to its own current value - computed once from a "range"
-    /// site as the reference - which preserves whatever relationship already exists between sites
-    /// exactly, without needing to know what that relationship means.
-    /// </para>
-    /// </summary>
     public static SpeciesCeilingResult Raise(byte[] code, int requiredMaxSpeciesId, GameVersion version = GameVersion.Invalid)
     {
         var result = new SpeciesCeilingResult();
@@ -352,12 +276,6 @@ public static class SpeciesCeilingPatcher
         return result;
     }
 
-    /// <summary>
-    /// Sets FinderStudioViewer.cro's model-group entry count to an explicit new total. Unlike the
-    /// species ceiling, this can't be inferred from a target species id - it depends on how many
-    /// model groups the newly inserted species/forms actually add (see the class doc comment) - so
-    /// the caller supplies the real value once it knows it, rather than this method guessing.
-    /// </summary>
     public static SpeciesCeilingResult RaiseFinderStudioModelGroupCount(byte[] finderStudioCro, uint newModelGroupCount, GameVersion version = GameVersion.Invalid)
     {
         var result = new SpeciesCeilingResult { AppliedTotal = newModelGroupCount };

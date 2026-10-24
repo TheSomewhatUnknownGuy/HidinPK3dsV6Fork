@@ -7,92 +7,38 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// A code.bin edit anchored to an exported symbol rather than an address.
-/// <para>
-/// code.bin has no relocation table to walk and no id fingerprints to match, so nothing about it
-/// can be re-derived from its own contents. What it does have is <c>static.crs</c>, which maps
-/// every exported symbol to its address in that build. Anchoring to a symbol plus an offset is
-/// therefore the only form of code.bin edit that survives a rebuild.
-/// </para>
-/// </summary>
 public sealed class CodeBinAnchoredPatch
 {
     public string Name { get; set; } = "";
-    /// <summary>Mangled export the address is measured from.</summary>
     public string Symbol { get; set; } = "";
-    /// <summary>Byte offset from the symbol's address.</summary>
     public int Offset { get; set; }
-    /// <summary>Bytes expected before patching; the run aborts if they differ.</summary>
     public string Original { get; set; } = "";
-    /// <summary>Literal replacement, hex. Ignored when <see cref="BranchTo"/> is set.</summary>
     public string Patched { get; set; }
-    /// <summary>Name of a <see cref="CodeBinBlock"/> to branch to instead of writing literal bytes.</summary>
     public string BranchTo { get; set; }
-    /// <summary>
-    /// Byte offset into <see cref="BranchTo"/>'s block. A hook usually enters partway in — the mint
-    /// dispatcher sits 0xB4 bytes inside the region that also holds the routine it calls, and the
-    /// two have to move together to keep their relative branches intact.
-    /// </summary>
     public int BranchOffset { get; set; }
-    /// <summary>Use BL rather than B.</summary>
     public bool Link { get; set; }
 
-    /// <summary>
-    /// Branches inside <see cref="Patched"/> whose destination must be taken from the build being
-    /// patched rather than baked into the hex.
-    /// <para>
-    /// This exists because the interesting callees are often NOT exported in static.crs, so the
-    /// symbol path cannot resolve them, and their addresses differ between Ultra Sun and Ultra Moon
-    /// (the ability-slot helpers differ by exactly 8). Hardcoding either build's address silently
-    /// corrupts the other. Instead each entry names a vanilla site that already calls the wanted
-    /// function in whichever build is loaded: the installer decodes that site's branch target BEFORE
-    /// writing anything, then re-encodes an equivalent branch at the given offset inside the patch.
-    /// The result is version-correct with no per-version table and no runtime check.
-    /// </para>
-    /// </summary>
     public List<CodeBinRetarget> Retargets { get; set; } = [];
 
     public byte[] OriginalBytes => Convert.FromHexString(Original);
     public byte[] PatchedBytes => string.IsNullOrEmpty(Patched) ? null : Convert.FromHexString(Patched);
 }
 
-/// <summary>One branch inside a patch whose target is copied from the live build.</summary>
 public sealed class CodeBinRetarget
 {
-    /// <summary>Byte offset of the branch within the patch's own bytes.</summary>
     public string At { get; set; } = "0x0";
-    /// <summary>Load address of a vanilla instruction that already branches where we want to go.</summary>
     public string From { get; set; } = "0x0";
 
-    /// <summary>
-    /// Alternative to <see cref="From"/>: resolve an exported symbol, then CONFIRM it by checking that
-    /// <see cref="Verify"/> is the word actually sitting there, searching a small window if it is not.
-    /// <para>
-    /// This is necessary because Ultra Sun and Ultra Moon ship a BYTE-IDENTICAL static.crs (same MD5),
-    /// so the symbol table is really only correct for Ultra Sun. Functions above roughly 0x4A0000 sit
-    /// 8 bytes later on Ultra Moon while the table still reports the Ultra Sun address, and trusting it
-    /// lands mid-instruction. The prologue word is a reliable signature to re-find the real entry.
-    /// </para>
-    /// </summary>
     public string Symbol { get; set; }
-    /// <summary>Expected first word at the symbol, hex, e.g. "E92D4070".</summary>
     public string Verify { get; set; }
-    /// <summary>How far either side of the reported address to look. Default 0x40.</summary>
     public int SearchWindow { get; set; } = 0x40;
 
-    /// <summary>
-    /// Like <see cref="Symbol"/> but for a callee that static.crs does not export at all: the address it
-    /// occupies on Ultra Sun, re-found on this build by the same <see cref="Verify"/> prologue signature.
-    /// </summary>
     public string Addr { get; set; }
-    /// <summary>Added to the resolved address, e.g. 4 to branch past a prologue a trampoline replays.</summary>
     public int Offset { get; set; }
 
     [JsonIgnore]
     public uint AddrValue => string.IsNullOrWhiteSpace(Addr) ? 0u
         : Convert.ToUInt32(Addr.Trim(), Addr.Trim().StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16 : 10);
-    /// <summary>Emit BL rather than B.</summary>
     public bool Link { get; set; } = true;
 
     [JsonIgnore]
@@ -101,42 +47,27 @@ public sealed class CodeBinRetarget
     public uint FromValue => Convert.ToUInt32(From.Trim(), From.Trim().StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16 : 10);
 }
 
-/// <summary>A routine placed in code.bin's free space, rebased on arrival.</summary>
 public sealed class CodeBinBlock
 {
     public string Name { get; set; } = "";
-    /// <summary>Branches inside this block whose destination must be resolved against the live build.</summary>
     public List<CodeBinRetarget> Retargets { get; set; } = [];
     public string Code { get; set; } = "";
-    /// <summary>Address the bytes were assembled for, as "0x005B9AAC".</summary>
     public string SourceBase { get; set; } = "0x0";
-    /// <summary>
-    /// Symbols this block calls. Each is resolved on the target and the matching call re-encoded,
-    /// so a block that calls FlipTokuseiIndex keeps working when that routine moves.
-    /// </summary>
     public List<string> CallsSymbols { get; set; } = [];
 
     public byte[] CodeBytes => Convert.FromHexString(Code);
     public uint SourceBaseValue => Convert.ToUInt32(SourceBase, 16);
 }
 
-/// <summary>The code.bin half of a port.</summary>
 public sealed class CodeBinPort
 {
-    /// <summary>Where code.bin is mapped at run time. 0x00100000 for USUM.</summary>
     public uint LoadBase { get; set; } = 0x00100000;
     public List<CodeBinBlock> Blocks { get; set; } = [];
     public List<CodeBinAnchoredPatch> Patches { get; set; } = [];
 }
 
-/// <summary>Applies a <see cref="CodeBinPort"/> to a target build's code.bin.</summary>
 public static class PortCodeBinInstaller
 {
-    /// <summary>
-    /// Resolves symbols, places blocks in free space, then writes the anchored patches.
-    /// Nothing is written unless every patch's recorded original still matches.
-    /// </summary>
-    /// <param name="keepOut">File ranges earlier installs placed, which must not be handed out again.</param>
     public static PortResult Apply(byte[] codeBin, CodeBinPort port, string romFsPath, Action<string> log = null,
                                    IEnumerable<(uint Start, int Size)> keepOut = null,
                                    int textEnd = ResearchEngine.CodeTextRegionEnd)
@@ -485,12 +416,6 @@ public static class PortCodeBinInstaller
         return result;
     }
 
-    /// <summary>
-    /// Puts back the <see cref="CodeBinAnchoredPatch.Original"/> bytes of every anchored patch, finding
-    /// each site the way <see cref="Apply"/> did (symbol + offset, converted to a file offset, with the
-    /// Ultra Moon drift window). A site is only restored when it still holds what the install wrote:
-    /// the literal patch (retargeted words just have to be branches) or, for a hook, a B/BL.
-    /// </summary>
     public static PortResult Revert(byte[] codeBin, CodeBinPort port, string romFsPath, out int reverted)
     {
         var result = new PortResult();
@@ -536,10 +461,6 @@ public static class PortCodeBinInstaller
         return result;
     }
 
-    /// <summary>
-    /// Whether <paramref name="at"/> holds what installing <paramref name="p"/> wrote: its literal
-    /// bytes (words a Retarget rewrites only have to be branches) or, for a hook, a B/BL of its kind.
-    /// </summary>
     private static bool HoldsInstalled(byte[] buf, long at, CodeBinAnchoredPatch p)
     {
         int len = p.OriginalBytes.Length;
@@ -564,10 +485,6 @@ public static class PortCodeBinInstaller
         return true;
     }
 
-    /// <summary>
-    /// Where <paramref name="p"/> is installed: <paramref name="reported"/> itself or, when
-    /// <paramref name="search"/>, the nearest site within the 0x40 Ultra Moon drift window. -1 if none.
-    /// </summary>
     private static long FindInstalled(byte[] buf, long reported, CodeBinAnchoredPatch p, bool search)
     {
         for (int d = 0; d <= (search ? 0x40 : 0); d += 4)

@@ -6,11 +6,6 @@ using System.Text.RegularExpressions;
 
 namespace pk3DS.Core.CTR
 {
-    /// <summary>
-    /// Pure C# ARM (ARMv5/ARMv6) instruction encoder and decoder.
-    /// Covers the ~25 instruction forms used in USUM CRO modding.
-    /// Eliminates the Keystone/Capstone native DLL dependency.
-    /// </summary>
     public static class ARMCodec
     {
         #region Condition Codes
@@ -68,23 +63,6 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Immediate Encoding
-        /// <summary>
-        /// Encode a 32-bit immediate value into the ARM Imm8r4 format (8-bit value + 4-bit rotation).
-        /// Returns (rotation, imm8) or null if the value cannot be encoded.
-        /// </summary>
-        /// <summary>
-        /// Encode a 32-bit value as the ARM "8-bit immediate rotated right by 2*rot" form, or null
-        /// when the value has no such representation.
-        /// <para>
-        /// The rotate field returned is the one <see cref="DecodeImm8r4"/> consumes, i.e. the value
-        /// is reconstructed as <c>imm8 ROR (2*rot)</c>. Finding the byte requires rotating the
-        /// value in the opposite direction, so the search index has to be negated before it is
-        /// returned; previously it was returned as-is, which made encode/decode disagree — e.g.
-        /// 0x3C0 encoded to (rot 3, 0x0F) but decoded back as 0x3C000000. Values whose lowest set
-        /// bit sits at an odd position (0x420, say) genuinely cannot be encoded, and now correctly
-        /// return null instead of a wrong answer.
-        /// </para>
-        /// </summary>
         public static (uint rot, uint imm8)? EncodeImm8r4(uint value)
         {
             (uint rot, uint imm8)? best = null;
@@ -112,7 +90,6 @@ namespace pk3DS.Core.CTR
             return (val << bits) | (val >> (32 - bits));
         }
 
-        /// <summary>Decode Imm8r4 → 32-bit value.</summary>
         public static uint DecodeImm8r4(uint rot, uint imm8)
         {
             return RotateRight(imm8, (int)(rot * 2));
@@ -130,11 +107,6 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Assembler (string → bytes)
-        /// <summary>
-        /// Assemble one or more ARM instructions. Lines separated by \n or ;.
-        /// Labels (ending with :) are supported for branch targets.
-        /// Returns machine code bytes or null on failure.
-        /// </summary>
         public static byte[] Assemble(string asmText, uint baseAddress = 0)
         {
             if (string.IsNullOrWhiteSpace(asmText)) return null;
@@ -568,9 +540,6 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Disassembler (bytes → string)
-        /// <summary>
-        /// Disassemble a block of ARM machine code into human-readable assembly.
-        /// </summary>
         public static string Disassemble(byte[] code, uint baseAddress = 0)
         {
             var lines = new List<string>();
@@ -583,7 +552,6 @@ namespace pk3DS.Core.CTR
             return string.Join(Environment.NewLine, lines);
         }
 
-        /// <summary>Disassemble a single 32-bit ARM instruction word.</summary>
         public static string DisassembleWord(uint word, uint pc = 0)
         {
             uint cond = word >> 28;
@@ -788,21 +756,12 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Utility
-        /// <summary>
-        /// Generate a B (branch) instruction from one absolute address to another.
-        /// </summary>
         public static byte[] EncodeBranch(uint from, uint to) =>
             BitConverter.GetBytes(0xEA000000 | BranchOffset24(from, to));
 
-        /// <summary>
-        /// Generate a BL (branch-with-link) instruction from one absolute address to another.
-        /// </summary>
         public static byte[] EncodeBranchLink(uint from, uint to) =>
             BitConverter.GetBytes(0xEB000000 | BranchOffset24(from, to));
 
-        /// <summary>
-        /// Generate a conditional branch instruction.
-        /// </summary>
         public static byte[] EncodeConditionalBranch(uint from, uint to, string condition, bool link = false)
         {
             uint cond = CondCodes.TryGetValue(condition, out uint cc) ? cc : 0xE;
@@ -810,11 +769,6 @@ namespace pk3DS.Core.CTR
             return BitConverter.GetBytes((cond << 28) | opcode | BranchOffset24(from, to));
         }
 
-        /// <summary>
-        /// Re-aim an authored B/BL at a new target, keeping its condition and link bit. A hook
-        /// authored as BL returns into the caller and one authored as BNE is conditional; a plain
-        /// <see cref="EncodeBranch"/> would silently drop both.
-        /// </summary>
         public static byte[] RetargetBranch(uint authored, uint from, uint to)
         {
             uint cond = (authored >> 28) & 0xF;
@@ -826,7 +780,6 @@ namespace pk3DS.Core.CTR
         // produced a different instruction (LDR [R1,#0x1000] became [R1,#0], LSL #33 spilled into Rd,
         // and an out-of-range branch landed somewhere else entirely).
 
-        /// <summary>The 24-bit word offset of a B/BL at <paramref name="from"/> to <paramref name="to"/>.</summary>
         public static uint BranchOffset24(uint from, uint to)
         {
             long delta = (long)to - from - 8;
@@ -840,11 +793,9 @@ namespace pk3DS.Core.CTR
         private static uint CheckRange(uint value, uint max, string what) =>
             value <= max ? value : throw new ArgumentException($"{what} 0x{value:X} does not fit (largest is 0x{max:X})");
 
-        /// <summary>Immediate shift amount; LSR/ASR #32 are legal and encoded as 0.</summary>
         private static uint ShiftAmount(uint amount, uint shiftType) =>
             amount == 32 && shiftType is 1 or 2 ? 0 : CheckRange(amount, 31, "shift amount");
 
-        /// <summary>Decode a B/BL target address from an instruction word.</summary>
         public static uint DecodeBranchTarget(uint word, uint pc)
         {
             int offset = (int)(word & 0x00FFFFFF);
@@ -852,13 +803,10 @@ namespace pk3DS.Core.CTR
             return (uint)(pc + 8 + (offset << 2));
         }
 
-        /// <summary>Check if an instruction word is a B or BL.</summary>
         public static bool IsBranch(uint word) => (word & 0x0E000000) == 0x0A000000;
 
-        /// <summary>Check if an instruction word is a BL.</summary>
         public static bool IsBranchLink(uint word) => (word & 0x0F000000) == 0x0B000000;
 
-        /// <summary>Encode a NOP instruction.</summary>
         public static byte[] EncodeNOP() => BitConverter.GetBytes(0xE1A00000u);
         #endregion
     }

@@ -168,12 +168,6 @@ public class ZoneData7
     }
 }
 
-/// <summary>
-/// One-bit flags packed into <see cref="ZoneData7.Flags"/>. Bit order/meanings come from the
-/// community-authored ZoneDataPattern.hexpat (its own author notes this "is NOT foolproof at
-/// identifying each structure properly 100% of the time") - treat exact bit positions as the best
-/// available evidence, not certainty, until cross-checked against real in-game behavior.
-/// </summary>
 [Flags]
 public enum ZoneFlags7 : uint
 {

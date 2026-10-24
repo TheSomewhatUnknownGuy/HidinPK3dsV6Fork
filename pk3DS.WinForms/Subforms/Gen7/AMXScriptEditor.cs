@@ -6,21 +6,6 @@ using pk3DS.Core;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Workstream 8 - editor for AMX NPC scripts (`a/0/9/2`, "amxscript"). Built on
-/// <see cref="pk3DS.Core.Script"/>/<see cref="Scripts"/> (decompress/disassemble) and the new
-/// <see cref="ScriptEditing"/> (structured, editable instruction decode) - both verified this
-/// session against every one of this ROM's real 759 scripts (decompress/recompress round-trip,
-/// disassembly, and a real edit-save-reload cycle all confirmed exact).
-/// <para>
-/// Editing is deliberately generic: each instruction's numeric argument(s) are editable in place
-/// (a plain "change this number" operation, never inserting/removing words), regardless of what
-/// that argument actually means - this ROM still has 179 of 256 real opcodes unnamed, so nothing
-/// here assumes it knows which argument is an item id vs a quantity vs a jump offset. Jump/switch
-/// instructions remain editable like anything else; their target text ("=&gt; 0x1234 (48)") is the
-/// only warning given.
-/// </para>
-/// </summary>
 public partial class AMXScriptEditor : Form
 {
     private readonly GARCFile amxGarc;
@@ -151,67 +136,22 @@ public partial class AMXScriptEditor : Form
         DGV_Instructions.Rows[e.RowIndex].Cells["ColInstruction"].Value = currentDecoded[e.RowIndex].Display.Split('\n')[0];
     }
 
-    /// <summary>
-    /// One known, byte-verified cutscene skip: a native call removed from a script, everything
-    /// else's branch/call offsets corrected around the gap by <see cref="ScriptEditing.RemoveWords"/>.
-    /// <see cref="RemoveStart"/>/<see cref="RemoveCount"/> name the exact words to remove, and
-    /// <see cref="ExpectedWords"/> is checked byte-for-byte before touching anything - refuses
-    /// rather than guessing if this build's script doesn't match (already applied, or a different
-    /// ROM revision), the same discipline every other patch in this codebase follows.
-    /// </summary>
     private sealed record TutorialSkip(string Label, int ScriptIndex, int RemoveStart, uint[] ExpectedWords)
     {
         public int RemoveCount => ExpectedWords.Length;
     }
 
-    /// <summary>
-    /// Catching tutorial (script 117): word 847 (byte 0x0D3C) is <c>DoCommand?(39, 0)</c> - native
-    /// index 39 is <c>CallCaptureDemo_</c>, confirmed by name via the script's own native-function
-    /// table. Correctly identified, and still WRONG TO REMOVE: the enclosing subroutine (the one this
-    /// call sits in) is reached through a sequential story-progress dispatcher that gates on
-    /// <c>GetGlobal(0x02FC)</c> - "have you reached step N yet?" - and NEITHER of this subroutine's
-    /// own neighbours (<c>FieldClose_</c> before the demo, <c>FieldOpen_</c> after it) ever writes to
-    /// that global; script 117 contains no <c>SetGlobal</c> call anywhere at all. The only place left
-    /// for the counter to advance is inside <c>CallCaptureDemo_</c> itself, as an engine-level side
-    /// effect of the real demo completing - remove the call and the counter never advances, so the
-    /// SAME dispatcher step re-fires every time the trigger area is re-entered (confirmed in game:
-    /// the tutorial "replays" - is skipped again - and re-gives its reward items, forever). There is
-    /// no safe way to fake that side effect from AMX script level; <see cref="CatchTutorialUndo"/>
-    /// exists because of this, not the earlier (different) mistake.
-    /// </summary>
     private static readonly TutorialSkip CatchTutorialSkip = new(
         "Skip the catching tutorial (WARNING: loops - see notes, use Undo below)", 117, 847, [0x87, 39, 0]);
     private static readonly TutorialSkip CatchTutorialUndo = CatchTutorialSkip with { Label = "Undo the catching-tutorial skip" };
 
-    /// <summary>
-    /// Z-Move tutorial (script 130): word 626 (byte 0x09C8) is <c>DoCommand?(33, 0)</c> - native
-    /// index 33 is <c>CallZenryokuWazaDemo_</c>. Structurally identical to the catching tutorial's
-    /// call site (same GetArg x3 / setup CallFunc at relative offset -192 / demo call / cleanup
-    /// CallFunc at relative offset -140 shape) - but NOT confirmed to share its loop bug: the
-    /// immediate call site here shows no adjacent <c>GetGlobal</c> gate the way script 117's does, so
-    /// whatever gates re-entry to this trigger may work differently (or may not exist at the same
-    /// layer). Left enabled with a caveat rather than assumed broken OR assumed safe - genuinely
-    /// unknown until tested in game.
-    /// </summary>
     private static readonly TutorialSkip ZMoveTutorialSkip = new(
         "Skip the Z-Move tutorial (unconfirmed whether it loops like catching did)", 130, 626, [0x87, 33, 0]);
     private static readonly TutorialSkip ZMoveTutorialUndo = ZMoveTutorialSkip with { Label = "Undo the Z-Move-tutorial skip" };
 
-    /// <summary>
-    /// Puts back the 6 words the first (wrong) attempt removed from script 117 at word 880, using
-    /// <see cref="ScriptEditing.InsertWords"/> - the exact inverse of the removal, including
-    /// correcting every branch that was adjusted around the gap back to its original delta. Only
-    /// offered/enabled when <see cref="DetectCatchTutorialNeedsRepair"/> finds the damage still
-    /// present, so there is nothing to accidentally double-apply.
-    /// </summary>
     private static readonly uint[] CatchTutorialRepairWords = [0x87, 42, 0, 0x87, 43, 0];
     private const int CatchTutorialRepairAt = 880;
 
-    /// <summary>
-    /// True if script 117 currently shows the wrong edit's signature: word 880 has already moved to
-    /// where the removed span's own successor (ClearAll/Return) used to be, with nothing matching
-    /// the original DoCommand?(42,...) there any more.
-    /// </summary>
     private bool DetectCatchTutorialNeedsRepair()
     {
         try
@@ -334,14 +274,6 @@ public partial class AMXScriptEditor : Form
         return $"{skip.Label}: applied and saved. Reload your ROM in pk3DS so other editors see it.";
     }
 
-    /// <summary>
-    /// The exact inverse of <see cref="ApplyTutorialSkip"/> for the SAME <paramref name="undo"/>
-    /// span: puts <see cref="TutorialSkip.ExpectedWords"/> back at <see
-    /// cref="TutorialSkip.RemoveStart"/> via <see cref="ScriptEditing.InsertWords"/>, correcting
-    /// every branch that crosses the reopened gap. Refuses if those words are already present (the
-    /// skip was never applied, or this has already been undone) - the mirror of how
-    /// <see cref="ApplyTutorialSkip"/> refuses unless they ARE present.
-    /// </summary>
     private string ApplyTutorialUndo(TutorialSkip undo)
     {
         if (undo.ScriptIndex == currentIndex && dirty)

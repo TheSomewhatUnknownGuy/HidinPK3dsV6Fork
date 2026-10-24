@@ -5,23 +5,14 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Exports a LayeredFS mod folder from an extracted ROM folder.
-/// Azahar: load/mods/TID/{exheader.bin, exefs/code.bin, romfs/} (azahar-emu ncch_container.cpp).
-/// Luma3DS: luma/titles/TID/{exheader.bin, code.bin, romfs/} (Luma3DS loader patcher.c).
-/// System.IO only, so tests/CompetitiveCheck compiles it directly.
-/// </summary>
 public static class ModExport
 {
     public enum Layout { Azahar, Luma }
 
     public record Result(List<string> Files, long Bytes, List<string> Errors);
 
-    /// <summary>FAT32 SD cards hold files smaller than 4 GiB.</summary>
     public const long Fat32Limit = 1L << 32;
 
-    /// <summary>Every path Uhuru Gift v16.0.3 changes versus vanilla US (docs/uhuru/changed-files.json):
-    /// the shipped mod folder's files plus romfs/a/0/4/2, which only the full ROM has.</summary>
     public static readonly string[] UhuruFiles =
     [
         "exefs/code.bin",
@@ -94,7 +85,6 @@ public static class ModExport
         "romfs/data/sound/niji_sound.bcsar"
     ];
 
-    /// <summary>The title ID as 16 uppercase hex digits (u64 at exheader offset 0x200).</summary>
     public static string ReadTitleId(string exheaderPath)
     {
         using var f = File.OpenRead(exheaderPath);
@@ -123,8 +113,6 @@ public static class ModExport
     }
 #nullable disable
 
-    /// <summary>Where a mod-relative path ("exheader.bin", "exefs/code.bin", "romfs/...") goes in the export.
-    /// File-name case is kept: Azahar on Linux looks romfs files up case-sensitively.</summary>
     public static string DestPath(string outDir, string tid, string rel, Layout layout)
     {
         rel = rel.Replace('\\', '/').TrimStart('/');
@@ -134,8 +122,6 @@ public static class ModExport
         return Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
     }
 
-    /// <summary>The file in the extracted ROM folder for a mod-relative path, or null if the path has no known root.
-    /// Extracted folders store code.bin as ".code.bin".</summary>
     public static string SourcePath(string romfs, string exefs, string exheader, string rel)
     {
         rel = rel.Replace('\\', '/').TrimStart('/');
@@ -159,10 +145,6 @@ public static class ModExport
         return null;
     }
 
-    /// <summary>
-    /// Copies exheader.bin, exefs/code.bin, Uhuru's files (when <paramref name="uhuru"/>) and <paramref name="extraPaths"/>
-    /// into the chosen layout. Nothing is written if any file is missing or 4 GiB or larger, or when <paramref name="dryRun"/>.
-    /// </summary>
     public static Result Build(string romfs, string exefs, string exheader, string outDir, Layout layout,
         IEnumerable<string> extraPaths, bool uhuru, bool dryRun)
     {

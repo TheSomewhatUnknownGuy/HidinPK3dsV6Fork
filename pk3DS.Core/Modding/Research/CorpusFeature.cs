@@ -8,7 +8,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Where one sheet's recorded writes belong, and how confident that is.</summary>
 public sealed class ResolvedSheetTarget
 {
     public required ResearchSheet Sheet { get; init; }
@@ -16,33 +15,19 @@ public sealed class ResolvedSheetTarget
     public List<ResearchPatch> Originals { get; } = [];
     public List<ResearchPatch> Edits { get; } = [];
 
-    /// <summary>Originals confirmed present in the chosen binary.</summary>
     public int OriginalsMatched { get; set; }
     public string Reason { get; set; } = "";
 
-    /// <summary>
-    /// Amount to add to every recorded offset to reach the real file position.
-    /// </summary>
     public uint OffsetDelta { get; set; }
 
-    /// <summary>
-    /// Extra per-row shift on top of <see cref="OffsetDelta"/>, for a feature that did not move as
-    /// one block between games. Null means every row shifts alike.
-    /// </summary>
     public Func<uint, int>? PerRowShift { get; set; }
 
-    /// <summary>Only a verified original set proves the sheet is aimed at this build.</summary>
     public bool Verified => Originals.Count > 0 && OriginalsMatched == Originals.Count;
 
-    /// <summary>
-    /// True when the target was chosen only because the offsets fit, with no evidence behind it.
-    /// </summary>
     public bool ResolvedByFit { get; set; }
 
-    /// <summary>Workbook this sheet came from, so siblings can be grouped.</summary>
     public string SourceFile => Sheet?.SourceFile ?? "";
 
-    /// <summary>Whether every one of this sheet's writes physically fits in a binary.</summary>
     public bool FitsIn(ResearchTarget target, IReadOnlyDictionary<ResearchTarget, byte[]>? binaries = null)
     {
         if (binaries == null || !binaries.TryGetValue(target, out var bin)) return true;
@@ -50,13 +35,8 @@ public sealed class ResolvedSheetTarget
     }
 }
 
-/// <summary>
-/// Turns a research workbook into an applicable edit: which binary each sheet belongs to, which of
-/// its rows are the "before" state and which are the writes.
-/// </summary>
 public static class CorpusFeature
 {
-    /// <summary>A row is the "before" state when its sheet or its note says so.</summary>
     public static bool IsOriginal(ResearchSheet sheet, ResearchPatch patch) =>
         (sheet.SheetName ?? "").Contains("original", StringComparison.OrdinalIgnoreCase) ||
         (patch.Note ?? "").TrimStart().StartsWith("Original", StringComparison.OrdinalIgnoreCase);
@@ -71,10 +51,6 @@ public static class CorpusFeature
         return AssemblyAgrees(bin, p, delta);
     }
 
-    /// <summary>
-    /// Whether a row's assembly text describes the instruction actually at its offset, even though
-    /// its hex column does not.
-    /// </summary>
     private static bool AssemblyAgrees(byte[] bin, ResearchPatch p, uint delta)
     {
         string text = p.Assembly;
@@ -110,11 +86,6 @@ public static class CorpusFeature
         return StripZeros(a) == StripZeros(b);
     }
 
-    /// <summary>
-    /// A sheet's edits with <see cref="ResolvedSheetTarget.OffsetDelta"/> already folded in, ready
-    /// to write. Rebasing here rather than at the call site means an unshifted sheet and a shifted
-    /// one are applied by exactly the same code.
-    /// </summary>
     public static List<ResearchPatch> RebasedEdits(ResolvedSheetTarget r)
     {
         if (r.OffsetDelta == 0 && r.PerRowShift == null) return r.Edits;
@@ -152,10 +123,6 @@ public static class CorpusFeature
         return ResearchTarget.BattleCro;
     }
 
-    /// <summary>
-    /// Resolves every sheet of a workbook against the loaded binaries.
-    /// </summary>
-    /// <param name="binaries">The candidate files, by target. Missing entries are simply not chosen.</param>
     public static List<ResolvedSheetTarget> Resolve(
         IEnumerable<ResearchSheet> sheets,
         IReadOnlyDictionary<ResearchTarget, byte[]> binaries)
@@ -242,9 +209,6 @@ public static class CorpusFeature
         return result;
     }
 
-    /// <summary>
-    /// Re-points sheets that were resolved by size alone onto the binary their siblings proved.
-    /// </summary>
     private static void AdoptSiblingTarget(List<ResolvedSheetTarget> resolved,
                                            IReadOnlyDictionary<ResearchTarget, byte[]> binaries)
     {
@@ -270,7 +234,6 @@ public static class CorpusFeature
         }
     }
 
-    /// <summary>Splits a sheet spanning two binaries by which file each offset can fit in.</summary>
     public static Dictionary<ResearchTarget, List<ResearchPatch>> SplitByFit(
         IEnumerable<ResearchPatch> patches, IReadOnlyDictionary<ResearchTarget, byte[]> binaries)
     {

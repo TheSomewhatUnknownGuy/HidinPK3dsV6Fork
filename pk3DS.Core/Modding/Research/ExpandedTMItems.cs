@@ -4,37 +4,15 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// The item IDs behind the Expansion Pack's extra TMs (TM101-TM128), and writing their names and bag entries.
-/// <para>
-/// <see cref="ExpandCode"/> takes its IDs from <c>TMExpansion.PickItemIds</c>: the lowest IDs below 1024 that no item
-/// uses. The bag stores item IDs in 10 bits, so an ID of 1024 or more would show as a different item.
-/// </para>
-/// <para>
-/// The checked US Expansion and Uhuru ROMs have 36 usable "???" ids below 960; the UM Expansion could differ (nine
-/// was observed there), so ids are chosen at runtime by name. Handing out ids from 960 up was dropped: on the checked
-/// UM Expansion ROM those are real items (Booster Energy, Eternatusite, Tera Crystal, and more), and writing TM names
-/// over them would have destroyed them.
-/// </para>
-/// </summary>
 public static class ExpandedTMItems
 {
-    /// <summary>Display name for a slot: index 100 is "TM101".</summary>
     public static string GetTMName(int tableIndex) => $"TM{tableIndex + 1:D3}";
 
-    /// <summary>
-    /// Grows the TM table in <paramref name="code"/> to <paramref name="newCount"/> entries. The new TMs get the
-    /// lowest item ids below 1024 that no item uses, so none overwrites a real item. <paramref name="code"/> is not
-    /// changed: returns the new code.bin buffer, or null with the reason in <paramref name="error"/>.
-    /// </summary>
-    /// <param name="newMoves">One move per new TM.</param>
-    /// <param name="newItemIds">The item ids of the new TMs, in TM order.</param>
 #nullable enable
     public static byte[]? ExpandCode(GameConfig cfg, byte[] code, int newCount, ushort[] newMoves,
                                      out ushort[] newItemIds, out string error) =>
         ExpandCode(cfg, code, newCount, newMoves, false, out newItemIds, out error, out _);
 
-    /// <summary>Like the compatibility overload, and reports any code.bin growth needed for the allocation.</summary>
     public static byte[]? ExpandCode(GameConfig cfg, byte[] code, int newCount, ushort[] newMoves,
                                      out ushort[] newItemIds, out string error, out GrowResult? growth) =>
         ExpandCode(cfg, code, newCount, newMoves, true, out newItemIds, out error, out growth);
@@ -146,11 +124,6 @@ public static class ExpandedTMItems
     }
 #nullable restore
 
-    /// <summary>
-    /// Writes what the new TMs need outside code.bin: their pocket and bag entries in the RomFS, and their names
-    /// and move descriptions in the item text. Call it only after code.bin was written.
-    /// </summary>
-    /// <param name="firstSlot">TM index of <paramref name="newItemIds"/>[0], e.g. 100 for TM101.</param>
     public static void WriteItemData(GameConfig cfg, ushort[] newItemIds, ushort[] newMoves, int firstSlot)
     {
         // Thrown, not returned: the caller reports it. A silent return would leave TM101+ unnamed with no message.

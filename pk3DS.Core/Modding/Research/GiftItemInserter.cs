@@ -8,27 +8,9 @@ public sealed class GiftItemInsertResult
     public bool Success;
     public string Error = "";
     public uint[] NewScriptCommands = [];
-    /// <summary>How many words the script grew by - the caller needs this to know whether the script's reserved memory (see <see cref="Script.AllocatedMemory"/>) still has room, before writing it back.</summary>
     public int WordsAdded;
 }
 
-/// <summary>
-/// Adds a brand-new "give item" call to a script by cloning an EXISTING, already-confirmed gift's
-/// own instruction span (from its quantity push through its confirming <c>CallFunc</c>, inclusive -
-/// exactly the unit <see cref="GiftItemLocator"/> already identifies) and inserting the clone right
-/// after the original, with new quantity/item id values. This makes the new gift call the SAME
-/// already-working "give item" subroutine the template used, so it doesn't depend on understanding
-/// what that subroutine actually does internally - only on correctly relocating the one thing that
-/// changes with its new position, the clone's own call delta (see <see cref="AmxRelocation"/>).
-/// <para>
-/// Inserting right after the template means the new gift always triggers exactly when the template
-/// gift already does - the same NPC interaction, branch, or condition - since it becomes part of the
-/// same straight-line code path. That's a deliberate scope limit: this adds a SECOND item to an
-/// existing gift moment, not a brand-new, independently-triggered NPC interaction (building the
-/// trigger logic itself - dialogue, flag checks, movement - is a much larger, per-script-specific
-/// task outside what this can safely automate).
-/// </para>
-/// </summary>
 public static class GiftItemInserter
 {
     public static GiftItemInsertResult AddAnotherGift(uint[] cmd, List<DecodedInstruction> decoded, GiftItemLocation template, int newQty, int newItemId)

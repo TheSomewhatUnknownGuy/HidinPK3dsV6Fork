@@ -5,15 +5,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Locates, reads and writes the USUM TM tables (move ids and item ids) in a decompressed code.bin.
-/// <para>
-/// Two layouts are recognised: the stock game (bound found from the CMP that guards the table lookup) and
-/// pk3DS's own expanded-TM code block (see <c>TMExpansion</c>). Anything else
-/// returns null from <see cref="Locate"/> with a reason; it never guesses.
-/// </para>
-/// Pure on purpose: only System, no GameConfig or WinForms.
-/// </summary>
 public sealed class TMTable
 {
     public enum Kind { Stock, CustomBlock }
@@ -22,7 +13,6 @@ public sealed class TMTable
     private const int ItemDelta = 0x1FA; // item table sits this many bytes before the move table
 
     public Kind Layout { get; }
-    /// <summary>Number of TMs (100 on stock).</summary>
     public int Count { get; }
     public int MoveOffset { get; }
     public int ItemOffset { get; }
@@ -35,7 +25,6 @@ public sealed class TMTable
         ItemOffset = itemOffset;
     }
 
-    /// <summary>The table, or null with the reason in <paramref name="error"/>.</summary>
     public static TMTable? Locate(byte[] code, out string error)
     {
         error = "";
@@ -47,7 +36,6 @@ public sealed class TMTable
     public ushort[] ReadMoves(byte[] code) => Read(code, MoveOffset);
     public ushort[] ReadItems(byte[] code) => Read(code, ItemOffset);
 
-    /// <summary>Overwrites exactly 2*Count bytes of each table.</summary>
     public void Write(byte[] code, ushort[] moves, ushort[] items)
     {
         if (moves.Length != Count) throw new ArgumentException($"expected {Count} moves, got {moves.Length}", nameof(moves));
@@ -123,14 +111,12 @@ public sealed class TMTable
         return new TMTable(Kind.Stock, count, moveOfs, itemOfs);
     }
 
-    /// <summary>File offsets of 4-aligned words equal to <paramref name="value"/>.</summary>
     private static IEnumerable<int> LiteralsEqual(byte[] c, uint value)
     {
         for (int i = 0; i + 4 <= c.Length; i += 4)
             if (U32(c, i) == value) yield return i;
     }
 
-    /// <summary>File offsets of ldr rX,[pc,#imm] instructions (any condition) whose target is <paramref name="lit"/>.</summary>
     private static IEnumerable<int> LdrsTo(byte[] c, int lit)
     {
         // The literal is within 4095 bytes + 8 of its ldr.

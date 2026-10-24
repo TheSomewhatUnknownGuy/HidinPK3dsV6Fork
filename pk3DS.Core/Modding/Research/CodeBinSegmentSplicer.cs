@@ -3,30 +3,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Inserts a small number of bytes at an arbitrary file offset INSIDE one already-loaded code.bin
-/// segment (.text/.rodata/.data), consuming that segment's own existing tail slack (the gap
-/// between its real content and its <c>NumMaxPages</c> allocation) rather than growing the file.
-/// <para>
-/// <see cref="CodeBinExpander"/> only ever grows a segment at its own OUTER boundary, shifting
-/// every later segment along with it - fine for a whole-segment grow, but wrong for "insert one
-/// new record before a terminator in the middle of a table", which is the shape workstream 1g
-/// (Pokémon cries) needs: a new 4-byte record has to land immediately before the existing
-/// 0xFFFF/0x8000 sentinel, not at the end of the file.
-/// </para>
-/// <para>
-/// Real, byte-verified finding this session (Ultra Sun Concept's real <c>code.bin</c>/
-/// <c>ExHeader.bin</c>): <c>.text</c>'s declared CodeSize (0x4B99F0) is smaller than the real,
-/// functioning code already packed into that segment - the Expansion Pack's cry-lookup routine and
-/// several others already run past that point, filling the segment's page allocation completely
-/// full (zero bytes of true padding remain between the last instruction and the 0x4BA000 page
-/// boundary). CodeSize is therefore stale/unenforced in this ROM; this class deliberately never
-/// touches it, matching that already-working precedent instead of trying to "correct" it. A
-/// practical consequence: in this ROM, <see cref="Insert"/> will only succeed once fresh slack has
-/// been created via <see cref="CodeBinExpander.Expand"/> first - there is no free room to consume
-/// today.
-/// </para>
-/// </summary>
 public static class CodeBinSegmentSplicer
 {
     private const uint LoadBase = 0x00100000;
@@ -39,23 +15,11 @@ public static class CodeBinSegmentSplicer
         public byte[] CodeBin = [];
         public int RelocatedPointers;
 
-        /// <summary>See <see cref="CodeBinExpander.ExpandResult.UnconfirmedPointerCandidates"/> - same meaning, same caveat.</summary>
         public List<uint> UnconfirmedPointerCandidates = [];
 
-        /// <summary>See <see cref="CodeBinExpander.ExpandResult.SkippedStringLikeCandidates"/> - same meaning.</summary>
         public List<uint> SkippedStringLikeCandidates = [];
     }
 
-    /// <summary>
-    /// Inserts <paramref name="bytesToInsert"/> at file offset <paramref name="fileOffset"/>,
-    /// shifting every byte from there to the end of the segment's own already-allocated page range
-    /// forward by that many bytes. Fails (rather than silently touching the next segment) if the
-    /// segment's tail doesn't already hold that many bytes of genuine filler (0xCC/0x00/0xFF) -
-    /// grow the segment with <see cref="CodeBinExpander.Expand"/> first in that case, then retry.
-    /// Every 4-byte-aligned pointer in the file that referenced something at-or-after
-    /// <paramref name="fileOffset"/> is bumped by the insert length, via the same heuristic
-    /// <see cref="CodeBinExpander"/> itself uses for a whole-segment grow.
-    /// </summary>
     public static Result Insert(byte[] codeBin, byte[] exheader, CodeBinExpander.Segment segment,
         int fileOffset, byte[] bytesToInsert)
     {

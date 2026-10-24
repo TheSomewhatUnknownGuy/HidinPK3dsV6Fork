@@ -5,18 +5,6 @@ using pk3DS.Core.Structures.PersonalInfo;
 
 namespace pk3DS.Core.Randomizers.Competitive;
 
-/// <summary>
-/// Compares game names while ignoring which apostrophe character is used.
-/// <para>
-/// Every name set in this file is matched against text read out of the ROM, and the ROM writes
-/// apostrophes as U+2019 ("Dragon’s Maw", "King’s Shield", "Mind’s Eye") while source code
-/// naturally spells them with an ASCII quote. Under an ordinal comparer those never match, so the
-/// rules keyed on them - the Dragon's Maw forced-move block, King's Shield as a utility move,
-/// Mind's Eye as a Scrappy equivalent - silently never fired. The item table is worse: it mixes
-/// both characters, so neither spelling alone is correct.
-/// </para>
-/// <para>Normalising the character removes the whole class of bug rather than fixing three names.</para>
-/// </summary>
 public sealed class GameNameComparer : IEqualityComparer<string>
 {
     public static readonly GameNameComparer Instance = new();
@@ -25,7 +13,6 @@ public sealed class GameNameComparer : IEqualityComparer<string>
 
     public int GetHashCode(string obj) => Normalize(obj)?.ToUpperInvariant().GetHashCode() ?? 0;
 
-    /// <summary>Folds apostrophe, hyphen/dash, and space variants used in ROM text onto canonical ASCII equivalents.</summary>
     public static string Normalize(string s)
     {
         if (string.IsNullOrEmpty(s)) return s;
@@ -437,16 +424,6 @@ public static class CompetitiveDatabase
         { 80, new[] { 1 } }, // Slowbro: Form 1 is Mega Slowbro; Form 2 is Galarian Slowbro
     };
 
-    /// <summary>
-    /// Returns the table indices that are genuinely this species' Mega Evolution forms — NOT
-    /// every alternate form. A Mega-capable species can also carry Expansion-Pack-added regional
-    /// forms (e.g. a Galarian/Hisuian variant, or Raichu's pre-existing Alolan form) that must
-    /// NOT be treated as Mega forms for BST-sync purposes. Since there's no explicit per-form
-    /// "is Mega" flag anywhere in the data, this assumes Mega forms are the LAST N alternate
-    /// forms (N = how many Mega Stones MegaStoneMap lists for this species) — i.e. any earlier
-    /// alt forms are non-Mega and are left alone. This matches how the Expansion Pack's Mega
-    /// additions are documented (appended on top of a species' existing forms).
-    /// </summary>
     public static int[] GetMegaFormIndices(int species, PersonalInfo[] table, int maxSpecies = 0)
     {
         if (table == null || species <= 0 || species >= table.Length) return [];

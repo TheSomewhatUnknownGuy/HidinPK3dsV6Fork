@@ -45,9 +45,6 @@ public partial class SMTE : Form
     private readonly string[] trClass = Main.Config.GetText(TextName.TrainerClasses);
     private TextData TrainerNames;
 
-    /// <summary>The (possibly grown-by-<see cref="B_AddTrainer_Click"/>) trainer arrays, read back by
-    /// the caller after the dialog closes - resizing inside the dialog rebinds these fields to new
-    /// array objects, which the caller's own pre-dialog locals would not see otherwise.</summary>
     public byte[][] TrData => trdata;
     public byte[][] TrPoke => trpoke;
 
@@ -89,9 +86,6 @@ public partial class SMTE : Form
     private Label L_MoneyTranslated;
     private readonly ToolTip toolTip1 = new();
 
-    /// <summary>
-    /// Shows what the trainer's money value works out to as a payout.
-    /// </summary>
     private void UpdateMoneyTranslation()
     {
         // The label is built after the trainer list is wired up, so the first selection change can
@@ -371,10 +365,6 @@ public partial class SMTE : Form
 
     private ComboBox[] CB_Passive;
 
-    /// <summary>
-    /// Rom Nueva + passives of the selected Pokémon, in the row Uhuru uses for Colour (never both: passives are off on Uhuru).
-    /// Nothing else edits those record bytes, so a slot saved without touching this row keeps what it had.
-    /// </summary>
     private void BuildPassiveRow(Control card)
     {
         string[] abilityNames = Main.Config.GetText(TextName.AbilityNames);
@@ -1089,20 +1079,13 @@ public partial class SMTE : Form
 
     private const string AnyIncludingHiddenText = "Any (1, 2, and H)";
 
-    /// <summary>Position of the convenience entry, which is not a value the ROM can store.</summary>
     private const int AbilityAnyIncludingHiddenIndex = 1;
 
-    /// <summary>First list position that maps to a real ability slot.</summary>
     private const int AbilityFirstConcreteIndex = 2;
 
-    /// <summary>
-    /// List position to the raw 2-bit trainer field. The list carries one entry the ROM has no
-    /// value for, so past it the two run one apart: 2/3/4 are ability 1, 2 and Hidden.
-    /// </summary>
     private static int AbilityIndexToSlot(int index) =>
         index < AbilityFirstConcreteIndex ? 0 : index - 1;
 
-    /// <summary>The inverse, used when loading a Pokémon back into the editor.</summary>
     private static int AbilitySlotToIndex(int slot) =>
         slot <= 0 ? 0 : slot + 1;
 
@@ -1152,8 +1135,6 @@ public partial class SMTE : Form
     // Uhuru: one entry per trpoke file (4571 teams, blocks 5/6 included); otherwise one per trdata record.
     private int TrainerCount => Main.Config.Info.TrainerBaseCount > 0 ? trpoke.Length : trdata.Length;
 
-    /// <summary>Uhuru blocks 5/6 (Inferno): a copy of the shared block 3/4 record whose count is the team length,
-    /// so NumPokemon == Pokemon.Count and the rest of the editor works unchanged.</summary>
     static TrainerData7 LoadInferno(byte[][] trdata, byte[][] trpoke, int i, int b)
     {
         int blk = TrainerBlocks.Block(i, b), id = TrainerBlocks.BaseId(i, b);
@@ -1163,13 +1144,6 @@ public partial class SMTE : Form
         return new TrainerData7(tr, trpoke[i], n);
     }
 
-    /// <summary>
-    /// Appends new trainer slots past the end of the table, the way Item Editor's Add Item Slots
-    /// does - a fresh id, a blank (no Pokémon) team the user fills in from here, and a placeholder
-    /// name grown into the same text table <see cref="SMTE.TrainerNames"/> already edits in place.
-    /// Actual overworld map placement and NPC/AMX scripting are out of scope here, same as this
-    /// editor already leaves them to the other tools that handle that.
-    /// </summary>
     private void B_AddTrainer_Click(object sender, EventArgs e)
     {
         string input = WinFormsUtil.PromptInput("Add Trainer Slots", "How many new trainers? (1-255)", "1");
@@ -1299,9 +1273,6 @@ public partial class SMTE : Form
         tr.Write(out byte[] trd, out byte[] trp); trdata[i] = trd; trpoke[i] = trp;
     }
 
-    /// <summary>
-    /// Serialises every trainer back into the arrays that get written to the ROM.
-    /// </summary>
     private void SaveAllEntries()
     {
         for (int i = 0; i < Trainers.Length; i++)

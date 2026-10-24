@@ -5,16 +5,8 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Randomizer step for Uhuru's Pokemon World Tournament cast (script 217). Pure, so a seeded Random makes it testable.
-/// </summary>
 public static class FacilityPoolShuffle
 {
-    /// <summary>
-    /// Shuffles the PWT trainer ids in place: the same ids end up in new slots, so the set (and its size) never changes.
-    /// Reads the ids from <paramref name="fp"/> as they are now, so earlier PWT edits are respected.
-    /// Returns how many slots changed.
-    /// </summary>
     public static int ShufflePwt(FacilityPools fp, Random rng)
     {
         var d = FacilityPools.Defs.First(x => x.Name == "PWT ids");

@@ -23,12 +23,6 @@ public static class Randomizer
         return 0;
     }
 
-    /// <summary>
-    /// Multiplies the current level with a scaling factor, returning a modified level.
-    /// </summary>
-    /// <param name="level">Current Level.</param>
-    /// <param name="factor">Modification factor.</param>
-    /// <returns>Boosted (or reduced) level.</returns>
     internal static int GetModifiedLevel(int level, decimal factor)
     {
         if (factor > 5m) factor = 1m + (factor / 100m);

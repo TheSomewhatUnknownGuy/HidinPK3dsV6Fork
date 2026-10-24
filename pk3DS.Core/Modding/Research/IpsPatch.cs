@@ -8,24 +8,18 @@ using System.Text;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One write recorded by an IPS patch.</summary>
 public readonly record struct IpsRecord(int Offset, byte[] Bytes, bool Rle)
 {
     public int End => Offset + Bytes.Length;
 }
 
-/// <summary>
-/// Reads and applies IPS patches, the format the community's loose code.bin patches ship in.
-/// </summary>
 public static class IpsPatch
 {
-    /// <summary>Largest offset a 24-bit IPS record can address.</summary>
     public const int MaxOffset = 0xFFFFFF;
 
     private static readonly byte[] Magic = "PATCH"u8.ToArray();
     private static readonly byte[] Eof = "EOF"u8.ToArray();
 
-    /// <summary>Parses a patch file into its records. Throws on a malformed file.</summary>
     public static List<IpsRecord> Read(byte[] patch)
     {
         if (patch == null || patch.Length < 8) throw new InvalidDataException("not an IPS file (too short)");
@@ -61,7 +55,6 @@ public static class IpsPatch
         throw new InvalidDataException("no EOF marker");
     }
 
-    /// <summary>Applies records to <paramref name="target"/> in place. Returns bytes written.</summary>
     public static int Apply(byte[] target, IEnumerable<IpsRecord> records)
     {
         int written = 0;
@@ -77,10 +70,6 @@ public static class IpsPatch
         return written;
     }
 
-    /// <summary>
-    /// Addresses more than one selected patch writes to, which is the one thing worth knowing
-    /// before applying several at once.
-    /// </summary>
     public static List<(int Offset, string[] Patches)> FindConflicts(
         IReadOnlyList<(string Name, List<IpsRecord> Records)> patches)
     {
@@ -109,7 +98,6 @@ public static class IpsPatch
         return result;
     }
 
-    /// <summary>A short description of what a patch touches, for the detail pane.</summary>
     public static string Describe(IReadOnlyList<IpsRecord> records)
     {
         if (records.Count == 0) return "no records";

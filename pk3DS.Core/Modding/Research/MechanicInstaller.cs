@@ -5,65 +5,28 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One effect to run, and when it runs.</summary>
 public sealed class MechanicEffect
 {
-    /// <summary>Timing byte the battle engine dispatches on.</summary>
     public byte Timing { get; set; }
-    /// <summary>Assembled ARM code for the effect. Ignored when <see cref="ExistingFunction"/> is set.</summary>
     public byte[] Code { get; set; } = [];
-    /// <summary>
-    /// Address of a routine already in the ROM to point at instead of writing new code.
-    /// <para>
-    /// Several effects are exactly an existing one wearing a different hat — an item that does what
-    /// an ability does. Clear Amulet is Clear Body's two routines attached to an item entry, so
-    /// pointing at them costs nothing and keeps the behaviour identical by construction, where a
-    /// copy would be one more thing to keep in step.
-    /// </para>
-    /// </summary>
     public uint ExistingFunction { get; set; }
-    /// <summary>
-    /// Address <see cref="Code"/> was assembled for. When set, the installer rebases the bytes to
-    /// wherever it actually places them.
-    /// <para>
-    /// Rebasing has to happen here, not in the caller. A caller can only guess the final address,
-    /// and the guess is wrong as soon as the master table is relocated ahead of the routine — which
-    /// is every install. Code rebased for a predicted address and then written somewhere else has
-    /// every branch off by the difference: Loaded Dice's two routines ended up calling into each
-    /// other instead of their shared helper, which crashes the moment a multi-hit move is used.
-    /// </para>
-    /// </summary>
     public uint SourceBase { get; set; }
 
-    /// <summary>Label used in logs only.</summary>
     public string Name { get; set; } = "";
 
     public bool ReusesExisting => ExistingFunction != 0;
 }
 
-/// <summary>A brand-new move / ability / item effect to add to a master table.</summary>
 public sealed class NewMechanicRequest
 {
     public CustomMechanicKind Kind { get; set; } = CustomMechanicKind.Move;
-    /// <summary>Game id the new entry answers to (e.g. move 805 for Terrain Pulse).</summary>
     public uint Id { get; set; }
     public string Name { get; set; } = "";
     public List<MechanicEffect> Effects { get; set; } = [];
 
-    /// <summary>
-    /// The game's own name list for this kind of mechanic, used to confirm <see cref="Id"/> really
-    /// is the thing being installed.
-    /// <para>
-    /// Supply it whenever you can. Ids picked by reasoning rather than by lookup put Sharpness and
-    /// Transistor onto 234 and 235 — which in an expanded build are Intrepid Sword and Dauntless
-    /// Shield, not free slots — and nothing about the install looked wrong afterwards, because
-    /// structurally it wasn't. The name table is the only thing that catches that class of mistake.
-    /// </para>
-    /// </summary>
     public string[] NameTable { get; set; }
 }
 
-/// <summary>What an install did, in enough detail to audit it afterwards.</summary>
 public sealed class MechanicInstallResult
 {
     public bool Success { get; set; }
@@ -91,41 +54,10 @@ public sealed class MechanicInstallResult
     }
 }
 
-/// <summary>
-/// Adds and extends battle mechanics in a Battle.cro, growing the master tables when they have no
-/// room left.
-/// <para>
-/// This replaces <see cref="MechanicEditor.AddNewMechanic"/>, which cannot do the job: it writes a
-/// master entry as <c>[pointer][reserved]</c> when the real record is <c>[id][handler]</c>, and its
-/// table-growth path only bumps an in-memory counter and then writes past the end of the table —
-/// straight over whatever data follows. It also depends on <see cref="CRODecompiler"/>'s table
-/// discovery, measured to be wrong even on stock cartridges.
-/// </para>
-/// <para>
-/// The tables here are located by id fingerprint (<see cref="BattleMechanicMap"/>), and growth is
-/// handled honestly: the move table has live data immediately behind it, so adding an entry means
-/// copying the table into the code reserve, repointing every per-entry handler relocation and the
-/// pointer that finds the table, then widening the entry-count literal the walker reads.
-/// </para>
-/// </summary>
 public static class MechanicInstaller
 {
-    /// <summary>Canonical call-setup stub: publish the slot count, hand back the timing table.</summary>
     private const int StubSize = 20;
 
-    /// <summary>
-    /// Adds a new entry to a master table, complete with call-setup stub, timing table and effect
-    /// functions, relocating the master table first if it cannot grow where it stands.
-    /// </summary>
-    /// <param name="map">A freshly built map of <paramref name="cro"/>; used to find the table.</param>
-    /// <param name="reserve">
-    /// Where new code and tables go. Pass <see cref="CodeRelocator.FindTailReserve"/> unless the
-    /// caller is managing its own arena.
-    /// </param>
-    /// <param name="bump">
-    /// First free byte in the reserve, advanced past everything written. Pass the previous call's
-    /// value to install several effects into one reserve without overlap.
-    /// </param>
     public static MechanicInstallResult AddMechanic(
         DecompiledCRO cro,
         BattleMechanicMap map,
@@ -309,11 +241,6 @@ public static class MechanicInstaller
         return result;
     }
 
-    /// <summary>
-    /// Whether the entry already dispatches exactly these effects (a reinstall): same timings, and
-    /// each slot's routine holds this effect's code rebased to that address, as installing writes it.
-    /// Every reinstall used to leak a fresh stub, routines and relocations into the reserve.
-    /// </summary>
     private static bool AlreadyInstalled(DecompiledCRO cro, MappedMechanic existing, NewMechanicRequest request)
     {
         var slots = existing.Slots;
@@ -449,10 +376,6 @@ public static class MechanicInstaller
         return result;
     }
 
-    /// <summary>
-    /// Adds one more timed effect to a mechanic that already has a call setup, relocating its
-    /// timing table into the reserve because tables sit nose-to-tail with no slack.
-    /// </summary>
     public static MechanicInstallResult AttachFunction(
         DecompiledCRO cro,
         BattleMechanicMap map,
@@ -544,23 +467,6 @@ public static class MechanicInstaller
         return result;
     }
 
-    /// <summary>
-    /// Guarantees the code segment holds a contiguous free run of at least
-    /// <paramref name="bytesNeeded"/>, growing it if it does not.
-    /// <para>
-    /// Call this <em>before</em> decompiling and before any install. Growing a segment shifts
-    /// everything after the insertion point, so every offset computed against the old image —
-    /// table addresses, hook sites, the reserve itself — is invalid afterwards and the caller must
-    /// rebuild its map from the returned bytes.
-    /// </para>
-    /// <para>
-    /// Each install that adds a master-table entry copies the whole table into the reserve, so
-    /// consumption is dominated by table size rather than by effect code: a move-table entry costs
-    /// ~2.8 KB regardless of how small the effect is. Sizing the growth generously is much cheaper
-    /// than discovering a shortfall halfway through a batch.
-    /// </para>
-    /// </summary>
-    /// <returns>True when the binary was grown; <paramref name="rom"/> is replaced in that case.</returns>
     public static bool EnsureReserve(ref byte[] rom, int bytesNeeded, ResearchDatabase db = null, Action<string> log = null)
     {
         if (!GameConfig.AllowGrowth)
@@ -606,11 +512,6 @@ public static class MechanicInstaller
         return true;
     }
 
-    /// <summary>
-    /// Confirms a rewritten image still resolves its master tables, using the fingerprint map
-    /// rather than <see cref="CRODecompiler"/>'s own table discovery — the latter reports no moves
-    /// even on an untouched cartridge, so it cannot tell a broken image from a healthy one.
-    /// </summary>
     private static bool StillReadable(byte[] rom, ResearchDatabase db, out string why)
     {
         why = null;
@@ -641,10 +542,6 @@ public static class MechanicInstaller
 
     private static uint Align(uint v) => (v + 3u) & ~3u;
 
-    /// <summary>
-    /// True when the record after the last entry is blank and unrelocated — the marker the walk
-    /// stops on for tables that carry no length anywhere.
-    /// </summary>
     private static bool HasTerminator(DecompiledCRO cro, uint tableOffset, int count)
     {
         uint at = tableOffset + (uint)(count * 8);
@@ -655,7 +552,6 @@ public static class MechanicInstaller
         return !cro.Relocations.Any(r => r.AbsoluteWriteTo(segs) == at + 4);
     }
 
-    /// <summary>Writes the 20-byte call-setup stub. The trailing word is filled by a relocation.</summary>
     private static void WriteStub(byte[] rom, uint at, int slotCount)
     {
         var enc = ARMCodec.EncodeImm8r4((uint)slotCount)
@@ -669,11 +565,6 @@ public static class MechanicInstaller
         BitConverter.GetBytes(0u).CopyTo(rom, (int)at + 16);          // timing table pointer
     }
 
-    /// <summary>
-    /// Rewrites the slot count a stub publishes. Most stubs carry it as a <c>MOV R1,#n</c>
-    /// immediate; the literal-loading variants (Poison Touch, Stall) keep it in the low half-word
-    /// of a packed literal whose high half holds unrelated flags, so only that half is touched.
-    /// </summary>
     private static bool UpdateStubCount(DecompiledCRO cro, uint handler, int newCount, BattleMechanicMap map, MechanicInstallResult result)
     {
         byte[] rom = cro.RawData;
@@ -710,16 +601,6 @@ public static class MechanicInstaller
         return false;
     }
 
-    /// <summary>
-    /// Finds where the entry count for a master table is written down.
-    /// <para>
-    /// Searching the whole binary for the number would be hopeless — 343 is a common word — so the
-    /// search is anchored on the literal pools that hold the table pointer itself. The routine that
-    /// walks the table loads its address and its length from the same pool, so the count is within
-    /// a few words of the pointer. Both forms are recognised: a bare data word, and a
-    /// <c>CMP Rn,#count</c> bounds check.
-    /// </para>
-    /// </summary>
     public static List<(uint Offset, bool IsInstruction)> FindEntryCountSites(DecompiledCRO cro, uint tableOffset, int count)
     {
         var sites = new List<(uint, bool)>();

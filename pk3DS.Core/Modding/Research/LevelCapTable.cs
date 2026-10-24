@@ -6,37 +6,23 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One rung of the level cap: a story flag, and the cap that applies once it is set.</summary>
-/// <param name="Label">What the flag means in game, for the editor.</param>
-/// <param name="FlagOffset">Byte offset into the story-flag block.</param>
-/// <param name="FlagBit">Single bit within that byte.</param>
-/// <param name="Cap">Highest level the player's Pokemon may reach at this point.</param>
 public sealed record LevelCapEntry(string Label, byte FlagOffset, byte FlagBit, byte Cap)
 {
-    /// <summary>The three bytes the game reads: offset, bit, cap.</summary>
     public byte[] ToBytes() => [FlagOffset, FlagBit, Cap];
 
     public override string ToString() =>
         $"{Label} - Lv {Cap} (flag 0x{FlagOffset:X2} bit 0x{FlagBit:X2})";
 }
 
-/// <summary>A story flag the level cap can key off, from the workbook's Data sheet.</summary>
 public sealed record StoryFlag(string Label, byte Offset, byte Bit)
 {
     public override string ToString() => $"{Label}  (0x{Offset:X2}/0x{Bit:X2})";
 }
 
-/// <summary>
-/// The level cap progression: which story flags raise the cap, and to what.
-/// </summary>
 public sealed class LevelCapTable
 {
-    /// <summary>Bytes per entry in the emitted block.</summary>
     public const int EntrySize = 3;
 
-    /// <summary>
-    /// Every story flag the workbook documents, not just the ones the default progression uses.
-    /// </summary>
     public static readonly StoryFlag[] KnownFlags =
     [
         new("Ride Pager", 0x01, 0x02),
@@ -102,13 +88,6 @@ public sealed class LevelCapTable
 
     public List<LevelCapEntry> Entries { get; init; } = [];
 
-    /// <summary>
-    /// The full progression: the workbook's Table Builder rungs, plus the three its flag table
-    /// left out.
-    /// </summary>
-    /// <summary>
-    /// Swaps "Sunne" and "Moone" in a label for Ultra Moon.
-    /// </summary>
     public static string VersionLabel(string label, bool ultraMoon)
     {
         if (!ultraMoon || string.IsNullOrEmpty(label)) return label;
@@ -117,7 +96,6 @@ public sealed class LevelCapTable
         return label;
     }
 
-    /// <summary>The stock progression, with place names matching the loaded game.</summary>
     public static LevelCapTable Default(bool ultraMoon)
     {
         var table = Default();
@@ -172,12 +150,8 @@ public sealed class LevelCapTable
         ],
     };
 
-    /// <summary>Highest level the game supports, and the cap once every rung is behind you.</summary>
     public const byte HardCeiling = 100;
 
-    /// <summary>
-    /// The block the routine walks: rungs in ascending cap order, then a terminator.
-    /// </summary>
     public byte[] ToBytes(bool terminate = true)
     {
         var bytes = new List<byte>((Entries.Count * EntrySize) + EntrySize);
@@ -186,9 +160,6 @@ public sealed class LevelCapTable
         return [.. bytes];
     }
 
-    /// <summary>
-    /// Problems that would make the table behave oddly in game, as plain sentences.
-    /// </summary>
     public List<string> Validate()
     {
         var problems = new List<string>();

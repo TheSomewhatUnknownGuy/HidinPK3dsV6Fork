@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One documented, fixed (non-ceiling) code_map.csv row checked against a live binary.</summary>
 public sealed class ExpansionPatchSite
 {
     public int Offset { get; init; }
@@ -23,20 +22,6 @@ public sealed class ExpansionPatchResult
         new[] { $"{Sites.Count} site(s):" }.Concat(Sites.Select(s => "  " + s)).Concat(Notes.Select(n => "  ! " + n)));
 }
 
-/// <summary>
-/// Applies a documented `code_map.csv` section's fixed byte patches - the ones that don't scale
-/// with a target count (unlike <see cref="SpeciesCeilingPatcher"/>/<see cref="ItemCeilingPatcher"/>),
-/// just a one-time retail-bytes-to-current-bytes swap. Every row is byte-verified against the live
-/// binary before being touched: if it already reads as the Expansion Pack's own current bytes,
-/// nothing happens; if it still reads as retail, the row's current bytes are written; anything else
-/// is left alone and reported rather than guessed at.
-/// <para>
-/// Serves workstream 1's "MODEL FLAGS" (the 0xCA0-&gt;0x1100 model-header offset move) and "POKEMON
-/// ICONS" (the 1154+(species-808) icon-index rewrite at 0x20C8B4) needs - both are one-shot patches
-/// a target ROM either already has or needs applying once, not something that scales with how many
-/// species get inserted afterward.
-/// </para>
-/// </summary>
 public static class ExpansionPatchApplier
 {
     public static ExpansionPatchResult Ensure(byte[] fileData, string targetFile, string section, GameVersion version = GameVersion.Invalid)

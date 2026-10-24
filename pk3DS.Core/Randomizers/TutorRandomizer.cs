@@ -15,7 +15,6 @@ public class TutorRandomizer
     private static readonly uint[] TutorPatchAddrs = { 0x4C8, 0x4D4, 0x4E0, 0x4EC };
     private static readonly int[] DefaultLengths = { 16, 17, 16, 18 };
 
-    /// <summary>True when randomizing was asked for but refused on Uhuru: the lists are read, not changed.</summary>
     public bool UhuruReadOnly { get; }
 
     public TutorRandomizer(string romfsPath, int mode)
@@ -26,12 +25,6 @@ public class TutorRandomizer
         Mode = UhuruReadOnly ? 0 : mode;
     }
 
-    /// <summary>
-    /// Randomizes (if Mode != 0) or simply reads (if Mode == 0) the move tutor lists.
-    /// Returns the resulting per-category move ID lists (index 0 = type tutors, 1-3 = special
-    /// tutors) so callers can feed them into the competitive legal-movepool aggregator, or null
-    /// if the tutor data couldn't be located (e.g. RomFS not extracted).
-    /// </summary>
     public ushort[][] Execute(int maxMoveID, MoveRandomizer moveRand, GameConfig config = null, bool isCompetitive = false)
     {
         string croPath = Path.Combine(RomFSPath, "Shop.cro");

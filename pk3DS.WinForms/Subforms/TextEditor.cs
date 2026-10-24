@@ -104,20 +104,6 @@ public partial class TextEditor : Form
     private readonly string Mode;
     private int entry = -1;
 
-    /// <summary>
-    /// Label for one text file: its real name when known, otherwise a preview of what is inside it.
-    /// <para>
-    /// The names come from <see cref="GameConfig.GameText"/>, which is already selected per game
-    /// version, rather than from indices written out by hand. The previous list hard-coded USUM
-    /// indices under a "Gen 6" comment and then repeated them in version-guarded branches that
-    /// could never run - the unguarded branch above always matched first - so the guards were dead
-    /// and one of them (104) named the Battle Tree table as Trainer Names.
-    /// </para>
-    /// <para>
-    /// Most of the archive has no assigned name at all. Rather than leave those as a bare number,
-    /// the first line of actual text is shown, which is usually enough to recognise the file.
-    /// </para>
-    /// </summary>
     private string DescribeTextFile(int index)
     {
         string label = index.ToString("000");
@@ -138,7 +124,6 @@ public partial class TextEditor : Form
         return preview.Length == 0 ? label : $"{label} - “{preview}”";
     }
 
-    /// <summary>"SpeciesClassifications" -> "Species Classifications".</summary>
     private static string Prettify(string name) =>
         System.Text.RegularExpressions.Regex.Replace(name, "(?<=[a-z0-9])(?=[A-Z])", " ");
 
@@ -535,12 +520,6 @@ public partial class TextEditor : Form
 
     #region [VAR ...] variable codes - insert picker and live preview
 
-    /// <summary>
-    /// Friendly, human-readable glosses for the most commonly used <c>[VAR ...]</c> codes (from
-    /// <see cref="TextVariableCode"/>), used to build a live-legible preview instead of showing raw
-    /// bracket syntax. Not exhaustive - every version's code table has entries beyond this list;
-    /// anything missing here still shows as its own code name in parentheses, never blank.
-    /// </summary>
     private static readonly Dictionary<string, string> VariableFriendlyNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["TRNAME"] = "Trainer's Name",
@@ -633,29 +612,11 @@ public partial class TextEditor : Form
         ["PHOTOMUSIC"] = "Photo Music",
     };
 
-    /// <summary>
-    /// Codes handled as an actual colour change in the preview (see <see cref="ColorPalette"/>)
-    /// rather than shown as a text placeholder - matched case-insensitively against the code name.
-    /// </summary>
     private static readonly HashSet<string> VariableColorCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "COLOR", "iCOLOR2", "iCOLOR3",
     };
 
-    /// <summary>
-    /// The preview's colour, keyed by the small index every real occurrence of <c>[VAR COLOR(n)]</c>
-    /// in this ROM's own game text actually uses (0, 1, 2 - never anything else, across all 127 real
-    /// text files scanned). Not guessed from outside documentation: derived directly from what each
-    /// index consistently wraps in real text - `0001` only ever wraps negative/warning/failure
-    /// wording ("disabled", "Unable!", "Unavailable", "There are no Pokémon", "cannot change"), and
-    /// `0002` only ever wraps positive/highlighted info (Nature names, met/hatched Location names,
-    /// "Learned", numbered move-slot labels, "Accepting ... requests"). `0000` is the reset/default,
-    /// confirmed by always appearing as the closing tag right after a `0001`/`0002` span.
-    /// `iCOLOR2`/`iCOLOR3` share the same 0/1/2 numbering in the (much smaller) real sample found for
-    /// them - applying the same palette is a reasonable extrapolation from the confirmed scheme,
-    /// not an independent guess, though their real sample size (2-3 lines each) is far smaller than
-    /// `COLOR`'s.
-    /// </summary>
     private static readonly Dictionary<int, Color> ColorPalette = new()
     {
         [0] = Color.Gainsboro, // reset / default - close to the preview's own base ForeColor
@@ -663,15 +624,6 @@ public partial class TextEditor : Form
         [2] = Color.DeepSkyBlue, // positive/highlighted info (confirmed: Nature/Location names, "Learned")
     };
 
-    /// <summary>
-    /// The 10-colour palette for the separate <c>[VAR BD00(n,0000,0000)]</c> / <c>[VAR BD01]</c>
-    /// code pair - not derived from scanning gametext (unlike <see cref="ColorPalette"/>), but
-    /// given directly by the user, who tested all 10 indices live in USUM (both NPC and battle
-    /// text) and reported exactly what each one renders as. Only the first of BD00's 3 args does
-    /// anything observable; BD01 takes no args and always resets, unlike COLOR's 0000-as-reset
-    /// convention - so it's handled as its own case in <see cref="RenderPreview"/>, not folded into
-    /// <see cref="VariableColorCodes"/>.
-    /// </summary>
     private static readonly Dictionary<int, Color> ExtendedColorPalette = new()
     {
         [0] = Color.Red,
@@ -713,9 +665,6 @@ public partial class TextEditor : Form
         RTB_Visualizer.Focus();
     }
 
-    /// <summary>Friendly name -> exact bracket text for every confirmed colour code, so a colour can
-    /// be inserted by name (matching <see cref="ColorPalette"/>/<see cref="ExtendedColorPalette"/>)
-    /// instead of requiring the hex argument to be typed by hand.</summary>
     private static readonly (string Label, string Code)[] ColorInsertOptions =
     [
         ("Reset to default", "[VAR COLOR(0000)]"),
@@ -767,15 +716,6 @@ public partial class TextEditor : Form
         RTB_Visualizer.Focus();
     }
 
-    /// <summary>
-    /// Renders <c>[VAR ...]</c> codes (and the related bracket forms <c>TextFile.cs</c> produces -
-    /// <c>[WAIT n]</c>, <c>[~ n]</c>) into <see cref="RTB_Preview"/> as a readable gloss with real
-    /// colour changes for the confirmed colour codes, so the preview shows roughly what a player
-    /// would see instead of raw bracket syntax. This is a human-readable approximation, not a
-    /// byte-perfect emulation of the game's own resolution logic (which needs real save/battle
-    /// state a static text editor doesn't have) - most named variables still show as a bracketed
-    /// gloss like <c>(Trainer's Name)</c>, since substituting a real value isn't possible here.
-    /// </summary>
     private void RenderPreview(string rawInput)
     {
         RTB_Preview.Clear();

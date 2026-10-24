@@ -88,14 +88,6 @@ public class Area7
         return areas;
     }
 
-    /// <summary>
-    /// Gets an annotated Area array
-    /// </summary>
-    /// <param name="ed">Encounter Data GARC</param>
-    /// <param name="zd">ZoneData GARC</param>
-    /// <param name="wd">WorldData GARC</param>
-    /// <param name="locationList">Location strings</param>
-    /// <returns>Annotated Area Array</returns>
     public static Area7[] GetArray(LazyGARCFile ed, LazyGARCFile zd, LazyGARCFile wd, string[] locationList)
     {
         var Worlds = wd.Files.Select(f => Mini.UnpackMini(f, "WD")[0]).ToArray();

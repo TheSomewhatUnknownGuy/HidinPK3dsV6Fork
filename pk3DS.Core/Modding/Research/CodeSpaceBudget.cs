@@ -2,17 +2,10 @@ using System;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// How much room is left in code.bin for new executable code, and who is competing for it.
-/// </summary>
 public static class CodeSpaceBudget
 {
-    /// <summary>
-    /// Bytes the level cap routine occupies with the default table.
-    /// </summary>
     public const int LevelCapBytes = 216;
 
-    /// <summary>Bytes the TM expansion needs at its maximum: its routines plus both 128-entry tables.</summary>
     public const int TMExpansionBytes = TMExpansion.CodeBytes + 4 * TMExpansion.MaxCount;
 
     public sealed record Report(int Offset, int Free)
@@ -20,14 +13,12 @@ public static class CodeSpaceBudget
         public bool Fits(int need) => Free >= need;
     }
 
-    /// <summary>Measures the executable pool as it stands right now.</summary>
     public static Report Measure(byte[] code)
     {
         var (offset, free) = ResearchEngine.FindFreeExecutableSpace(code);
         return new Report(offset, Math.Max(0, free));
     }
 
-    /// <summary>A one-line statement of the pool, for logs and status bars.</summary>
     public static string Describe(byte[] code)
     {
         var r = Measure(code);
@@ -37,9 +28,6 @@ public static class CodeSpaceBudget
                $"Level caps need {LevelCapBytes}, the TM expansion needs {TMExpansionBytes}.";
     }
 
-    /// <summary>
-    /// Why <paramref name="need"/> bytes cannot be placed, in terms someone can act on.
-    /// </summary>
     public static string ExplainShortfall(byte[] code, int need, string feature)
     {
         var r = Measure(code);

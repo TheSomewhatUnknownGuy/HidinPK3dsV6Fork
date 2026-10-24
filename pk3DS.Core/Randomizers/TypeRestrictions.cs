@@ -5,15 +5,10 @@ using pk3DS.Core.Randomizers.Competitive;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// Type-shaped constraints shared by the starter, trainer and wild randomizers.
-/// </summary>
 public static class TypeRestrictions
 {
-    /// <summary>Number of types the games actually use.</summary>
     public const int TypeCount = 18;
 
-    /// <summary>The two type slots of a species, deduplicated for mono-types.</summary>
     public static int[] TypesOf(GameConfig config, int species)
     {
         try
@@ -29,7 +24,6 @@ public static class TypeRestrictions
 
     public static bool IsMonoType(GameConfig config, int species) => TypesOf(config, species).Length == 1;
 
-    /// <summary>Whether two species share any type at all.</summary>
     public static bool SharesType(GameConfig config, int a, int b)
     {
         var ta = TypesOf(config, a);
@@ -37,10 +31,8 @@ public static class TypeRestrictions
         return ta.Any(tb.Contains);
     }
 
-    /// <summary>Whether a species carries a given type in either slot.</summary>
     public static bool HasType(GameConfig config, int species, int type) => TypesOf(config, species).Contains(type);
 
-    /// <summary>Types this one hits super-effectively, excluding itself.</summary>
     private static List<int> SuperEffectiveAgainst(int attacking)
     {
         var list = new List<int>();
@@ -52,9 +44,6 @@ public static class TypeRestrictions
         return list;
     }
 
-    /// <summary>
-    /// Every distinct trio of types where each beats the next, wrapping around.
-    /// </summary>
     public static List<int[]> FindTypeTriangles()
     {
         var found = new List<int[]>();
@@ -77,7 +66,6 @@ public static class TypeRestrictions
         return found;
     }
 
-    /// <summary>One triangle at random, or the classic trio if the chart yields none.</summary>
     public static int[] PickTypeTriangle(Random rand)
     {
         var all = FindTypeTriangles();
@@ -86,9 +74,6 @@ public static class TypeRestrictions
             : all[rand.Next(all.Count)];
     }
 
-    /// <summary>
-    /// The most type-varied subset the picker can manage, used for "force diverse types".
-    /// </summary>
     public static bool AddsNewType(GameConfig config, IEnumerable<int> chosen, int candidate)
     {
         var have = new HashSet<int>();

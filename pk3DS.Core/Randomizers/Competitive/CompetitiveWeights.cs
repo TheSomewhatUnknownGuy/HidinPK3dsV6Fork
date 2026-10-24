@@ -6,14 +6,6 @@ using System.Text.Json;
 
 namespace pk3DS.Core.Randomizers.Competitive;
 
-/// <summary>
-/// Every tunable number in the competitive engine, with the defaults from the v2 spec. The live
-/// values are competitive_weights.json beside pk3DS; presets carry a copy via UniversalSettings.
-/// <para>
-/// Bonuses and factors are never negative and penalties never positive, so a weight with the wrong
-/// sign is rejected rather than silently flipping what it rewards.
-/// </para>
-/// </summary>
 public sealed class CompetitiveWeights
 {
     // Manifesto 0.2 / 0.6 (CompetitiveRules keeps the documented defaults)
@@ -76,10 +68,6 @@ public sealed class CompetitiveWeights
 
     public void Save(string path) => File.WriteAllText(path, ToJson());
 
-    /// <summary>
-    /// Reads weights JSON. Anything unusable keeps its default and is named in <paramref name="problems"/>,
-    /// so a typo can't silently change behavior.
-    /// </summary>
     public static CompetitiveWeights Parse(string json, List<string> problems)
     {
         var w = new CompetitiveWeights();
@@ -124,7 +112,6 @@ public sealed class CompetitiveWeights
         return w;
     }
 
-    /// <summary>Reads the weights file, writing it with the defaults first if it's missing.</summary>
     public static CompetitiveWeights Load(string path, List<string> problems)
     {
         try

@@ -5,15 +5,12 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One mechanic, fully resolved: what it is, what runs, and when.</summary>
 public sealed class MappedMechanic
 {
     public CustomMechanicKind Kind { get; init; }
     public uint Id { get; init; }
     public string Name { get; init; } = "";
-    /// <summary>Offset of this entry's 8-byte record in the master table.</summary>
     public uint EntryOffset { get; init; }
-    /// <summary>Where the master table points.</summary>
     public uint HandlerOffset { get; init; }
     public ResolvedChain Chain { get; init; }
 
@@ -24,18 +21,6 @@ public sealed class MappedMechanic
         $"{Kind} 0x{Id:X3} {Name} -> 0x{HandlerOffset:X6} ({Chain?.Shape}, {Slots.Count} timing slot(s))";
 }
 
-/// <summary>
-/// A Battle.cro resolved end to end: master tables located by content, handlers walked through to
-/// their timing tables and effect functions.
-/// <para>
-/// This is the entry point everything else should build on. It deliberately does not depend on
-/// <see cref="CRODecompiler"/>'s own table discovery, which was verified to misidentify the tables
-/// (reporting zero moves, and an ability table 0x2D18 away from the real one) on stock US/UM as
-/// well as on modified ROMs. Locating by id fingerprint instead works on any build, and was
-/// checked against vanilla US, vanilla UM, and an Expansion Pack ROM whose tables sit 0x20000
-/// further in.
-/// </para>
-/// </summary>
 public sealed class BattleMechanicMap
 {
     public byte[] Rom { get; }
@@ -52,13 +37,10 @@ public sealed class BattleMechanicMap
         Cro = cro;
     }
 
-    /// <summary>Absolute address a relocation writes into <paramref name="slot"/>, or 0.</summary>
     public uint ResolveSlot(uint slot) => _slotToTarget.TryGetValue(slot, out var v) ? v : 0;
 
-    /// <summary>All pointer slots filled by relocations.</summary>
     public IReadOnlyCollection<uint> RelocatedSlots => _slotToTarget.Keys;
 
-    /// <summary>Builds the map for a Battle.cro image.</summary>
     public static BattleMechanicMap Build(byte[] rom, ResearchDatabase db, string sourcePath = null)
     {
         if (rom == null) throw new ArgumentNullException(nameof(rom));
@@ -126,7 +108,6 @@ public sealed class BattleMechanicMap
         Mechanics.FirstOrDefault(m => m.Kind == kind && !string.IsNullOrEmpty(m.Name) &&
                                       m.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Every timing byte in use, with how often it appears — the practical vocabulary.</summary>
     public Dictionary<byte, int> TimingHistogram()
     {
         var hist = new Dictionary<byte, int>();

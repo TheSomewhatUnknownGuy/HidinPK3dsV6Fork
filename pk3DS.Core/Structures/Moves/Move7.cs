@@ -47,9 +47,6 @@ public class Move7 : Move
 
     public MoveFlag7 Flags { get => (MoveFlag7)BitConverter.ToUInt32(Data, 0x24); set => BitConverter.GetBytes((uint)value).CopyTo(Data, 0x24); }
 
-    /// <summary>
-    /// Calculates standard Gen 7 Z-Move base power from the base move's power.
-    /// </summary>
     public static int GetZMovePower(int basePower)
     {
         if (basePower <= 55) return 100;
@@ -64,10 +61,6 @@ public class Move7 : Move
         return 200;
     }
 
-    /// <summary>
-    /// Standardizes Z-Move attributes (Z-Move ID, Z-Power, and Z-Effect) based on Type, Category, and Power.
-    /// Status moves default to Z-Effect 26 (resets lowered stats of the user).
-    /// </summary>
     public void FixZMove(int statusZEffect = 26)
     {
         if (Category == 0) // Status

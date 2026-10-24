@@ -5,22 +5,14 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Checks that an address resolved from the research corpus actually lands on code in the binary
-/// being patched.
-/// </summary>
 public static class SymbolVerifier
 {
-    /// <summary>How confident we are that an offset is a real function entry.</summary>
     public enum Verdict
     {
-        /// <summary>Looks like a function prologue.</summary>
         Good,
 
-        /// <summary>Decodes as an instruction but is not a recognisable entry point.</summary>
         Weak,
 
-        /// <summary>Padding, data, or outside the file. Almost certainly the wrong build.</summary>
         Bad,
     }
 
@@ -32,9 +24,6 @@ public static class SymbolVerifier
         public string Reason { get; init; } = "";
     }
 
-    /// <summary>
-    /// Inspects the word at <paramref name="offset"/> and judges whether it starts a routine.
-    /// </summary>
     public static Check Inspect(byte[] binary, string name, uint offset)
     {
         Check Fail(string why) => new() { Name = name, Offset = offset, Verdict = Verdict.Bad, Reason = why };
@@ -80,7 +69,6 @@ public static class SymbolVerifier
         };
     }
 
-    /// <summary>Result of confirming a documented offset against a specific binary.</summary>
     public sealed class Relocation
     {
         public string Name { get; init; } = "";
@@ -91,13 +79,8 @@ public static class SymbolVerifier
         public string Note { get; init; } = "";
     }
 
-    /// <summary>Bytes of a routine used as its fingerprint. 24 is enough to be unique in practice.</summary>
     public const int SignatureLength = 24;
 
-    /// <summary>
-    /// Confirms a documented offset against the binary being patched, and finds the routine if it
-    /// has moved.
-    /// </summary>
     public static Relocation Locate(byte[] reference, byte[] target, string name, uint documented)
     {
         if (reference == null || target == null)
@@ -142,7 +125,6 @@ public static class SymbolVerifier
         return true;
     }
 
-    /// <summary>Inspects several at once and summarises how the set looks.</summary>
     public static (List<Check> Checks, int Good, int Weak, int Bad) InspectAll(
         byte[] binary, IEnumerable<(string Name, uint Offset)> symbols)
     {
@@ -163,9 +145,6 @@ public static class SymbolVerifier
         return (list, good, weak, bad);
     }
 
-    /// <summary>
-    /// A sentence for the log describing whether the corpus matches the binary.
-    /// </summary>
     public static string Summarise(int good, int weak, int bad, string version)
     {
         int total = good + weak + bad;

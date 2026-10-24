@@ -4,17 +4,8 @@ using System.Security.Cryptography;
 
 namespace pk3DS.Core.CTR
 {
-    /// <summary>
-    /// Recompiles a DecompiledCRO back to a valid binary.
-    /// Handles relocation patch serialization, segment table updates,
-    /// SHA-256 hash recalculation, and CRR hash update.
-    /// </summary>
     public static class CROCompiler
     {
-        /// <summary>
-        /// Write all modifications in the DecompiledCRO back to the raw data.
-        /// Does NOT resize; assumes CROUtil.ExpandSegment was already called if needed.
-        /// </summary>
         public static byte[] Compile(DecompiledCRO cro)
         {
             byte[] data = cro.RawData;
@@ -34,9 +25,6 @@ namespace pk3DS.Core.CTR
             return data;
         }
 
-        /// <summary>
-        /// Save the compiled CRO to disk.
-        /// </summary>
         public static void SaveToFile(DecompiledCRO cro, string path)
         {
             if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(path) is { } refusal) throw new InvalidOperationException(refusal);
@@ -91,14 +79,6 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Hash Recalculation
-        /// <summary>
-        /// Recalculate the SHA-256 hashes in the CRO header (offsets 0x00-0x7F).
-        /// Hash layout:
-        ///   0x00-0x1F: Hash of header (0x80-0x13F)
-        ///   0x20-0x3F: Hash of code segment
-        ///   0x40-0x5F: Hash of rodata + data segments
-        ///   0x60-0x7F: Hash of everything after data (name table, relocation tables, etc.)
-        /// </summary>
         public static void RecalculateHashes(byte[] data)
         {
             if (data.Length < 0x140) return;

@@ -148,11 +148,6 @@ namespace pk3DS.Core.Modding
             }
         }
 
-        /// <summary>
-        /// Exports a LayeredFS mod folder (see <see cref="ModExport"/>): exheader.bin, code.bin, the files pk3DS changed
-        /// (ProjectState.ModifiedFiles, files pasted into the US/UM patch folders, the root CROs) and, on Uhuru,
-        /// every file Uhuru changes, so the folder works over a vanilla ROM. Nothing is written if any file is missing or too big.
-        /// </summary>
         public static bool ExportLayeredFSModPackage(string romfsPath, string exefsPath, string exheaderPath, string outputDir,
             ModExport.Layout layout, bool uhuru, out string statusMessage)
         {

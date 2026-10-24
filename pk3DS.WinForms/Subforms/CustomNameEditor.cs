@@ -7,11 +7,6 @@ using pk3DS.Core;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Allows users to assign custom display names to Pokémon and their forms
-/// within the editor only. These names are NOT written back to the ROM.
-/// They are persisted in CustomNames.json next to the executable.
-/// </summary>
 public partial class CustomNameEditor : Form
 {
     private static readonly string CustomNamesFile = Path.Combine(Application.StartupPath, "CustomNames.json");

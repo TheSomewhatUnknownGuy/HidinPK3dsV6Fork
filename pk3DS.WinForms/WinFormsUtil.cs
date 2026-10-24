@@ -62,9 +62,6 @@ public static class WinFormsUtil
     private static string _extractedSprites;
     private static bool _extractedSpritesProbed;
 
-    /// <summary>
-    /// Folder holding the extracted expanded-form sprites, or null when none is installed.
-    /// </summary>
     public static string ExtractedSpritesFolder
     {
         get
@@ -309,27 +306,9 @@ public static class WinFormsUtil
         return form - 1;
     }
 
-    /// <summary>
-    /// Item name for an ID, using a cached copy of the name table.
-    /// <para>
-    /// GameConfig.GetText clones the whole array on every call, which is fine once per editor but
-    /// not once per icon drawn in a list. The cache is keyed on the array instance so it refreshes
-    /// by itself when the ROM or language changes.
-    /// </para>
-    /// </summary>
     private static string[] _itemNameCache;
     private static string[][] _itemNameCacheSource;
 
-    /// <summary>
-    /// Assigns an image to a PictureBox, disposing whatever it held.
-    /// <para>
-    /// Setting PictureBox.Image does not release the previous one, and GetSprite returns a freshly
-    /// allocated Bitmap every call. Anything that re-renders repeatedly - scrolling a list of
-    /// trainers, stepping through entries - therefore leaks one bitmap per step, and a process is
-    /// limited to about ten thousand GDI handles before allocation starts failing. That presents as
-    /// an unrelated crash a long way from the leak.
-    /// </para>
-    /// </summary>
     public static void SetImage(PictureBox box, Image image)
     {
         if (box == null) return;
@@ -338,7 +317,6 @@ public static class WinFormsUtil
         if (!ReferenceEquals(previous, image)) previous?.Dispose();
     }
 
-    /// <summary>Scales an image down to fit a square, preserving aspect ratio. Never scales up.</summary>
     private static Bitmap FitWithin(Bitmap source, int max)
     {
         if (source == null || (source.Width <= max && source.Height <= max)) return source;
@@ -365,16 +343,6 @@ public static class WinFormsUtil
         return _itemNameCache != null && item < _itemNameCache.Length ? _itemNameCache[item] : null;
     }
 
-    /// <summary>
-    /// The icon for an item: downloaded art first, then the embedded resource, then the generic
-    /// held-item picture.
-    /// <para>
-    /// Name before ID deliberately. The ID-keyed resource is only correct while item numbering is
-    /// fixed, and this project moves it - the TM expansion claims 1024-1051, and a randomizer run
-    /// reshuffles the rest. An ID lookup then returns some other item's picture and never fails,
-    /// which is the worst way for it to be wrong.
-    /// </para>
-    /// </summary>
     public static Bitmap getIcon(int item, int _, GameConfig config)
     {
         var byName = ItemSpriteCache.Get(ItemName(item, config));
@@ -799,7 +767,6 @@ public static class WinFormsUtil
         }
     }
 
-    /// <summary>The gradient Main is showing; sub-forms reuse it so every window shares one look. Set by Main.</summary>
     public static string CurrentGradientName { get; set; }
 
     // The accent follows the gradient on screen: the gradient's most saturated stop, kept at its hue and
@@ -850,7 +817,6 @@ public static class WinFormsUtil
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ListBox, object> AccentedLists = new();
 
-    /// <summary>Draws the selected row in the theme accent instead of system blue. Only for plain lists nobody owner-draws already.</summary>
     private static void AccentListBox(ListBox lb, VisualTheme theme)
     {
         if (lb.DrawMode != DrawMode.Normal || AccentedLists.TryGetValue(lb, out _)) return;
@@ -868,8 +834,6 @@ public static class WinFormsUtil
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object> ThemedCombos = new();
 
-    /// <summary>Flat combo whose border and arrow button are repainted in theme colours. The system draws both white
-    /// whatever BackColor says, and no owner-draw mode reaches them, so a NativeWindow repaints them after each WM_PAINT.</summary>
     private static void ThemeCombo(ComboBox cb)
     {
         cb.FlatStyle = FlatStyle.Flat;
@@ -925,7 +889,6 @@ public static class WinFormsUtil
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Button, object> RoundedButtons = new();
 
-    /// <summary>Rounds a flat button's corners and redraws its outline smoothly. Attached once per button.</summary>
     private static void RoundButton(Button b)
     {
         if (RoundedButtons.TryGetValue(b, out _)) return;
@@ -978,25 +941,6 @@ public static class WinFormsUtil
         }
     }
 
-    /// <summary>
-    /// Double-buffers a control and every container beneath it.
-    /// <para>
-    /// Buffering a TabControl on its own does nothing for tab switching: the tearing is between the
-    /// page and the panels and buttons it holds, not inside the tab strip. The recursion is what
-    /// makes this worth calling at all.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// Draws a TabControl's strip ourselves, in the theme's colours.
-    /// <para>
-    /// Left to Windows, the strip is painted by the OS in the system theme - which is why it stayed
-    /// light against a dark window - and the OS repaints a tab whenever the mouse enters or leaves
-    /// it. That hot-tracking repaint is what flickered on hover: the strip is not opaque to the
-    /// form behind it, so each repaint exposed the parent and forced the gradient through again.
-    /// Owner-drawing fills every tab opaquely and removes the hot-track pass entirely, so hovering
-    /// no longer repaints anything.
-    /// </para>
-    /// </summary>
     private static void ApplyOwnerDrawnTabs(TabControl tc, VisualTheme theme)
     {
         var pal = ThemePalette.For(theme);
@@ -1022,52 +966,16 @@ public static class WinFormsUtil
 
     private static readonly Dictionary<TabControl, (Color Strip, Color Selected, Color Text)> TabPalette = new();
 
-    /// <summary>
-    /// Supplies the window's painted background so child controls can continue it rather than
-    /// guess at a matching flat colour. Set by the form that owns the gradient.
-    /// </summary>
     public static Func<Bitmap> BackgroundProvider { get; set; }
 
-    /// <summary>
-    /// The form <see cref="BackgroundProvider"/> belongs to.
-    /// <para>
-    /// The provider is a single static, so without this every themed window borrowed the main
-    /// window's gradient for its tab strip - a gradient that is not behind it, producing a strip
-    /// that matched nothing. Tab strips on any other form fall back to the flat theme colour.
-    /// </para>
-    /// </summary>
     public static Form BackgroundOwner { get; set; }
 
-    /// <summary>
-    /// Fills the part of the tab strip no tab covers.
-    /// <para>
-    /// Owner-drawing supplies the tab items only; the run of strip to the right of the last tab is
-    /// still painted by the control, which is why it stayed light against a dark window. Paint runs
-    /// after the items are drawn, so filling everything outside their bounds here leaves the tabs
-    /// intact and replaces only the gap.
-    /// </para>
-    /// <para>
-    /// Where the owning form exposes its background, the matching slice of it is drawn so the strip
-    /// continues the gradient instead of approximating it with a flat colour that only matches at
-    /// one point.
-    /// </para>
-    /// </summary>
     private static void TabStripPaintHandler(object sender, PaintEventArgs e)
     {
         if (sender is not TabControl tc) return;
         PaintStrip(tc, e.Graphics);
     }
 
-    /// <summary>
-    /// Repaints the tab strip after the native control has drawn it.
-    /// <para>
-    /// A TabControl is a native common control that paints its own strip during WM_PAINT. Relying on
-    /// the managed Paint event to cover that is unreliable - the ordering depends on double
-    /// buffering and on whether visual styles drew the strip in the theme pass - which is how the
-    /// strip kept coming back as a light band across a dark window. Painting from the message loop
-    /// instead, immediately after the default handler has run, is deterministic.
-    /// </para>
-    /// </summary>
     private sealed class TabStripOverlay : NativeWindow
     {
         private readonly TabControl tc;
@@ -1170,12 +1078,6 @@ public static class WinFormsUtil
             SetDoubleBufferedTree(child);
     }
 
-    /// <summary>
-    /// A ComboBox with AutoCompleteSource.ListItems rebuilds its autocomplete list on every Items change,
-    /// which made a 5-item refill cost 44 ms instead of 12 ms. This keeps autocomplete off until the combo
-    /// is used (mouse or key), so list changes while it is idle are cheap. Not Enter: a form focuses its first
-    /// combo when shown, which would switch it back on straight away.
-    /// </summary>
     public static void DeferAutoComplete(Control root)
     {
         foreach (Control c in root.Controls)
@@ -1318,11 +1220,6 @@ public static class WinFormsUtil
         return MessageBox.Show(msg, "Prompt", btn, MessageBoxIcon.Asterisk);
     }
 
-    /// <summary>
-    /// Asks the user to choose between the Regular and Competitive randomizer up front, before
-    /// the Universal Randomizer window itself opens. Returns true for Competitive, false for
-    /// Regular, or null if the user closed the prompt without choosing.
-    /// </summary>
     public static bool? PromptRandomizerMode()
     {
         using var dialog = new Form

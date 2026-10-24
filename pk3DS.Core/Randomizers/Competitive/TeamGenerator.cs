@@ -78,9 +78,6 @@ public class TeamGenerator
         return weights;
     }
 
-    /// <summary>
-    /// Picks a weighted-random archetype.
-    /// </summary>
     public TeamArchetype GetRandomArchetype()
     {
         float totalWeight = ArchetypeWeights.Values.Sum();
@@ -100,10 +97,6 @@ public class TeamGenerator
         return TeamArchetype.Balance; // Fallback
     }
 
-    /// <summary>
-    /// Returns the required roles for each member of a team for the given archetype.
-    /// In Doubles/VGC, roles are adjusted for field dynamics (Speed Control, Redirection, Bulky Attackers).
-    /// </summary>
     public CompetitiveRole[] GetRolesForArchetype(TeamArchetype archetype, int teamSize = 6, bool isDoubles = false)
     {
         if (teamSize <= 0) teamSize = 1;
@@ -293,9 +286,6 @@ public class TeamGenerator
         return roles;
     }
 
-    /// <summary>
-    /// Returns the full archetype specification with all constraints.
-    /// </summary>
     public TeamArchetypeSpecification GetSpecification(TeamArchetype archetype)
     {
         var spec = new TeamArchetypeSpecification { Archetype = archetype };
@@ -410,10 +400,6 @@ public class TeamGenerator
         return spec;
     }
 
-    /// <summary>
-    /// Determines if a Pokemon's stats are suitable for the given role and archetype constraints.
-    /// Used for team composition filtering during species selection.
-    /// </summary>
     public static bool IsStatSuitableForRole(
         Structures.PersonalInfo.PersonalInfo pi, CompetitiveRole role, TeamArchetypeSpecification spec = null)
     {

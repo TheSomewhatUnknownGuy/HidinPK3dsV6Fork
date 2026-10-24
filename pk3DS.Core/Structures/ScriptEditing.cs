@@ -3,66 +3,28 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core;
 
-/// <summary>One numeric argument slot belonging to a decoded AMX instruction, editable in place.</summary>
 public sealed class ScriptArgSlot
 {
-    /// <summary>Index into the flat instruction word array this argument lives in.</summary>
     public int FlatIndex;
 
-    /// <summary>True if this argument is packed into bits 16-31 of the opcode word itself (a
-    /// single-word instruction), rather than being its own separate following word.</summary>
     public bool Packed;
 
     public string Label = "";
 }
 
-/// <summary>One decoded AMX instruction, with its argument slots ready to read or edit.</summary>
 public sealed class DecodedInstruction
 {
-    /// <summary>Index of this instruction's opcode word in the flat instruction array.</summary>
     public int FlatIndex;
 
-    /// <summary>Total words this instruction occupies (1 for packed/argless, 2+ otherwise).</summary>
     public int WordCount;
 
-    /// <summary>The original human-readable line from <see cref="Scripts.ParseScript"/> for this instruction.</summary>
     public string Display = "";
 
     public List<ScriptArgSlot> Args { get; } = [];
 }
 
-/// <summary>
-/// Turns a decompressed AMX instruction stream into a list of editable instructions, and back.
-/// <para>
-/// Deliberately does NOT reimplement <see cref="Scripts.ParseScript"/>'s large per-opcode switch -
-/// with 256 distinct opcodes seen across this ROM's real scripts (179 of them still unnamed
-/// placeholders), hand-transcribing that switch's word-consumption rules a second time would risk
-/// a silent, hard-to-notice mismatch that corrupts editing for whichever opcode got it wrong.
-/// Instead, this calls the already-verified <c>ParseScript</c> once and derives each instruction's
-/// word span from the hex offset prefix every line already carries (<c>"0x0004: [2E] ..."</c>) -
-/// the span between consecutive instructions' offsets, divided by 4, is that instruction's real
-/// word count, whatever shape its own opcode case happens to have (including the one genuinely
-/// variable-length opcode, the 0x82 switch/jump table - no special-casing needed, since its
-/// consumed word count falls straight out of the same offset math as everything else).
-/// </para>
-/// <para>
-/// A one-word instruction's argument (if the displayed text shows one) is packed into that same
-/// word's upper 16 bits (bits 16-31, a signed 16-bit value) - matching the switch's own
-/// <c>(short)(c &gt;&gt; 16)</c> pattern; anything spanning more than one word has its remaining
-/// words each treated as an independent, whole-word argument. This can't know each argument's
-/// individual semantic meaning (item id vs quantity vs a jump delta, say) without the opcode names
-/// this ROM is still missing - editing is generic by design, and jump-shaped instructions (their
-/// argument is a byte offset relative to the instruction's own position) are left editable but
-/// clearly displayed as such, same as everything else, so the caller/UI can warn appropriately.
-/// </para>
-/// </summary>
 public static class ScriptEditing
 {
-    /// <param name="nativeHashes">
-    /// Forwarded to <see cref="Scripts.ParseScript"/> - see <see cref="Script.NativeFunctionHashes"/>.
-    /// Only affects the human-readable <see cref="DecodedInstruction.Display"/> text; word boundaries
-    /// and argument slots are unaffected either way.
-    /// </param>
     public static List<DecodedInstruction> Decode(uint[] cmd, uint[] nativeHashes = null)
     {
         string[] lines = Scripts.ParseScript(cmd, nativeHashes: nativeHashes);
@@ -93,14 +55,12 @@ public static class ScriptEditing
         return result;
     }
 
-    /// <summary>Parses the leading <c>"0xNNNN:"</c> byte offset every <see cref="Scripts.ParseScript"/> line starts with.</summary>
     private static int ParseLineByteOffset(string line)
     {
         int colon = line.IndexOf(':');
         return Convert.ToInt32(line[2..colon], 16);
     }
 
-    /// <summary>True if the line's own parenthesised argument list isn't empty (i.e. not literally "()").</summary>
     private static bool HasDisplayedArgument(string line)
     {
         int open = line.IndexOf('(');
@@ -112,7 +72,6 @@ public static class ScriptEditing
     public static int GetArgValue(uint[] cmd, ScriptArgSlot slot) =>
         slot.Packed ? (short)(cmd[slot.FlatIndex] >> 16) : unchecked((int)cmd[slot.FlatIndex]);
 
-    /// <summary>Writes a new value into an argument slot, in place, without touching any other word.</summary>
     public static void SetArgValue(uint[] cmd, ScriptArgSlot slot, int value)
     {
         cmd[slot.FlatIndex] = slot.Packed
@@ -120,14 +79,6 @@ public static class ScriptEditing
             : unchecked((uint)value);
     }
 
-    /// <summary>
-    /// Opcodes whose word right after the opcode is a self-relative branch/call delta - target =
-    /// (this instruction's own flat word index * 4) + delta - mirrored exactly from
-    /// <see cref="Scripts.ParseScript"/>'s own case list (CallFunc, the unconditional jumps, and
-    /// every conditional branch). <see cref="SwitchOpcode"/> (0x82) is handled separately: it packs
-    /// several such deltas, one per case plus a default, at positions that depend on its own case
-    /// count rather than a fixed offset.
-    /// </summary>
     private static readonly HashSet<uint> BranchOpcodes =
     [
         0x31, 0x33, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x81,
@@ -135,26 +86,6 @@ public static class ScriptEditing
 
     private const uint SwitchOpcode = 0x82;
 
-    /// <summary>
-    /// Removes <paramref name="wordCount"/> words starting at <paramref name="startFlatIndex"/> from
-    /// a decompressed instruction stream, and corrects every branch/call/switch-case delta ELSEWHERE
-    /// in the same stream whose source and target end up on opposite sides of the removed span.
-    /// <para>
-    /// A delta entirely before the removed span, or entirely after it, needs no change: both its
-    /// source and target shift by the same amount when later instructions move down to fill the
-    /// gap, so their difference - the delta itself - is unaffected. Only a delta that CROSSES the
-    /// removed span would otherwise end up pointing at the wrong place once its neighbours move;
-    /// this recomputes exactly those, and only those.
-    /// </para>
-    /// <para>
-    /// Throws if some other instruction's branch target lands INSIDE the span being removed - that
-    /// would mean removing code something else still jumps into, which is never safe to silently
-    /// patch around. Reuses <see cref="Decode"/> for instruction boundaries rather than re-deriving
-    /// word counts here, for the same reason <see cref="Decode"/> itself avoids re-deriving them
-    /// from the opcode table: a second, hand-written copy of those rules is exactly how a rename or
-    /// a new opcode quietly goes stale in one copy and not the other.
-    /// </para>
-    /// </summary>
     public static uint[] RemoveWords(uint[] cmd, int startFlatIndex, int wordCount)
     {
         if (wordCount <= 0) return (uint[])cmd.Clone();
@@ -215,14 +146,6 @@ public static class ScriptEditing
         return result;
     }
 
-    /// <summary>
-    /// The exact inverse of <see cref="RemoveWords"/>: inserts <paramref name="words"/> starting at
-    /// <paramref name="startFlatIndex"/>, correcting every branch/call/switch-case delta elsewhere
-    /// whose source and target end up on opposite sides of the new span - the same crossing-delta
-    /// adjustment <see cref="RemoveWords"/> makes, just shifting outward instead of closing a gap.
-    /// Exists to undo a removal cleanly (repair a bad edit) rather than requiring the original,
-    /// un-edited stream to still be available.
-    /// </summary>
     public static uint[] InsertWords(uint[] cmd, int startFlatIndex, uint[] words)
     {
         if (words.Length == 0) return (uint[])cmd.Clone();

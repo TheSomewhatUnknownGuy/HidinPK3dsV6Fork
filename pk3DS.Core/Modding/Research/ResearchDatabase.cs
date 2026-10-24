@@ -7,14 +7,6 @@ using System.Text.Json.Serialization;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// The whole ARM research corpus, parsed once and queryable by target binary.
-/// <para>
-/// Nothing here is hardcoded to a particular ROM: addresses, function names, free space and
-/// relocations all come from the workbooks, so re-pointing a table or moving a function is a
-/// spreadsheet edit rather than a code change.
-/// </para>
-/// </summary>
 public sealed class ResearchDatabase
 {
     public List<ResearchSheet> Sheets { get; } = [];
@@ -23,7 +15,6 @@ public sealed class ResearchDatabase
     public string SourceFolder { get; private set; } = "";
     public string Version { get; private set; } = "UM";
 
-    /// <summary>Folder name -> category label. Anything else is scanned as "Root".</summary>
     private static readonly (string Sub, string Category)[] CategoryFolders =
     [
         ("Move Edits", "Move"),
@@ -64,9 +55,6 @@ public sealed class ResearchDatabase
         return db;
     }
 
-    /// <summary>
-    /// Parses every workbook in a folder, in parallel, appending the results in file order.
-    /// </summary>
     private void LoadFolder(string folder, string category, SearchOption option, Action<string> log)
     {
         string[] files;
@@ -137,20 +125,12 @@ public sealed class ResearchDatabase
     public IEnumerable<ResearchFreeSpace> AllFreeSpace => Sheets.SelectMany(s => s.FreeSpace);
     public IEnumerable<ResearchTableLocation> AllTables => Sheets.SelectMany(s => s.Tables);
 
-    /// <summary>
-    /// Documented master index tables, best copy per name. These carry the id fingerprints used
-    /// by <see cref="MechanicTableLocator"/> to find the tables inside an actual ROM.
-    /// </summary>
     public List<ResearchMechanicIndex> MechanicIndexes =>
         Sheets.SelectMany(s => s.MechanicIndexes)
               .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
               .Select(g => g.OrderByDescending(m => m.Entries.Count).First())
               .ToList();
 
-    /// <summary>
-    /// Ready-to-place routines for a binary, largest first. These are the candidates a
-    /// "add a custom function" flow offers the user.
-    /// </summary>
     public List<ResearchFunctionBody> BodiesFor(ResearchTarget target, int minimumSize = 8) =>
         AllBodies.Where(b => b.Target == target && b.Size >= minimumSize)
                  .OrderByDescending(b => b.Size)
@@ -158,14 +138,9 @@ public sealed class ResearchDatabase
 
     public IEnumerable<ResearchSheet> SheetsOfKind(ResearchSheetKind kind) => Sheets.Where(s => s.Kind == kind);
 
-    /// <summary>Applyable effect sheets (patch lists that actually carry bytes), by category.</summary>
     public IEnumerable<ResearchSheet> EffectSheets =>
         Sheets.Where(s => s.Kind == ResearchSheetKind.PatchList && s.Patches.Count > 0);
 
-    /// <summary>
-    /// Function symbol table for one binary, keyed by in-file offset. Later duplicates lose to
-    /// the first entry that carries a name, so the richest documentation wins.
-    /// </summary>
     public Dictionary<uint, ResearchFunction> FunctionSymbols(ResearchTarget target)
     {
         var map = new Dictionary<uint, ResearchFunction>();
@@ -179,7 +154,6 @@ public sealed class ResearchDatabase
         return map;
     }
 
-    /// <summary>Timing byte -> meaning, merged across every sheet that documents them.</summary>
     public IReadOnlyDictionary<byte, ResearchTiming> Timings
     {
         get
@@ -191,21 +165,12 @@ public sealed class ResearchDatabase
         }
     }
 
-    /// <summary>
-    /// Regions with room to spare in a given binary, largest first — the allocator's preferred
-    /// source of truth over scanning the file for 0xCC runs.
-    /// </summary>
     public List<ResearchFreeSpace> FreeSpaceFor(ResearchTarget target, int minimumRoom = 4) =>
         AllFreeSpace
             .Where(f => f.Target == target && f.Room >= minimumRoom)
             .OrderByDescending(f => f.Room)
             .ToList();
 
-    /// <summary>
-    /// The master index tables, de-duplicated by name. Several workbooks carry their own copy of
-    /// this registry; the copy that documents the most (expansion counts and relocated addresses)
-    /// wins, so a stale duplicate can't mask a maintained one.
-    /// </summary>
     public List<ResearchTableLocation> TableRegistry =>
         AllTables
             .Where(t => !string.IsNullOrWhiteSpace(t.Name))
@@ -236,9 +201,6 @@ public sealed class ResearchDatabase
     public void SaveJson(string path) =>
         File.WriteAllText(path, JsonSerializer.Serialize(new Snapshot(this), JsonOpts));
 
-    /// <summary>
-    /// Options for the cache round-trip.
-    /// </summary>
     private static readonly JsonSerializerOptions CacheOpts = new()
     {
         WriteIndented = false,
@@ -247,12 +209,8 @@ public sealed class ResearchDatabase
         PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
     };
 
-    /// <summary>Default place the parsed corpus is cached.</summary>
     public static string DefaultCachePath => CacheFile("research_cache.json");
 
-    /// <summary>
-    /// Resolves a cache file name to somewhere it can actually be written.
-    /// </summary>
     public static string CacheFile(string name)
     {
         string beside = AppDomain.CurrentDomain.BaseDirectory;
@@ -282,10 +240,6 @@ public sealed class ResearchDatabase
 
     private static string _cacheDir;
 
-    /// <summary>
-    /// Cheap signature of the source folder: how many workbooks, their total size, and the newest
-    /// timestamp. Enough to notice an edit, an addition or a deletion without reading any of them.
-    /// </summary>
     public static string Fingerprint(string folder)
     {
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return "";
@@ -306,9 +260,6 @@ public sealed class ResearchDatabase
         catch { return ""; }
     }
 
-    /// <summary>
-    /// Loads the corpus, reusing a cached parse when the source folder has not changed.
-    /// </summary>
     public static ResearchDatabase LoadCached(string armResearchFolder, string version = "UM",
                                               string cachePath = null, Action<string> log = null)
     {
@@ -370,7 +321,6 @@ public sealed class ResearchDatabase
     private static ResearchDatabase _memo;
     private static string _memoKey;
 
-    /// <summary>Identity of a parsed corpus: where it came from, which game, and its signature.</summary>
     private static string MemoKeyFor(string folder, string version, string fingerprint) =>
         string.Join('|', folder, version, fingerprint);
 
@@ -384,9 +334,6 @@ public sealed class ResearchDatabase
         return db;
     }
 
-    /// <summary>
-    /// The parsed corpus that ships inside the program, for when the research folder is not present.
-    /// </summary>
     public static ResearchDatabase LoadEmbedded(string version = "UM", Action<string> log = null)
     {
         log ??= _ => { };
@@ -429,9 +376,6 @@ public sealed class ResearchDatabase
         }
     }
 
-    /// <summary>
-    /// The corpus for a version: the folder when there is one, the built-in copy otherwise.
-    /// </summary>
     public static ResearchDatabase LoadBest(string armResearchFolder, string version,
                                             string cachePath = null, Action<string> log = null)
     {
@@ -444,7 +388,6 @@ public sealed class ResearchDatabase
         return LoadEmbedded(version, log);
     }
 
-    /// <summary>Discards the cache so the next load reparses.</summary>
     public static void ClearCache(string cachePath = null)
     {
         lock (MemoLock) { _memo = null; _memoKey = null; }
@@ -456,10 +399,8 @@ public sealed class ResearchDatabase
         catch { /* nothing depends on the delete succeeding */ }
     }
 
-    /// <summary>Flat, human-diffable projection — handy for reviewing what the parser understood.</summary>
     private sealed class Snapshot
     {
-        /// <summary>Source-folder signature this snapshot was produced from; empty when unknown.</summary>
         public string Fingerprint { get; set; } = "";
 
         public string SourceFolder { get; set; }

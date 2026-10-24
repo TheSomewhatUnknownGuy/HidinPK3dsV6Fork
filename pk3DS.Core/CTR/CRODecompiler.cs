@@ -5,11 +5,6 @@ using System.Linq;
 
 namespace pk3DS.Core.CTR
 {
-    /// <summary>
-    /// Decompiles a CRO binary into a fully navigable DecompiledCRO object model.
-    /// Discovers move/ability/item tables, timing entries, function pointers,
-    /// and all relocation patch chains.
-    /// </summary>
     public static class CRODecompiler
     {
 
@@ -17,9 +12,6 @@ namespace pk3DS.Core.CTR
         private const uint VANILLA_MOVE_DISPATCHER_SIG = 0xE92D4070;   // PUSH {R4-R6, LR}
         private const uint VANILLA_ABILITY_DISPATCHER_SIG = 0xE92D4030; // PUSH {R4, R5, LR}
 
-        /// <summary>
-        /// Decompile a CRO binary into a structured DecompiledCRO object.
-        /// </summary>
         public static DecompiledCRO Decompile(byte[] data, string sourcePath = null, string[] moveNames = null, string[] abilityNames = null, string[] itemNames = null)
         {
             var cro = new DecompiledCRO
@@ -54,9 +46,6 @@ namespace pk3DS.Core.CTR
             return cro;
         }
 
-        /// <summary>
-        /// Lightweight decompile that only parses header, segments, and relocations (no table discovery).
-        /// </summary>
         public static DecompiledCRO DecompileStructure(byte[] data, string sourcePath = null)
         {
             var cro = new DecompiledCRO { RawData = data, SourcePath = sourcePath };
@@ -123,12 +112,6 @@ namespace pk3DS.Core.CTR
         #endregion
 
         #region Mechanic Table Discovery
-        /// <summary>
-        /// Discover a mechanic table by scanning .rodata (segment 1) for dense clusters
-        /// of relocation patches pointing back to .code (segment 0).
-        /// USUM dispatches via LDR PC, [PC, Rn, LSL #2] pointer tables, so the actual
-        /// function pointer array lives in .rodata and each entry has an RPT.
-        /// </summary>
         private static MechanicTable DiscoverMechanicTable(byte[] data, DecompiledCRO cro, MechanicType type, string[] names, HashSet<int> claimedClusters, HashSet<uint> claimedJumpTables)
         {
             var table = new MechanicTable { Type = type };
@@ -508,9 +491,6 @@ namespace pk3DS.Core.CTR
             return tt;
         }
 
-        /// <summary>
-        /// Estimate function size by scanning for a return instruction (POP {.., PC} or BX LR).
-        /// </summary>
         private static int EstimateFunctionSize(byte[] data, uint offset)
         {
             int maxScan = 0x400; // 1KB max function size
@@ -621,9 +601,6 @@ namespace pk3DS.Core.CTR
         }
         #endregion
 
-        /// <summary>
-        /// Public wrapper for EstimateFunctionSize.
-        /// </summary>
         public static int EstimateFunctionSizePublic(byte[] data, uint offset) => EstimateFunctionSize(data, offset);
 
         #region Helpers

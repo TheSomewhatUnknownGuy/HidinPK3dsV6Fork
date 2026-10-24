@@ -7,149 +7,73 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>How a recipe puts its effect into the ROM.</summary>
 public enum RecipeEffectKind
 {
-    /// <summary>A hand-written Battle.cro patch that already exists in <see cref="ResearchEngine"/>.</summary>
     ItemPatch,
 
-    /// <summary>One of the built-in <see cref="FunctionTemplates"/>, installed as a custom function.</summary>
     Template,
 
-    /// <summary>Nothing is patched: the entry is data only (names, descriptions, table rows).</summary>
     DataOnly,
 
-    /// <summary>
-    /// The level cap: <see cref="LevelCapPatch"/> assembles its routine and table and hooks both
-    /// the experience path and the Rare Candy path.
-    /// </summary>
     LevelCap,
 
-    /// <summary>
-    /// The byte writes a research sheet already records, applied straight into its target binary.
-    /// </summary>
     CorpusPatch,
 
-    /// <summary>
-    /// A finished <see cref="PatchPackage"/>: mechanic slots, code blocks, site hooks and item data,
-    /// applied by <see cref="PatchPackageInstaller"/>.
-    /// </summary>
     Package,
 
-    /// <summary>
-    /// A loose <c>.ips</c> patch against code.bin, of the kind the community distributes.
-    /// </summary>
     IpsPatch,
 
-    /// <summary>
-    /// A handful of literal byte writes into code.bin, with the expected before-value recorded.
-    /// </summary>
     ByteEdit,
 }
 
-/// <summary>
-/// One literal byte write, with the value it is expected to replace.
-/// </summary>
-/// <param name="Target">
-/// Which binary this byte belongs to. Null means the recipe's own <see cref="Recipe.Target"/>, which
-/// is what every single-file recipe wants. Set it when one feature spans two files - a hook in one
-/// binary reaching a routine in another is a normal shape, and splitting that across two recipes
-/// would let a user install half of it.
-/// </param>
 public sealed record ByteEdit(uint Offset, byte From, byte To, ResearchTarget? Target = null);
 
-/// <summary>
-/// A precondition: <paramref name="Bytes"/> must already be at <paramref name="Offset"/> in
-/// <paramref name="Target"/> for the recipe to be applicable to this build.
-/// </summary>
-/// <param name="Describes">What its presence proves, for the refusal message.</param>
-/// <param name="Remedy">
-/// What the reader should do about it. Optional; without one the refusal falls back to a generic
-/// "built for a different binary" line, which is right for a wrong-build anchor and wrong for an
-/// anchor that is really saying "you already have this".
-/// </param>
 public sealed record RecipeAnchor(ResearchTarget Target, uint Offset, byte[] Bytes, string Describes,
                                   string? Remedy = null)
 {
-    /// <summary>Whether the binary holds this anchor.</summary>
     public bool Present(byte[] bin) =>
         bin != null && Offset + Bytes.Length <= bin.Length &&
         System.Linq.Enumerable.Range(0, Bytes.Length).All(k => bin[Offset + k] == Bytes[k]);
 }
 
-/// <summary>
-/// How far a region of code.bin moved between games: rows at or after <paramref name="From"/> shift
-/// by <paramref name="Delta"/>.
-/// </summary>
 public sealed record CodeBinShift(uint From, int Delta);
 
-/// <summary>
-/// A complete, one-click addition to a ROM.
-/// </summary>
 public sealed class Recipe
 {
     public string Name { get; init; } = "";
     public string Summary { get; init; } = "";
     public CustomMechanicKind Kind { get; init; } = CustomMechanicKind.Item;
 
-    /// <summary>Ids this recipe occupies. Most need one; the mints need twenty-one.</summary>
     public int SlotCount => Entries.Count;
 
-    /// <summary>Name and description for each slot, in order.</summary>
     public List<RecipeEntry> Entries { get; init; } = [];
 
     public RecipeEffectKind EffectKind { get; init; } = RecipeEffectKind.DataOnly;
 
-    /// <summary>For <see cref="RecipeEffectKind.ItemPatch"/>: the patch name ResearchEngine knows.</summary>
     public string? PatchName { get; init; }
 
-    /// <summary>For <see cref="RecipeEffectKind.Template"/>: the template name, and its timing.</summary>
     public string? TemplateName { get; init; }
 
-    /// <summary>
-    /// Parameter values for <see cref="TemplateName"/>, keyed by the template's parameter keys.
-    /// </summary>
     public Dictionary<string, string> TemplateValues { get; init; } = [];
 
-    /// <summary>
-    /// Timing byte to install at, when the recipe knows it. Null asks <see cref="TemplateTiming"/>
-    /// to resolve one from the template's model.
-    /// </summary>
     public byte? Timing { get; init; }
 
-    /// <summary>Mechanic the template attaches to, by name. Null uses the assigned id itself.</summary>
     public string? AttachTo { get; init; }
 
-    /// <summary>For <see cref="RecipeEffectKind.Package"/>: the loaded package itself.</summary>
     public PatchPackage? Package { get; init; }
 
-    /// <summary>Where the package was loaded from, for the detail pane.</summary>
     public string? PackagePath { get; init; }
 
-    /// <summary>For <see cref="RecipeEffectKind.IpsPatch"/>: full path to the .ips file.</summary>
     public string? IpsPath { get; init; }
 
-    /// <summary>For <see cref="RecipeEffectKind.ByteEdit"/>: the writes, already version-selected.</summary>
     public List<ByteEdit> ByteEdits { get; init; } = [];
 
-    /// <summary>
-    /// Bytes that must already be present before this recipe is allowed to write.
-    /// </summary>
     public List<RecipeAnchor> Anchors { get; init; } = [];
 
-    /// <summary>
-    /// Offset to add to a workbook's code.bin rows for a given game, keyed by "US"/"UM".
-    /// </summary>
     public Dictionary<string, List<CodeBinShift>> CodeBinDeltaByVersion { get; init; } = [];
 
-    /// <summary>
-    /// Game this recipe is valid for — "US", "UM", or null for anything.
-    /// </summary>
     public string? ForVersion { get; init; }
 
-    /// <summary>
-    /// Which shelf this belongs on, for grouping the list.
-    /// </summary>
     public string Category => EffectKind switch
     {
         RecipeEffectKind.Package => "Items & abilities",
@@ -160,22 +84,15 @@ public sealed class Recipe
         _ => "Battle mechanics",
     };
 
-    /// <summary>For <see cref="RecipeEffectKind.CorpusPatch"/>: the source workbook, e.g. "Nature Mints.xlsx".</summary>
     public string? SheetFile { get; init; }
 
-    /// <summary>Binary the recorded patches are written into.</summary>
     public ResearchTarget Target { get; init; } = ResearchTarget.BattleCro;
 
-    /// <summary>
-    /// Every file this recipe writes to, as plain names.
-    /// </summary>
     public List<string> TargetFiles { get; init; } = [];
 
-    /// <summary>The files this recipe changes, for display. Never empty.</summary>
     public IReadOnlyList<string> ResolvedTargets =>
         TargetFiles.Count > 0 ? TargetFiles : [FileNameOf(Target)];
 
-    /// <summary>The RomFS/ExeFS file a target names.</summary>
     public static string FileNameOf(ResearchTarget t) => t switch
     {
         ResearchTarget.BagCro => "Bag.cro",
@@ -189,18 +106,13 @@ public sealed class Recipe
         _ => "(unknown)",
     };
 
-    /// <summary>How many byte writes the sheet holds, for display before installing.</summary>
     public int PatchCount { get; set; }
 
-    /// <summary>
-    /// Things this recipe cannot do by itself, stated up front rather than discovered afterwards.
-    /// </summary>
     public List<string> Caveats { get; init; } = [];
 
     public override string ToString() => $"{Name} ({SlotCount} id{(SlotCount == 1 ? "" : "s")})";
 }
 
-/// <summary>One id a recipe occupies, with the text that should appear in game.</summary>
 public sealed class RecipeEntry
 {
     public string Name { get; init; } = "";
@@ -208,14 +120,11 @@ public sealed class RecipeEntry
     public string? Plural { get; init; }
     public string? PluralAlt { get; init; }
 
-    /// <summary>Id chosen by the author. -1 until assigned.</summary>
     public int Id { get; set; } = -1;
 }
 
-/// <summary>The built-in recipe book.</summary>
 public static class Recipes
 {
-    /// <summary>The twenty-one nature mints, in the order the game's own dispatcher walks them.</summary>
     private static readonly (string Nature, string Raises, string Lowers)[] Mints =
     [
         ("Lonely",  "Attack",    "Defense"),
@@ -241,9 +150,6 @@ public static class Recipes
         ("Serious", "nothing",   "nothing"),
     ];
 
-    /// <summary>
-    /// Whether a loaded package covers <paramref name="feature"/>, by name or in its item names.
-    /// </summary>
     private static bool HasPackageFor(string feature)
     {
         try
@@ -293,9 +199,6 @@ public static class Recipes
     private static bool Serious(this (string Nature, string Raises, string Lowers) m) =>
         m.Raises == "nothing";
 
-    /// <summary>
-    /// The Gen 8/9 competitive items, each labelled by its own name rather than by patch jargon.
-    /// </summary>
     private static readonly (string Item, string Desc, string? Plural)[] CompetitiveItems =
     [
         ("Clear Amulet",
@@ -387,13 +290,9 @@ public static class Recipes
         return list;
     }
 
-    /// <summary>A template plus the parameter values that make it into one specific item.</summary>
     private sealed record TemplateBuild(string Template, Dictionary<string, string> Values,
                                         byte Timing, List<string> Caveats);
 
-    /// <summary>
-    /// The Gen 8/9 items whose behaviour an existing template genuinely produces.
-    /// </summary>
     private static TemplateBuild? MapToTemplate(string item) => item switch
     {
         // Clear Body's routine IS Clear Amulet's mechanic: refuse an opponent's stat drop, allow
@@ -420,20 +319,10 @@ public static class Recipes
         _ => null,
     };
 
-    /// <summary>
-    /// Recipe names <see cref="ResearchEngine.ApplyItemPatch"/> has a working handler for.
-    /// </summary>
     private static string? MapToPatchName(string item) => null;
 
     public static IReadOnlyList<Recipe> Book => All.Value;
 
-    /// <summary>
-    /// The recipes shown in the Recipes tab: the Gen 8/9 items, plus the mints.
-    /// </summary>
-    /// <param name="version">
-    /// "US" or "UM". IPS patches are offered only for the matching build; anything else and none
-    /// are offered at all, because guessing wrong writes a UM patch into a US binary.
-    /// </param>
     public static List<Recipe> Discover(ResearchDatabase? db, string? version = null)
     {
         var list = new List<Recipe>();
@@ -461,10 +350,6 @@ public static class Recipes
         return list;
     }
 
-    /// <summary>Mechanics that are literally a byte, with their per-version offsets.</summary>
-    /// <summary>
-    /// The Rare Candy in-bag evolution patch, corrected and relocated.
-    /// </summary>
     private static Recipe RareCandyInBagEvolution()
     {
         // Where each trampoline lives now. C keeps the workbook's address (already blank); A and B
@@ -553,10 +438,6 @@ public static class Recipes
         };
     }
 
-    /// <summary>
-    /// The Expansion Pack's own Rare Candy / evolution-cutscene-skip feature, recorded as byte edits
-    /// so it can be installed on demand instead of only arriving bundled with an Expansion build.
-    /// </summary>
     private static Recipe ExpansionRareCandyEvolution()
     {
         const uint Blank = 0x00000000;
@@ -635,20 +516,17 @@ public static class Recipes
         };
     }
 
-    /// <summary>Assigns a binary to a run of edits, so one recipe can span files.</summary>
     private static IEnumerable<ByteEdit> In(ResearchTarget t, IEnumerable<ByteEdit> edits)
     {
         foreach (var e in edits) yield return e with { Target = t };
     }
 
-    /// <summary>Encodes an ARM <c>B</c> at <paramref name="at"/> reaching <paramref name="target"/>.</summary>
     private static uint Branch(uint at, uint target)
     {
         long off = ((long)target - (at + 8)) / 4;
         return 0xEA000000u | (uint)(off & 0x00FFFFFF);
     }
 
-    /// <summary>Turns whole-word writes into the per-byte edits <see cref="ByteEdit"/> records.</summary>
     private static IEnumerable<ByteEdit> Words(params (uint At, uint From, uint To)[] rows)
     {
         foreach (var (at, from, to) in rows)
@@ -853,9 +731,6 @@ public static class Recipes
         }
     }
 
-    /// <summary>
-    /// Whole-mechanic edits recorded in the "Other Mechanics" workbooks.
-    /// </summary>
     private static IEnumerable<Recipe> OtherMechanics(string? version)
     {
         (string Sheet, string Name, string Summary, string[] Caveats)[] features =
@@ -967,9 +842,6 @@ public static class Recipes
         }
     }
 
-    /// <summary>
-    /// Loose .ips patches for the loaded build, from the version's own folder only.
-    /// </summary>
     private static List<Recipe> DiscoverIps(string? version)
     {
         var list = new List<Recipe>();
@@ -1023,7 +895,6 @@ public static class Recipes
         return list;
     }
 
-    /// <summary>Folders searched for the loose .ips patch sets.</summary>
     public static IEnumerable<string> IpsFolders()
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -1039,7 +910,6 @@ public static class Recipes
         }
     }
 
-    /// <summary>Folders searched for packages, nearest first.</summary>
     public static IEnumerable<string> PackageFolders()
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -1140,7 +1010,6 @@ public static class Recipes
     public static Recipe? ByName(string name) =>
         All.Value.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Recipes whose effect is actually implemented, as opposed to text-only.</summary>
     public static IEnumerable<Recipe> Working =>
         All.Value.Where(r => r.EffectKind != RecipeEffectKind.ItemPatch || r.PatchName != null);
 }

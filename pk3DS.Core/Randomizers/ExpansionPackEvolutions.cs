@@ -5,26 +5,6 @@ using pk3DS.Core.Structures;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// The Expansion Pack mod (which adds Gen 8/9 species 808-1025, plus Galarian/Hisuian regional
-/// forms and White-Striped Basculin, to a Gen 6/7 ROM) doesn't give a number of these Pokemon a
-/// working evolution method. This adds one for each, every time a seed is generated — matching
-/// their real mainline-game evolution method wherever the ROM's evolution format can represent
-/// it (Method 4 = level up, 8 = use item, 21 = level up knowing a move, 22 = level up with a
-/// specific species in the party, 33 = level up at night), and falling back to an equivalent
-/// level requirement where it can't (move-use counters, step counters, battle counters, etc. —
-/// each such substitution is called out below).
-///
-/// Every species/move/item is resolved BY NAME at runtime against this ROM's own text tables
-/// rather than hardcoded IDs, since Expansion Pack species IDs can vary slightly by build. The
-/// one exception is species from Rellor (species ~953) onward: pk3DS's own Gen8/9 name table
-/// (Gen89SpeciesNames.Names808_1025) has a known off-by-one gap starting at Rellor's slot, so
-/// name lookup for species at/after that point falls back to a hardcoded National Dex number.
-/// Regional-form entries assume the added form is form index 1 (2 for White-Striped Basculin,
-/// since Basculin already has 2 vanilla forms) — this matches how every existing Gen 7 regional
-/// form (Alolan Raichu, etc.) is indexed, but wasn't verifiable against a live ROM; spot-check
-/// in the Evolution Editor if an entry looks off.
-/// </summary>
 public static class ExpansionPackEvolutions
 {
     private sealed class EvoDef
@@ -174,15 +154,8 @@ public static class ExpansionPackEvolutions
         new() { SourceName = "Slowpoke", SourceForm = 1, TargetForm = 1, TargetName = "Slowking", Method = MethodUseItem, ArgItemName = "Galarica Wreath", Level = 37, FallbackSourceId = 79, FallbackTargetId = 199 },
     ];
 
-    /// <summary>
-    /// Adds the missing evolution methods to <paramref name="config"/>'s in-memory evolution sets.
-    /// </summary>
-    /// <returns>How many entries were added. Zero means nothing needed changing.</returns>
     public static int Apply(GameConfig config) => Apply(config, config?.Evolutions);
 
-    /// <summary>
-    /// As above, against an explicit set of evolutions rather than the one on the config.
-    /// </summary>
     public static int Apply(GameConfig config, EvolutionSet[] evolutions)
     {
         int added = 0;
@@ -258,7 +231,6 @@ public static class ExpansionPackEvolutions
         return added;
     }
 
-    /// <summary>Writes the in-memory evolution sets back to the ROM's evolution GARC.</summary>
     public static bool Save(GameConfig config)
     {
         try
@@ -276,10 +248,6 @@ public static class ExpansionPackEvolutions
         catch { return false; }
     }
 
-    /// <summary>
-    /// Applies the missing methods and writes them out in one step.
-    /// </summary>
-    /// <returns>How many entries were added and saved.</returns>
     public static int ApplyAndSave(GameConfig config)
     {
         int added = Apply(config);
@@ -287,12 +255,8 @@ public static class ExpansionPackEvolutions
         return added;
     }
 
-    /// <summary>
-    /// How many of these evolutions are missing from the ROM right now, without changing anything.
-    /// </summary>
     public static int CountMissing(GameConfig config) => CountMissing(config, config?.Evolutions);
 
-    /// <summary>As above, against an explicit set of evolutions.</summary>
     public static int CountMissing(GameConfig config, EvolutionSet[] evolutions)
     {
         if (config == null || evolutions == null || config.MaxSpeciesID < 1025) return 0;
@@ -323,12 +287,6 @@ public static class ExpansionPackEvolutions
         return missing;
     }
 
-    /// <summary>
-    /// The evolution entry a definition belongs to. Gen 7 keeps one evolution file per personal
-    /// entry, forms included, so Galarian Farfetch'd's evolution must go in its form's entry: written
-    /// to the base entry it made Kantonian Farfetch'd evolve into Sirfetch'd. Returns -1 when this ROM
-    /// has no such form, rather than falling back to the base species.
-    /// </summary>
     private static int SourceIndex(GameConfig config, int sourceId, int sourceForm)
     {
         if (sourceForm <= 0) return sourceId;
@@ -336,6 +294,5 @@ public static class ExpansionPackEvolutions
         return index == sourceId ? -1 : index;
     }
 
-    /// <summary>Every species this class can add an evolution for, for reporting.</summary>
     public static int DefinedCount => Evolutions.Length;
 }

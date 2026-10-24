@@ -5,14 +5,10 @@ using pk3DS.Core.Modding;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Shows where a patch could be written, so the offset does not have to be worked out by hand.
-/// </summary>
 public sealed class FreeRegionPicker : Form
 {
     private readonly ListBox LB_Regions;
 
-    /// <summary>The region the user chose, or null if they cancelled.</summary>
     public AbilityFlagPatcher.FreeRegion Selected { get; private set; }
 
     public FreeRegionPicker(List<AbilityFlagPatcher.FreeRegion> regions, int neededBytes, string fileName)

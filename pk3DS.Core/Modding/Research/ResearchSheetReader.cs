@@ -6,21 +6,8 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Classifies a worksheet by its actual column schema, then extracts typed records for that
-/// schema.
-/// <para>
-/// The previous pipeline ran one heuristic ("find any column named Offset/Address, read a Hex
-/// column next to it") over every sheet in the tree. That produced ~29k "patches" including
-/// obvious nonsense — offsets past 0x33000000, which is far beyond any CRO or code.bin — because
-/// index sheets, type charts and text dumps were all being read as if they were patch lists. It
-/// also meant the relocation tracker, the 3k-entry stock-function index and the free-space
-/// registry were mined for patches and otherwise thrown away.
-/// </para>
-/// </summary>
 public static class ResearchSheetReader
 {
-    /// <summary>Largest plausible in-file offset. USUM's .code.bin is ~6 MB; CROs are far smaller.</summary>
     public const uint MaxPlausibleOffset = 0x0100_0000; // 16 MB
 
     public static ResearchSheet Read(string xlsxPath, string sheetName, string category, string version)
@@ -159,10 +146,6 @@ public static class ResearchSheetReader
         return (ResearchSheetKind.Unknown, -1, 0.0);
     }
 
-    /// <summary>
-    /// True when the sheet has no header but reads as address/hex pairs in the first two columns.
-    /// Requires several consecutive hits so a stray hex-looking cell can't promote a notes sheet.
-    /// </summary>
     private static bool LooksPositionalPatchList(ResearchGrid grid)
     {
         int hits = 0, examined = 0;
@@ -298,17 +281,6 @@ public static class ResearchSheetReader
         }
     }
 
-    /// <summary>
-    /// Reads the "Table locations and sizes" registry: which master tables exist, where they live
-    /// originally, and where they've been relocated to.
-    /// <para>
-    /// The sheet uses a two-row header — a banner row spanning each block ("Code Location" at one
-    /// column, "Table Data" further right) with per-column sub-headers ("Original", "Post-Load",
-    /// "# entries", "Edited") on the row below. Both blocks are resolved by finding their
-    /// sub-header columns within the block's span, so re-ordering or inserting a column in the
-    /// spreadsheet doesn't break the mapping.
-    /// </para>
-    /// </summary>
     private static void ExtractTableLocations(ResearchGrid grid, int bannerRow, ResearchSheet sheet)
     {
         int cCodeBanner = ResearchGrid.ColumnOf(grid.HeaderMap(bannerRow), "Code Location");
@@ -412,14 +384,6 @@ public static class ResearchSheetReader
         }
     }
 
-    /// <summary>
-    /// Reads a master index sheet ("Move Index", "Ability Index", ...) entry by entry.
-    /// <para>
-    /// The id sequence captured here is what lets the table be found in an arbitrary ROM later:
-    /// handler pointers are relocated and so differ per build, but the ids are part of the game's
-    /// data and stay put.
-    /// </para>
-    /// </summary>
     private static void ExtractMechanicIndex(ResearchGrid grid, int headerRow, ResearchSheet sheet)
     {
         var h = grid.HeaderMap(headerRow);
@@ -506,17 +470,6 @@ public static class ResearchSheetReader
         }
     }
 
-    /// <summary>
-    /// Extracts a patch sheet as a sequence of <em>sections</em>.
-    /// <para>
-    /// These sheets aren't flat lists: a text-only row acts as a banner ("Hidden Power 0x2D",
-    /// "Call Function") and the address/hex rows beneath it belong to that banner. Crucially, a
-    /// section whose addresses restart at 0 and step by 4 is not a patch at all — it's a complete
-    /// relocatable routine the researcher wrote for placement at an address chosen later. Reading
-    /// row-at-a-time (as before) both lost the grouping and threw those routines away as
-    /// "offset 0 is out of range", discarding the most directly reusable material in the corpus.
-    /// </para>
-    /// </summary>
     private static void ExtractPatches(ResearchGrid grid, int headerRow, ResearchSheet sheet, string version)
     {
         int cOffset, cHex, cAsm, cNote;
@@ -630,10 +583,6 @@ public static class ResearchSheetReader
             sheet.Diagnostics.Add($"{rejectedEmpty} row(s) rejected: no hex payload and no assembly");
     }
 
-    /// <summary>
-    /// Decides whether a collected section is a relocatable routine or a set of absolute patches,
-    /// and files it accordingly.
-    /// </summary>
     private static void EmitSection(
         ResearchSheet sheet, string name,
         List<(uint Offset, byte[] Bytes, string Asm, int Row)> rows,
@@ -687,12 +636,6 @@ public static class ResearchSheetReader
 
     private static string Get(ResearchGrid g, int row, int col) => col < 0 ? "" : g[row, col].Trim();
 
-    /// <summary>
-    /// Parses a hex address cell. Deliberately strict: the cell must be pure hex digits (after
-    /// stripping an optional 0x and separators). The old parser used <c>uint.TryParse(..., HexNumber)</c>
-    /// on loosely-trimmed text, which is what let stray values through as multi-hundred-megabyte
-    /// offsets, and threw on cells like "n/a" — taking the whole workbook down with it.
-    /// </summary>
     public static bool TryHex(string s, out uint value)
     {
         value = 0;

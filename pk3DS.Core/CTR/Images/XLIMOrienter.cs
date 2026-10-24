@@ -50,12 +50,6 @@ public class XLIMOrienter
 
     // Morton Translation
 
-    /// <summary>
-    /// Combines X/Y Coordinates to a decimal ordinate.
-    /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <returns></returns>
     internal static uint CartesianToDecimal(uint x, uint y)
     {
         x &= 0x0000ffff;
@@ -79,12 +73,6 @@ public class XLIMOrienter
         return x | (y << 1);
     }
 
-    /// <summary>
-    /// Decimal Ordinate In to X / Y Coordinate Out
-    /// </summary>
-    /// <param name="d">Loop integer which will be decoded to X/Y</param>
-    /// <param name="x">Output X coordinate</param>
-    /// <param name="y">Output Y coordinate</param>
     internal static void DecimalToCartesian(uint d, out uint x, out uint y)
     {
         x = d;

@@ -6,23 +6,10 @@ namespace pk3DS.Core.Randomizers.Competitive;
 
 public enum BulkGoal { Mixed, Physical, Special }
 
-/// <summary>What the EV/nature optimizer is asked for. Arrays are in EV order; see <see cref="CompetitiveMath"/>.</summary>
-/// <param name="AttackStat">ATK or SPA to fill to 252, or -1 for none.</param>
-/// <param name="UnusedAttackStat">The preferred stat for the nature to lower.</param>
-/// <param name="SpeedTarget">Speed must end strictly greater than this; 0 = no target.</param>
-/// <param name="SlowSpeed">Trick Room / Gyro Ball / slow pivot: 0 Speed EVs and a -Spe nature.</param>
-/// <param name="HazardHpModulus">Avoid an HP stat divisible by this (Stealth Rock: 4 for 2x Rock-weak, 2 for 4x); 0 = off.</param>
-/// <param name="DenyDownloadSpA">Spend up to 8 EVs so SpD ends above Def, which makes a foe's Download raise Atk instead of SpA.</param>
-/// <param name="SpeedCreep">The target is a small creep: a higher attacking stat outranks reaching it with fewer EVs.</param>
 public sealed record SpreadRequest(int[] Base, int[] Ivs, int Level, int AttackStat, int UnusedAttackStat,
     int SpeedTarget, bool SlowSpeed, BulkGoal Goal,
     int HazardHpModulus = 0, bool DenyDownloadSpA = false, bool SpeedCreep = false);
 
-/// <summary>
-/// Pure stat, EV and move-score math for the competitive engine (v2 spec §1-2). Depends only on the
-/// BCL, TypeChart.cs and CompetitiveWeights, so tests/CompetitiveCheck compiles it on its own.
-/// Every stat array here is in TrainerPoke7 EV order: [HP, Atk, Def, SpA, SpD, Spe].
-/// </summary>
 public static class CompetitiveMath
 {
     public const int HP = 0, ATK = 1, DEF = 2, SPA = 3, SPD = 4, SPE = 5;
@@ -30,7 +17,6 @@ public static class CompetitiveMath
     // The stat each nature row (raised) and column (lowered) affects, in the game's nature order.
     private static readonly int[] NatureStat = [ATK, DEF, SPE, SPA, SPD];
 
-    /// <summary>PersonalInfo.Stats is [HP, Atk, Def, Spe, SpA, SpD]; this returns it in EV order.</summary>
     public static int[] ToEvOrder(int[] personalStats) =>
         [personalStats[0], personalStats[1], personalStats[2], personalStats[4], personalStats[5], personalStats[3]];
 
@@ -44,14 +30,12 @@ public static class CompetitiveMath
         return stat == plus ? 110 : stat == minus ? 90 : 100;
     }
 
-    /// <summary>Gen 7 stat formula, in integer math as the game does it.</summary>
     public static int Stat(int stat, int baseStat, int iv, int ev, int level, int naturePercent)
     {
         int core = (2 * baseStat + iv + ev / 4) * level / 100;
         return stat == HP ? core + level + 10 : (core + 5) * naturePercent / 100;
     }
 
-    /// <summary>Smallest EV (0-252, step 4) reaching at least <paramref name="target"/>; -1 if 252 falls short.</summary>
     public static int MinEvFor(int stat, int baseStat, int iv, int level, int naturePercent, int target)
     {
         for (int ev = 0; ev <= 252; ev += 4)
@@ -59,15 +43,9 @@ public static class CompetitiveMath
         return -1;
     }
 
-    /// <summary>Smallest EV giving the same stat as <paramref name="ev"/> does.</summary>
     public static int Trim(int stat, int baseStat, int iv, int ev, int level, int naturePercent) =>
         MinEvFor(stat, baseStat, iv, level, naturePercent, Stat(stat, baseStat, iv, ev, level, naturePercent));
 
-    /// <summary>
-    /// Spec §1. Tries every nature allowed and keeps the one that (in order) meets the speed target with
-    /// the fewest Speed EVs, then has the highest attacking stat, then the best bulk, then lowers the
-    /// unused attacking stat. A speed creep puts the attacking stat first instead.
-    /// </summary>
     public static (int[] Evs, byte Nature) OptimizeSpread(SpreadRequest r)
     {
         int[] bestEvs = null;
@@ -171,10 +149,6 @@ public static class CompetitiveMath
         }
     }
 
-    /// <summary>
-    /// Spec §2: P x STAB x A x S x H x C, where <paramref name="attackStat"/> is S, the final Atk or SpA
-    /// from the Pokemon's §1 spread.
-    /// </summary>
     public static double ExpectedDamage(int power, int accuracy, int hitMin, int hitMax,
         bool stab, bool adaptability, double attackStat, bool chargeTurn, CompetitiveWeights w)
     {
@@ -186,17 +160,9 @@ public static class CompetitiveMath
         return p * s * a * attackStat * h * (chargeTurn ? w.ChargeTurnFactor : 1);
     }
 
-    /// <summary>
-    /// A status move scores like a neutral attack of StatusMoveBase power off the stronger attacking stat,
-    /// so it stays competitive with attacks, whose damage scales with that stat, without beating strong ones.
-    /// </summary>
     public static double StatusScore(double strongestStat, double listWeight, CompetitiveWeights w) =>
         w.StatusMoveBase * strongestStat * listWeight;
 
-    /// <summary>
-    /// Spec §2: for each of the 18 types, credit for hitting it super-effectively when the set can't
-    /// yet, and part credit for hitting neutrally a type that resists everything in the set.
-    /// </summary>
     public static double CoverageGain(int moveType, IReadOnlyCollection<int> setAttackTypes, CompetitiveWeights w)
     {
         double gain = 0;
@@ -213,7 +179,6 @@ public static class CompetitiveMath
     public static double Score(double damage, double coverageGain, double listWeight, CompetitiveWeights w) =>
         damage * (1 + w.CoverageWeight * coverageGain) * listWeight;
 
-    /// <summary>Index picked with probability proportional to weight; negative and NaN weights count as 0, and it is uniform when no weight is positive.</summary>
     public static int WeightedIndex(IReadOnlyList<double> weights, Random rnd)
     {
         double total = weights.Sum(x => x > 0 ? x : 0);

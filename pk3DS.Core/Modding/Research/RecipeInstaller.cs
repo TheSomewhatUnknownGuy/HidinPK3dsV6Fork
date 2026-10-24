@@ -7,12 +7,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Outcome of planning or applying a recipe.</summary>
 public sealed class RecipeResult
 {
     public List<string> Steps { get; } = [];
     public List<string> Errors { get; } = [];
-    /// <summary>Things the user must know that did not stop the operation (e.g. a part left as is).</summary>
     public List<string> Warnings { get; } = [];
     public bool Ok => Errors.Count == 0;
 
@@ -27,31 +25,18 @@ public sealed class RecipeResult
                 .Concat(Errors.Select(e => "  ERROR: " + e)));
 }
 
-/// <summary>
-/// Applies a <see cref="Recipe"/>: its text first, then its effect.
-/// </summary>
 public static class RecipeInstaller
 {
-    /// <summary>Checks a recipe against a ROM without writing anything.</summary>
-    /// <param name="values">
-    /// Package parameter values by name. A package can claim more than one id — the mints package
-    /// claims twenty-two — and supplying only the first left the rest on their authored defaults,
-    /// which collide on most ROMs. Null keeps the old behaviour of binding just the first id.
-    /// </param>
     public static RecipeResult Plan(Recipe recipe, GameConfig config, string? battleCroPath = null,
                                     ResearchDatabase? db = null, BattleMechanicMap? map = null,
                                     IDictionary<string, string>? values = null)
         => Run(recipe, config, battleCroPath, db, map, values, commit: false);
 
-    /// <summary>Applies a recipe. Only call after a clean <see cref="Plan"/>.</summary>
     public static RecipeResult Apply(Recipe recipe, GameConfig config, string? battleCroPath = null,
                                      ResearchDatabase? db = null, BattleMechanicMap? map = null,
                                      IDictionary<string, string>? values = null)
         => Run(recipe, config, battleCroPath, db, map, values, commit: true);
 
-    /// <summary>
-    /// Writes a recipe's names and descriptions into every language the ROM ships.
-    /// </summary>
     private static int WriteTextAllLanguages(GameConfig config, Recipe recipe,
                                              TextName nameTable, TextName? flavourTable,
                                              TextName? pluralTable, TextName? pluralAltTable,
@@ -171,9 +156,6 @@ public static class RecipeInstaller
         return written;
     }
 
-    /// <summary>
-    /// Whether a version-stamped recipe matches the ROM actually loaded.
-    /// </summary>
     private static bool VersionMatches(Recipe recipe, GameConfig config, out string wanted, out string loaded)
     {
         wanted = (recipe.ForVersion ?? "").Trim();
@@ -182,7 +164,6 @@ public static class RecipeInstaller
         return string.Equals(wanted, loaded, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>RomFS path of the binary a recipe patches.</summary>
     private static string? ResolveTargetFile(ResearchTarget target, GameConfig config)
     {
         string? romfs = config?.RomFS;
@@ -200,10 +181,6 @@ public static class RecipeInstaller
         return Path.Combine(romfs, name);
     }
 
-    /// <summary>
-    /// On Uhuru, why this recipe may not run, or null. Only patch packages (whose anchors check the original
-    /// bytes), IPS patches (their records are checked in Run) and data-only recipes are allowed; the other kinds write unchecked.
-    /// </summary>
     private static string? UhuruRecipeRefusal(Recipe recipe)
     {
         if (recipe.EffectKind == RecipeEffectKind.DataOnly) return null;
@@ -1296,7 +1273,6 @@ public static class RecipeInstaller
         return r;
     }
 
-    /// <summary>Where an IPS recipe's undo bytes live: beside the install record, outside exefs.</summary>
     private static string IpsUndoPath(GameConfig config, string ipsPath) =>
         Path.Combine(Path.GetDirectoryName(InstallRecord.PathFor(config.RomFS)) ?? "",
                      $"pk3ds-undo-{Path.GetFileName(ipsPath)}.json");
@@ -1315,9 +1291,6 @@ public static class RecipeInstaller
         catch { }
     }
 
-    /// <summary>
-    /// Reverts a recipe from the ROM: restores recorded original bytes or backups.
-    /// </summary>
     public static RecipeResult Revert(Recipe recipe, GameConfig config, string? battleCroPath = null,
                                       ResearchDatabase? db = null, BattleMechanicMap? map = null)
     {

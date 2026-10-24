@@ -5,24 +5,13 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Address-anchored edits to a CRO that has no master tables of its own.</summary>
 public sealed class CroSitePort
 {
-    /// <summary>Routines placed in the CRO's own free space; hooks branch into these.</summary>
     public List<PortedBlock> Blocks { get; set; } = [];
 
-    /// <summary>Fixed-address edits, each carrying the bytes that were there before.</summary>
     public List<PortedSitePatch> SitePatches { get; set; } = [];
 }
 
-/// <summary>
-/// Applies a <see cref="CroSitePort"/> to a CRO such as Bag.cro.
-/// <para>
-/// Simpler than the Battle.cro path because there is nothing to re-derive: no tables to locate, no
-/// routines to resolve through a donor. That makes the recorded originals the whole safety net, so
-/// a build that differs at any anchor is refused outright rather than half-patched.
-/// </para>
-/// </summary>
 public static class PortCroSiteInstaller
 {
     public static PortResult Apply(byte[] croBytes, CroSitePort port, string label = "CRO", Action<string> log = null)

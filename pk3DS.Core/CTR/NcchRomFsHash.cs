@@ -4,9 +4,6 @@ using System.Security.Cryptography;
 
 namespace pk3DS.Core.CTR;
 
-/// <summary>
-/// Repairs the RomFS superblock hash that 3dstool records in an NCCH header.
-/// </summary>
 public static class NcchRomFsHash
 {
     private const int MediaUnit = 0x200;
@@ -17,7 +14,6 @@ public static class NcchRomFsHash
     private const int RomFsHashRegionField = 0x1B8;
     private const int RomFsSuperblockHashField = 0x1E0;
 
-    /// <summary>A CCI keeps a copy of partition 0's NCCH header here, which needs the same repair.</summary>
     private const long CciEmbeddedHeaderCopy = 0x1000;
 
     public sealed record Result(bool Changed, string Message)
@@ -25,7 +21,6 @@ public static class NcchRomFsHash
         public static Result No(string why) => new(false, why);
     }
 
-    /// <summary>Repairs a .3ds/.cci or a bare .cxi in place.</summary>
     public static Result Fix(string romPath)
     {
         try
@@ -78,9 +73,6 @@ public static class NcchRomFsHash
         }
     }
 
-    /// <summary>
-    /// How many bytes the RomFS superblock hash must cover, from the IVFC header itself.
-    /// </summary>
     private const int IvfcHeaderSize = 0x60;
 
     private static int HashRegionBytes(FileStream fs, long romfs)
@@ -97,7 +89,6 @@ public static class NcchRomFsHash
         return aligned is > 0 and <= 0x10000 ? (int)aligned : -1;
     }
 
-    /// <summary>Offset of the first NCCH partition, whether the file is a CCI or a bare CXI.</summary>
     private static long FindFirstPartition(FileStream fs, out bool isCci)
     {
         isCci = false;

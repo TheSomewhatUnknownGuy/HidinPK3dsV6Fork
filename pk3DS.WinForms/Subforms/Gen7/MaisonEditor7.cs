@@ -34,11 +34,6 @@ public partial class MaisonEditor7 : Form
 
     }
 
-    /// <summary>
-    /// Appends new, empty-roster trainers past the end of the table - same "Add N slots" shape as
-    /// Item Editor's Add Item Slots. A blank trainer here has <c>Count = 0</c> (no assigned Pokémon
-    /// sets yet); use Assign List/Set to give it a roster once it exists.
-    /// </summary>
     private void B_AddTrainer_Click(object sender, EventArgs e)
     {
         string input = WinFormsUtil.PromptInput("Add Trainers", "How many new Battle Tree/Royal trainers? (1-255)", "1");
@@ -72,7 +67,6 @@ public partial class MaisonEditor7 : Form
             "Each starts with an empty roster - use Assign List or Set to give it Pokémon sets.");
     }
 
-    /// <summary>Appends new, blank Pokémon set slots the same way, for Set/Assign List to fill in.</summary>
     private void B_AddPokemonSet_Click(object sender, EventArgs e)
     {
         string input = WinFormsUtil.PromptInput("Add Pokémon Sets", "How many new Pokémon set slots? (1-255)", "1");
@@ -98,10 +92,6 @@ public partial class MaisonEditor7 : Form
         WinFormsUtil.Alert($"Added {count} Pokémon set slot(s): ids {firstNew}-{pkFiles.Length - 1}.");
     }
 
-    /// <summary>
-    /// Releases the sprites drawn in the set list; a ListBox does not own what an owner-draw
-    /// handler paints, so nothing else would free them.
-    /// </summary>
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         foreach (var img in choiceSprites.Values) img?.Dispose();
@@ -114,9 +104,6 @@ public partial class MaisonEditor7 : Form
     private byte[][] pkFiles;
     private readonly bool royal;
 
-    /// <summary>The (possibly grown-by-<see cref="B_AddTrainer_Click"/>/<see cref="B_AddPokemonSet_Click"/>)
-    /// arrays, read back by the caller after the dialog closes - see SMTE's identical TrData/TrPoke
-    /// getters for why this is necessary rather than relying on the caller's pre-dialog locals.</summary>
     public byte[][] TrFiles => trFiles;
     public byte[][] PkFiles => pkFiles;
     private readonly string[] natures = Main.Config.GetText(TextName.Natures);
@@ -183,17 +170,8 @@ public partial class MaisonEditor7 : Form
             LB_Choices.Items.Add(Entry.ToString());
     }
 
-    /// <summary>Sprites drawn in the set list, cached per set and released when the form closes.</summary>
     private readonly Dictionary<int, Image> choiceSprites = [];
 
-    /// <summary>
-    /// Draws each set in the trainer's list as its sprite and species name.
-    /// <para>
-    /// The list holds set indices, and it used to show them as the bare numbers they are - a column
-    /// reading "1, 2, 19, 20, 21" with nothing to say which Pokémon those are. The underlying items
-    /// are still the indices, so saving is unchanged; only what is on screen differs.
-    /// </para>
-    /// </summary>
     private void SetupChoiceList()
     {
         LB_Choices.DrawMode = DrawMode.OwnerDrawFixed;
@@ -719,11 +697,6 @@ public partial class MaisonEditor7 : Form
 
     private Label L_StoredEmpty;
 
-    /// <summary>
-    /// An empty list is a big featureless rectangle, so say what fills it. A label over the list, because an owner-drawn
-    /// ListBox never calls DrawItem when it has no items. It copies the list's back colour each time the theme changes it,
-    /// otherwise the theme would make it Transparent and the form's colour would show through as a second box.
-    /// </summary>
     private void BuildStoredSetsHint()
     {
         L_StoredEmpty = new Label

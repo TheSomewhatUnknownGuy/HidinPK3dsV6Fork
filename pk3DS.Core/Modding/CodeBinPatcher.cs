@@ -7,9 +7,6 @@ namespace pk3DS.Core.Modding
 {
     public static class CodeBinPatcher
     {
-        /// <summary>
-        /// Encodes a 32-bit ARM Branch (B) or Branch-Link (BL) instruction.
-        /// </summary>
         public static uint SynthesizeBranch(uint fromVA, uint toVA, bool link = true)
         {
             // ARM Branch instruction calculation:
@@ -22,9 +19,6 @@ namespace pk3DS.Core.Modding
             return instruction;
         }
 
-        /// <summary>
-        /// Injects a Trampoline Branch into code.bin and appends the custom ARM payload to the end of the binary.
-        /// </summary>
         public static uint InjectTrampolinePayload(DecompiledCodeBin codeBin, uint hookVirtualAddress, byte[] payloadBytes, bool link = true)
         {
             uint hookFileOffset = hookVirtualAddress - codeBin.BaseVirtualAddress;
@@ -62,19 +56,12 @@ namespace pk3DS.Core.Modding
             return payloadVA;
         }
 
-        /// <summary>
-        /// Encodes assembly string into bytes and injects as a trampoline payload.
-        /// </summary>
         public static uint InjectAssemblyPayload(DecompiledCodeBin codeBin, uint hookVirtualAddress, string assemblyText, bool link = true)
         {
             byte[] payloadBytes = ARMCodec.Assemble(assemblyText, hookVirtualAddress);
             return InjectTrampolinePayload(codeBin, hookVirtualAddress, payloadBytes, link);
         }
 
-        /// <summary>
-        /// Re-compiles DecompiledCodeBin into a final byte array.
-        /// Re-compresses with LZSS if requested or if original binary was compressed.
-        /// </summary>
         public static byte[] Compile(DecompiledCodeBin codeBin, bool compress = true)
         {
             byte[] data = codeBin.RawData;

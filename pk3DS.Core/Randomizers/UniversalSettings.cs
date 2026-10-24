@@ -87,12 +87,8 @@ public class UniversalSettings
     public bool TypesFollowMegas { get; set; } = false;
     public bool ForceDualTypes { get; set; } = false;
 
-    /// <summary>
-    /// How the 18x18 type effectiveness chart in code.bin is rewritten.
-    /// </summary>
     public int TypeEffectivenessMode { get; set; } = 0;
 
-    /// <summary>Inverse only: keep as many immunities as the original chart had.</summary>
     public bool TypeEffectivenessAddRandomImmunities { get; set; } = false;
 
     // Pokemon Abilities
@@ -106,9 +102,6 @@ public class UniversalSettings
     public bool BanBadAbilities { get; set; } = false;
     public bool EnsureTwoAbilities { get; set; } = false;
 
-    /// <summary>
-    /// Individual abilities the user banned by name, on top of the category toggles above.
-    /// </summary>
     public List<string> BannedAbilityNames { get; set; } = [];
 
     // Pokemon Evolutions
@@ -126,15 +119,10 @@ public class UniversalSettings
     // Starters
     public int StartersMode { get; set; } = 0; // 0: Unchanged, 1: Custom, 2: Random (completely), 3: Random (basic with 2 evos)
 
-    /// <summary>
-    /// Type shape imposed on the three starters.
-    /// </summary>
     public int StarterTypeRestriction { get; set; } = 0;
 
-    /// <summary>Type index used when <see cref="StarterTypeRestriction"/> is Single Type.</summary>
     public int StarterSingleType { get; set; } = 0;
 
-    /// <summary>Require every starter to have exactly one type.</summary>
     public bool StarterNoDualTypes { get; set; } = false;
     public int CustomStarter1 { get; set; } = 1;
     public int CustomStarter2 { get; set; } = 4;
@@ -181,47 +169,27 @@ public class UniversalSettings
 
     // TAB 4: FOE POKEMON
     // Trainer Pokemon
-    /// <summary>
-    /// How trainer teams are re-picked.
-    /// </summary>
     public int TrainerPokemonMode { get; set; } = 0;
 
-    /// <summary>Try not to give one trainer the same species twice.</summary>
     public bool TrainerAvoidDuplicates { get; set; } = false;
 
-    /// <summary>Push boss teams (Kahunas, Elite Four, Guzma, Lusamine) toward covering different types.</summary>
     public bool TrainerDiverseTypesBoss { get; set; } = false;
 
-    /// <summary>Push important trainers' teams toward covering different types.</summary>
     public bool TrainerDiverseTypesImportant { get; set; } = false;
 
-    /// <summary>Push every other trainer's team toward covering different types.</summary>
     public bool TrainerDiverseTypesRegular { get; set; } = false;
 
-    /// <summary>
-    /// What to do with each trainer's battle format.
-    /// </summary>
     public int BattleStyleMode { get; set; } = 0;
 
-    /// <summary>
-    /// Format used when <see cref="BattleStyleMode"/> is Single Style: 0 Singles, 1 Doubles.
-    /// </summary>
     public int BattleStyleChoice { get; set; } = 0;
     public int MasterAIMode { get; set; } = 0; // 0: Normal, 1: Important Trainers Only, 2: All Trainers (Master AI)
     public bool DoubleBattleMode { get; set; } = false;
     public bool BetterTrainerMovesets { get; set; } = true;
-    /// <summary>
-    /// Give trainer Pokemon that were NOT randomized competitively better builds (moves, items,
-    /// EVs via the competitive sanitizer). Off: vanilla slots stay exactly as the game shipped them.
-    /// </summary>
     public bool UpgradeVanillaTrainers { get; set; } = false;
     public bool RivalCarriesStarter { get; set; } = true;
     public bool TrainerTrySimilarStrength { get; set; } = true;
-    /// <summary>Uhuru only: randomize block 0 once and copy its species into every other difficulty block.</summary>
     public bool UhuruOneTeam { get; set; } = true;
-    /// <summary>Uhuru only: skip the PWT trainers (TrainerBlocks.UhuruPwtTrainers) in every block.</summary>
     public bool UhuruKeepPwtCast { get; set; }
-    /// <summary>Uhuru only: shuffle which slot each PWT trainer sits in (script 217). The same 146 trainers stay in the pool. Off by default; a settings file without it loads as off.</summary>
     public bool UhuruShufflePwtPool { get; set; }
     public bool WeightTypesByNumPokemon { get; set; } = false;
     public bool TrainerDontUseLegendaries { get; set; } = true;
@@ -273,70 +241,37 @@ public class UniversalSettings
     public int WildLevelModifierPercent { get; set; } = 0;
     public bool WildAllowAltFormes { get; set; } = true;
 
-    /// <summary>
-    /// How widely one original species may be replaced by different things.
-    /// </summary>
     public int WildReplacementsPerSpecies { get; set; } = 0;
 
-    /// <summary>Split an encounter set by its encounter type before mapping (One Per Map only).</summary>
     public bool WildSplitByEncounterType { get; set; } = false;
 
-    /// <summary>
-    /// Type shape imposed on wild encounters.
-    /// </summary>
     public int WildTypeRestriction { get; set; } = 0;
 
-    /// <summary>Keep a themed zone's theme rather than rolling a new one (Random Zone Themes only).</summary>
     public bool WildKeepZoneThemes { get; set; } = false;
 
-    /// <summary>
-    /// Evolution shape imposed on wild encounters.
-    /// </summary>
     public int WildEvolutionRestriction { get; set; } = 0;
 
-    /// <summary>Map a family's members onto one replacement family, keeping their relations.</summary>
     public bool WildKeepEvolutionRelations { get; set; } = false;
 
-    /// <summary>
-    /// Try not to put the same species in one encounter table twice.
-    /// </summary>
     public bool WildAvoidRepeats { get; set; } = false;
 
     // TAB 6: TM/HMS & TUTORS
     // TMs & HMs
-    /// <summary>
-    /// Drop Rare Candy to 10 PokéDollars and stock it in every ordinary Poké Mart.
-    /// </summary>
     public bool CheapRareCandies { get; set; } = false;
 
-    /// <summary>Price in PokéDollars used by <see cref="CheapRareCandies"/>.</summary>
     public int CheapRareCandyPrice { get; set; } = 10;
 
     // TAB: LEVEL CAPS
-    /// <summary>Install the story-flag level caps as part of a randomize.</summary>
     public bool EnableLevelCaps { get; set; } = false;
 
-    /// <summary>
-    /// Levels added to (or taken off) every checkpoint, relative to the researched curve.
-    /// </summary>
     public int LevelCapShift { get; set; } = 0;
 
-    /// <summary>
-    /// Read the curve's shape from the ROM's own trainer levels instead of the researched values.
-    /// </summary>
     public bool LevelCapMatchTrainers { get; set; } = false;
 
-    /// <summary>Cap at the final checkpoint; the whole curve is scaled to land here.</summary>
     public int LevelCapFinal { get; set; } = 100;
 
-    /// <summary>
-    /// One cap per checkpoint, in table order, as edited on the Level Caps tab.
-    /// </summary>
     public List<int> LevelCapCaps { get; set; } = [];
 
-    /// <summary>
-    /// Expand the TM table to 128 slots. Off by default, and deliberately not on the randomizer UI.
-    /// </summary>
     public bool ExpandTMs { get; set; } = false;
 
     public int TMHMMovesMode { get; set; } = 0; // 0: Unchanged, 1: Random, 2: No Game-Breaking Moves
@@ -403,31 +338,15 @@ public class UniversalSettings
     public bool AllWildPokemonCanCallAllies { get; set; } = false;
     public bool FasterHPAndExpBars { get; set; } = false;
 
-    /// <summary>
-    /// Drop every species' egg hatch counter to its minimum.
-    /// </summary>
     public bool FastEggHatching { get; set; } = false;
 
-    /// <summary>
-    /// Zero every species' EV yield, so nothing trains anything by being defeated.
-    /// </summary>
     public bool NoEVsFromPokemon { get; set; } = false;
 
-    /// <summary>
-    /// Multiplier to scale battle EXP yield (1 to 255).
-    /// </summary>
     public bool CustomExpMultiplier { get; set; } = false;
     public int ExpMultiplier { get; set; } = 2;
 
-    /// <summary>
-    /// Research Center recipes to install as part of a randomize, by name.
-    /// </summary>
     public List<string> InstallPatches { get; set; } = [];
 
-    /// <summary>
-    /// The competitive weights this preset carries. Null in older presets and in a fresh form, which
-    /// leaves competitive_weights.json alone.
-    /// </summary>
     public Competitive.CompetitiveWeights Weights { get; set; }
 
     // Preset Encoding & Decoding

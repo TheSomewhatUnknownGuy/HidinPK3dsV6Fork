@@ -232,7 +232,6 @@ namespace pk3DS.WinForms
                 }
             }
 
-            /// <summary>Writes a resized script (e.g. after <see cref="SwitchCaseInserter"/> added a case) back into this zone's own "ZS" (Zone Script) GARC member.</summary>
             public bool WriteZoneScript(int scriptIndex, uint[] newScriptCommands, LazyGARCFile garc, int worldID, out string error)
             {
                 error = "";
@@ -770,30 +769,6 @@ namespace pk3DS.WinForms
             MessageBox.Show("NPC successfully converted to a Trainer using the chosen unused trainer data. Model ID was preserved.");
         }
 
-        /// <summary>
-        /// Appends a brand-new trainer-battle placement to the current area, using
-        /// <see cref="OWTrainerFile.AppendEntry"/> (this session's own addition - verified via a
-        /// scratch round-trip test against real zone 0 data: correct area targeting, zero change to
-        /// every other entry's core fields, and correct pointer relocation for any later entry whose
-        /// sub-data offset was affected).
-        /// <para>
-        /// This only creates the TRAINER DATA side (a real `trdata` battle reference, tagged
-        /// ObjectType=0x07 so the game engine treats it as a real trainer with vision/battle logic
-        /// already built in - the same mechanism <see cref="B_ConvertTrainer_Click"/> already
-        /// exercises for existing NPCs). It does NOT place the model on the map - per the user's own
-        /// described workflow, that's PawnGarcEditor's job; this just gives PGE something correctly
-        /// tagged to attach a model to.
-        /// </para>
-        /// <para>
-        /// "Mandatory" isn't a data flag this format is confirmed to have (this session's own
-        /// research found <see cref="OWTrainerEntry.Flagwork"/>/<see cref="OWTrainerEntry.FlagworkNum"/>
-        /// don't fit the known story-flag encoding) - in this engine, a trainer battle becomes
-        /// unavoidable through ordinary level design: position it (in PGE) so it physically blocks
-        /// the player's only path, the same way every existing mandatory rival battle in the real
-        /// game works. The status message below says this explicitly rather than implying a
-        /// "mandatory" toggle exists that doesn't.
-        /// </para>
-        /// </summary>
         private void B_AddTrainer_Click(object sender, EventArgs e)
         {
             if (Map?.TrainerData == null)
@@ -920,30 +895,6 @@ namespace pk3DS.WinForms
                     npcEntry.X.ToString("F1"), npcEntry.Y.ToString("F1"), npcEntry.Z.ToString("F1"));
         }
 
-        /// <summary>
-        /// Adds a brand-new dialogue/gift NPC placement, using <see cref="FieldNpcTable.AppendEntry"/>
-        /// (this session's own addition - verified end-to-end against real Iki Town data: correct
-        /// entry insertion, byte-identical core fields on every other entry, correctly-shifted shared
-        /// detail-pool pointers, and a full Mini.PackMini/UnpackMini round-trip).
-        /// <para>
-        /// Two behavior choices, both real and immediately usable:
-        /// </para>
-        /// <list type="bullet">
-        /// <item>Reuse an EXISTING `ScriptId` value directly (including 0, the generic/default case) -
-        /// no script editing at all, since multiple NPC instances can already legitimately share one
-        /// dispatch value (confirmed live: several real "filler" NPCs all share `ScriptId=0`).</item>
-        /// <item>Clone a real "give a reward" case (<see cref="SwitchCaseInserter.FindRewardLikeCases"/>
-        /// - a structural pattern match: several near-identical cases differing in exactly one
-        /// argument, converging on one shared helper subroutine - presented honestly as
-        /// "reward-shaped", not asserted to definitely be a Bag item id, since that would need full
-        /// ARM-level disassembly this session hasn't done) via <see cref="SwitchCaseInserter.AddClonedCase"/>,
-        /// with the one varying argument customizable to a new value, wired to a fresh `ScriptId`.</item>
-        /// </list>
-        /// <para>
-        /// This only creates the NPC's DATA (placement + dispatch) - it does not place the model on
-        /// the map, matching the user's own described workflow (PawnGarcEditor's job).
-        /// </para>
-        /// </summary>
         private void B_AddNpc_Click(object sender, EventArgs e)
         {
             if (Map?.NpcTable == null || Map.NpcTable.Entries.Count == 0)

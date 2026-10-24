@@ -36,19 +36,12 @@ public class TrainerPoke7
     public int Friendship { get => Data[0xC]; set => Data[0xC] = (byte)value; }
 
     // Uhuru (trainer-format.md): slot 0 byte 0x0C (Friendship above) is the team-size override in blocks 5/6.
-    /// <summary>Uhuru: slot 0 only, raw team level offset for modes 6/7: 0 = none, 0x80 + n = party max + n.</summary>
     public int TeamLevelOffset { get => Data[0xD]; set => Data[0xD] = (byte)value; }
 
-    /// <summary>Uhuru colour variant: 0 random, 1/2 normal, 3/4/5 colour sets A/B/C (r4-notes.md).</summary>
     public int Colour { get => Data[0x16]; set => Data[0x16] = (byte)value; }
 
     private static readonly int[] PassiveLow = [0x0D, 0x0F, 0x13];
 
-    /// <summary>
-    /// Rom Nueva + passive ability ids (0 = none): low bytes at 0x0D/0x0F/0x13, bit 8 of each in 0x16 bits 0-2.
-    /// Shares bytes with <see cref="TeamLevelOffset"/> and <see cref="Colour"/> (Uhuru), so only use it while
-    /// <c>PassiveGuard.Enabled</c>, which is never true on Uhuru. A record with no passives has none; it does not inherit its species'.
-    /// </summary>
     public int[] Passives
     {
         get => pk3DS.Core.Modding.PassiveGuard.Unpack(Data, PassiveLow, 0x16, 0);

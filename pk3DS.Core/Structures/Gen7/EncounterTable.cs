@@ -46,10 +46,6 @@ public class EncounterTable
         Encounter7s[8] = AdditionalSOS;
     }
 
-    /// <summary>
-    /// Copies the first set of slots to all others, including weather if specified.
-    /// </summary>
-    /// <param name="PlusWeather">Copy first set to weather slots (only first few get copied as Weather has less slots)</param>
     public void CopySlotsToSOS(bool PlusWeather = false)
     {
         int length = Encounter7s.Length - 2; // except weather

@@ -1007,11 +1007,6 @@ public partial class PersonalEditor7 : Form
 
     private ComboBox[] passive_boxes;
 
-    /// <summary>
-    /// Rom Nueva + passive rows: a "Passives" tab with three "(None)"-first ability dropdowns, created only while the Passive Abilities
-    /// setting is on (the bytes belong to the TM list otherwise). Ids 0..345, the range the mod reads. A tab rather than the General
-    /// tab because that page is full: the form is fixed at 760x680 and has no free row.
-    /// </summary>
     private void InitializePassiveRows()
     {
         if (!pk3DS.Core.Modding.PassiveGuard.Enabled || passive_boxes != null) return;

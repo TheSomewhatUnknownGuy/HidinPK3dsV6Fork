@@ -9,173 +9,74 @@ using System.Text.RegularExpressions;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>A value the installer asks for, or fills in from a default, before anything is applied.</summary>
 public sealed class PatchParameter
 {
-    /// <summary>What it means, shown to whoever is choosing.</summary>
     public string Description { get; set; } = "";
 
-    /// <summary>item | move | ability | number | text. Drives validation and the editor widget.</summary>
     public string Type { get; set; } = "number";
 
-    /// <summary>Used when the caller supplies nothing.</summary>
     public string Default { get; set; }
 
-    /// <summary>For item/move/ability: the name the id must already carry, as a safety check.</summary>
     public string ExpectName { get; set; }
 
-    /// <summary>When true the id may point at an unnamed slot; otherwise ExpectName must match.</summary>
     public bool AllowUnnamed { get; set; } = true;
 }
 
-/// <summary>
-/// A list of numbers written into a placed block, so data a routine reads can be chosen rather
-/// than baked into the block's bytes.
-/// <para>
-/// The mint id table is the motivating case: twenty-one item ids that a routine walks, sitting
-/// inside a code block. Without this they would be fixed at export time — which is precisely the
-/// set of ids someone applying the package is most likely to need to move.
-/// </para>
-/// </summary>
 public sealed class PatchDataTable
 {
-    /// <summary>Which binary the block lives in: "Battle.cro", "Bag.cro", "code.bin".</summary>
     public string Target { get; set; } = "Battle.cro";
-    /// <summary>Name of the block this table sits inside.</summary>
     public string Block { get; set; } = "";
-    /// <summary>Byte offset from the start of that block.</summary>
     public string Offset { get; set; } = "0x0";
-    /// <summary>1, 2, or 4 bytes per entry.</summary>
     public int ElementSize { get; set; } = 2;
-    /// <summary>Comma-separated values, usually a parameter reference.</summary>
     public string Values { get; set; } = "";
-    /// <summary>Write a zero entry after the values, for routines that walk until zero.</summary>
     public bool Terminate { get; set; } = true;
-    /// <summary>Space the block reserves, in entries. A longer list is refused rather than truncated.</summary>
     public int Capacity { get; set; }
 
     public uint OffsetValue => Convert.ToUInt32(Offset.Trim(), Offset.Trim().StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16 : 10);
 }
 
-/// <summary>Item data to write, expressed relative to an existing item rather than as raw bytes.</summary>
 public sealed class PatchItemData
 {
-    /// <summary>Item whose data block is copied as the starting point.</summary>
     public string CloneFrom { get; set; }
     public string Name { get; set; }
-    /// <summary>Held-effect selector. Omit to leave the clone's value; 0 means "no code.bin behaviour".</summary>
     public string HeldEffect { get; set; }
-    /// <summary>
-    /// Parameter a HeldEffect routine reads back for this item (<c>Item.HeldArgument</c>), e.g. a
-    /// type index for a Plate-shaped item. Confirmed live: Charcoal/Flame Plate's own damage-calc
-    /// handler reads this field back via a dedicated accessor (0x00061324 in Battle.cro) rather
-    /// than hardcoding its boost per item, which is why a whole family of type-keyed items can
-    /// share one HeldEffect and differ only by this byte.
-    /// </summary>
     public string HeldArgument { get; set; }
     public string FlingPower { get; set; }
     public string Price { get; set; }
-    /// <summary>
-    /// Which Bag pocket the item is filed under. This is NOT <c>Item.PocketField</c> - the Bag UI
-    /// reads a separate nibble-packed table in RomFS <c>a/1/0/3</c> (file[0], base offset 0, 512 bytes
-    /// covering ids 0-1023: byte = id/2, EVEN ids in the HIGH nibble, odd ids in the low one).
-    /// A cloned item inherits its template's nibble, which is why every item cloned from Ability
-    /// Capsule previously landed in the wrong pocket. Values:
-    /// 0=General, 1=Medicine, 2=TM/HM, 3=Berry, 4=Key, 5=Z-Crystal(Bag), 6=RotoPower, 7=Z-Crystal(Hold).
-    /// Omit to leave the cloned value alone.
-    /// </summary>
     public string Pocket { get; set; }
 
-    /// <summary>
-    /// Item kind discriminator - <c>Item.Unk_0xC</c>, at ITEM_DATA offset 0xC. This is the gate on
-    /// the ENTIRE bag-use effect system: <c>item::ITEM_UTIL_GetHealingItemType</c> reads this byte
-    /// first (as field index 0xF) and, unless it is exactly 1, returns 0x1C - which the 28-entry
-    /// effect jump table in Bag.cro treats as "no handler", so the item silently does nothing.
-    /// Potion, Max Potion and Rare Candy all carry 1; Ability Capsule carries 0, because it is not
-    /// a healing item at all and is special-cased through its own state machine instead.
-    /// Omit to leave the cloned value alone.
-    /// </summary>
     public string ItemKind { get; set; }
 
-    /// <summary>
-    /// <c>Item.EffectField</c> - the field-use routine selector (0 = unusable outside battle).
-    /// Omit to leave the cloned value alone.
-    /// </summary>
     public string EffectField { get; set; }
 
-    /// <summary>
-    /// Arbitrary <c>pk3DS.Core.Structures.Item</c> properties to set after cloning, keyed by the
-    /// property name exactly as that struct declares it - so the full field-effect vocabulary is
-    /// reachable without a bespoke field here for each one.
-    /// <para>
-    /// This is how a bag-use effect is actually built. Confirmed in game: an item's effect comes
-    /// entirely from its own ITEM_DATA record, so cloning a vanilla item and adjusting these
-    /// reproduces that item's behaviour with no injected code at all. Useful ones:
-    /// <c>LevelUp</c> (Rare Candy), <c>Revive</c>/<c>ReviveAll</c> (Sacred Ash - whole party),
-    /// <c>HealAmount</c>, <c>PPGain</c>, <c>FunctionFlags0</c> (RestoreHP/RestorePP/RestorePPAll/
-    /// AddEV*), <c>FunctionFlags1</c>, <c>CureInflict</c>, <c>EVHP</c>..<c>EVSPD</c> (signed, so
-    /// negative values reduce EVs), and <c>UseKeep</c> - the flutes' own "not consumed on use"
-    /// flag, which is what makes an unlimited-use item unlimited.
-    /// </para>
-    /// Values parse as bool, integer, or comma-separated enum flag names.
-    /// </summary>
     public Dictionary<string, string> Fields { get; set; } = [];
 }
 
-/// <summary>
-/// One self-contained, reusable element: what it is, what it needs choosing, and every edit it
-/// makes across the binaries and the data.
-/// <para>
-/// The point of the parameters is that nothing here is tied to the ids this was developed against.
-/// A package says "an item, defaulting to 865, called Room Service"; the person applying it can put
-/// it wherever their build has room. Ids appear as <c>${name}</c> and are substituted before any
-/// installer sees them.
-/// </para>
-/// </summary>
 public sealed class PatchPackage
 {
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
 
-    /// <summary>Other packages that must be applied first, by name.</summary>
     public List<string> Requires { get; set; } = [];
 
     public Dictionary<string, PatchParameter> Parameters { get; set; } = [];
 
-    /// <summary>Master-table entries to add to Battle.cro.</summary>
     public List<PortedMechanic> Mechanics { get; set; } = [];
-    /// <summary>Free-standing routines placed in Battle.cro's reserve.</summary>
     public List<PortedBlock> Blocks { get; set; } = [];
-    /// <summary>Address-anchored edits to Battle.cro.</summary>
     public List<PortedSitePatch> SitePatches { get; set; } = [];
-    /// <summary>Edits to other CROs, keyed by file name.</summary>
     public Dictionary<string, CroSitePort> OtherCros { get; set; } = [];
-    /// <summary>Symbol-anchored edits to code.bin.</summary>
     public CodeBinPort CodeBin { get; set; }
 
-    /// <summary>Value lists written into placed blocks after they land.</summary>
     public List<PatchDataTable> DataTables { get; set; } = [];
 
-    /// <summary>Item data to write, keyed by id (may be a parameter reference).</summary>
     public Dictionary<string, PatchItemData> ItemData { get; set; } = [];
-    /// <summary>Names to write into every language, keyed by id.</summary>
     public Dictionary<string, string> ItemNames { get; set; } = [];
-    /// <summary>Plural names to write into every language, keyed by id.</summary>
     public Dictionary<string, string> ItemNamesPlural { get; set; } = [];
-    /// <summary>Plural alt names to write into every language, keyed by id.</summary>
     public Dictionary<string, string> ItemNamesPluralAlt { get; set; } = [];
 
-    /// <summary>
-    /// Bag descriptions to write into every language, keyed by id.
-    /// </summary>
     public Dictionary<string, string> ItemDescriptions { get; set; } = [];
 
-    /// <summary>
-    /// Lines to write into a game text file, in every language: file index (inside the gametext
-    /// GARC) to line index to text. The file grows if the line is past its end. Used for the bag's
-    /// use-result messages (file 1, stock lines 0-158) that custom bag-use effects display.
-    /// </summary>
     public Dictionary<string, Dictionary<string, string>> GameTextLines { get; set; } = [];
 
     private static readonly JsonSerializerOptions Options = new()
@@ -192,7 +93,6 @@ public sealed class PatchPackage
     public static PatchPackage Load(string path) => FromJson(File.ReadAllText(path));
     public void Save(string path) => File.WriteAllText(path, ToJson());
 
-    /// <summary>Loads every package in a folder, newest schema first, reporting anything unreadable.</summary>
     public static List<PatchPackage> LoadFolder(string folder, IList<string> problems = null)
     {
         var list = new List<PatchPackage>();
@@ -209,7 +109,6 @@ public sealed class PatchPackage
         return list;
     }
 
-    /// <summary>Orders packages so anything a package requires comes before it.</summary>
     public static List<PatchPackage> InDependencyOrder(IEnumerable<PatchPackage> packages, IList<string> problems = null)
     {
         var byName = new Dictionary<string, PatchPackage>(StringComparer.OrdinalIgnoreCase);
@@ -248,15 +147,10 @@ public sealed class PatchPackage
     }
 }
 
-/// <summary>Substitutes <c>${name}</c> references and turns a package into concrete edits.</summary>
 public static class PatchParameters
 {
-    /// <summary>
-    /// <c>${name}</c>, and <c>${name[i]}</c> for one element of a list parameter.
-    /// </summary>
     private static readonly Regex Ref = new(@"\$\{([A-Za-z0-9_]+)(?:\[(\d+)\])?\}", RegexOptions.Compiled);
 
-    /// <summary>Fills in defaults for anything the caller did not supply, and reports what is missing.</summary>
     public static Dictionary<string, string> Resolve(
         PatchPackage package, IDictionary<string, string> supplied, IList<string> problems = null)
     {
@@ -272,7 +166,6 @@ public static class PatchParameters
         return values;
     }
 
-    /// <summary>Expands every reference in a string. Unknown names are left alone and reported.</summary>
     public static string Expand(string text, IDictionary<string, string> values, IList<string> problems = null)
     {
         if (string.IsNullOrEmpty(text)) return text;
@@ -297,7 +190,6 @@ public static class PatchParameters
         });
     }
 
-    /// <summary>Reads a possibly-parameterised number, in decimal or 0x form.</summary>
     public static bool TryNumber(string text, IDictionary<string, string> values, out uint result, IList<string> problems = null)
     {
         result = 0;
@@ -308,10 +200,6 @@ public static class PatchParameters
         return uint.TryParse(s, out result);
     }
 
-    /// <summary>
-    /// Produces a copy of the package with every reference expanded, leaving the original untouched
-    /// so one package can be applied more than once with different values.
-    /// </summary>
     public static PatchPackage Bind(PatchPackage package, IDictionary<string, string> values, IList<string> problems = null)
     {
         // Round-tripping through JSON is the simplest deep copy that also catches a package whose

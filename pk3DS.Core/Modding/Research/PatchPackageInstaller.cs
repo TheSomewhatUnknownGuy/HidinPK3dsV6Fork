@@ -5,7 +5,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>What one package would do, or did.</summary>
 public sealed class PackageResult
 {
     public string Package { get; init; } = "";
@@ -22,22 +21,8 @@ public sealed class PackageResult
         Log.Select(l => "  " + l).Concat(Errors.Select(e => "  ERROR: " + e)));
 }
 
-/// <summary>
-/// Applies <see cref="PatchPackage"/>s to a ROM, resolving each package's parameters first.
-/// <para>
-/// Everything a package touches goes through the installers that already exist — the master-table
-/// path for mechanics, the site path for CROs, the symbol-anchored path for code.bin — so a package
-/// gains all of their checking rather than a second, weaker copy of it. What this adds is the layer
-/// above: choosing ids, ordering by dependency, and refusing a package whose chosen id names
-/// something else in the target.
-/// </para>
-/// </summary>
 public static class PatchPackageInstaller
 {
-    /// <summary>
-    /// Validates a package against a ROM without writing: are the parameters resolvable, do the ids
-    /// name what they claim, is anything already present.
-    /// </summary>
     public static PackageResult Preview(
         PatchPackage package,
         IDictionary<string, string> supplied,
@@ -101,11 +86,6 @@ public static class PatchPackageInstaller
         return result;
     }
 
-    /// <summary>
-    /// Applies the Battle.cro half of a bound package. The caller keeps ownership of the other
-    /// binaries, because a package that spans files must not leave some of them written and the
-    /// rest not.
-    /// </summary>
     public static PackageResult ApplyBattleCro(
         PatchPackage package,
         IDictionary<string, string> supplied,
@@ -144,14 +124,6 @@ public static class PatchPackageInstaller
         return result;
     }
 
-    /// <summary>
-    /// Writes a package's data tables into blocks that have already been placed.
-    /// <para>
-    /// Must run after the blocks land, because a table is positioned relative to its block, not to
-    /// the file. <paramref name="placed"/> is the block-name to address map the CRO or code.bin
-    /// installer produced.
-    /// </para>
-    /// </summary>
     public static PackageResult ApplyDataTables(
         PatchPackage bound, string target, byte[] binary, IReadOnlyDictionary<string, uint> placed, IReadOnlyDictionary<string, uint> externalPlaced = null)
     {
@@ -291,11 +263,6 @@ public static class PatchPackageInstaller
         }
     }
 
-    /// <summary>Writes a package's item data and names, using the game's own tables.</summary>
-    /// <summary>
-    /// On Uhuru, why <see cref="ApplyData"/> would refuse this package's item-ceiling raise, or null.
-    /// RecipeInstaller asks before writing any binary, because ApplyData runs after them.
-    /// </summary>
     public static string UhuruCeilingRefusal(PatchPackage package, IDictionary<string, string> supplied, byte[] codeBin)
     {
         if (!UhuruGuard.Active || codeBin == null) return null;

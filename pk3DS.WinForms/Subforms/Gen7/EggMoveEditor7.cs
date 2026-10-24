@@ -73,7 +73,6 @@ string[] specieslist = Main.Config.Personal.GetPersonalEntryList(AltForms, speci
 
     private readonly EggMoves7[] entries;
 
-    /// <summary>Species name per entry index, including alternate-form rows.</summary>
     private readonly string[] entryNames;
     private readonly EggMoves7[] vanillaEntries;
 
@@ -299,14 +298,6 @@ string[] specieslist = Main.Config.Personal.GetPersonalEntryList(AltForms, speci
     private void B_ImportJSON_Click(object sender, EventArgs e) => ImportEggMoves(".json");
     private void B_ImportTS_Click(object sender, EventArgs e) => ImportEggMoves(".ts");
 
-    /// <summary>
-    /// Imports egg moves from JSON or a Showdown-style listing.
-    /// <para>
-    /// JSON is <c>{ "Species": ["Move", ...] }</c>. The text form is a species name on its own line
-    /// followed by moves prefixed with "-", blocks separated by a blank line - the shape a Poképaste
-    /// or a Showdown export already has.
-    /// </para>
-    /// </summary>
     private void ImportEggMoves(string preferred)
     {
         using var ofd = new OpenFileDialog
@@ -392,7 +383,6 @@ string[] specieslist = Main.Config.Personal.GetPersonalEntryList(AltForms, speci
         return [.. ids];
     }
 
-    /// <summary>Matches a species name case-insensitively, tolerating a trailing form suffix.</summary>
     private int FindSpeciesId(string name)
     {
         string wanted = name.Trim();

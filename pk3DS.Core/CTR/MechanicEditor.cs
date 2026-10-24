@@ -5,23 +5,10 @@ using System.Linq;
 
 namespace pk3DS.Core.CTR
 {
-    /// <summary>
-    /// High-level mechanic editing operations: add/edit/delete functions in move/ability/item tables.
-    /// Implements the five operations from the ARM Research guide:
-    ///   I.   Setup — Expansion and Preparation
-    ///   II.  Finding Relevant Patches
-    ///   III. Adding Functions to Existing Mechanics
-    ///   IV.  Adding Entirely New Mechanics
-    ///   V.   BSS Allocation
-    /// </summary>
     public static class MechanicEditor
     {
         #region I. Setup — Expansion & Preparation
 
-        /// <summary>
-        /// Ensure the CRO has enough free space in the specified segment.
-        /// Creates a backup before expanding.
-        /// </summary>
         public static byte[] EnsureExpanded(byte[] data, string filePath, char segment, int bytesToAdd)
         {
             if (!string.IsNullOrEmpty(filePath))
@@ -30,10 +17,6 @@ namespace pk3DS.Core.CTR
             return CROUtil.ExpandSegment(data, segment, bytesToAdd);
         }
 
-        /// <summary>
-        /// Ensure there are enough empty slots in the relocation patch table.
-        /// If needed, expands the file to accommodate more entries.
-        /// </summary>
         public static byte[] EnsureRelocationCapacity(byte[] data, int extraEntries)
         {
             uint ptOfs = BitConverter.ToUInt32(data, 0x128);
@@ -80,9 +63,6 @@ namespace pk3DS.Core.CTR
 
         #region II. Finding Relevant Patches (Relocation Chain Tracing)
 
-        /// <summary>
-        /// Complete relocation chain for a mechanic entry.
-        /// </summary>
         public class RelocationChain
         {
             public int MechanicIndex;
@@ -103,9 +83,6 @@ namespace pk3DS.Core.CTR
             public int TotalRelocations => 1 + (CallFuncToTimingRPT >= 0 ? 1 : 0) + TimingToFunctionRPTs.Count;
         }
 
-        /// <summary>
-        /// Trace the complete relocation chain for a mechanic entry.
-        /// </summary>
         public static RelocationChain TraceRelocationChain(DecompiledCRO cro, int mechanicIndex, MechanicType type)
         {
             var chain = new RelocationChain { MechanicIndex = mechanicIndex, Type = type };
@@ -146,10 +123,6 @@ namespace pk3DS.Core.CTR
 
         #region III. Adding Functions to Existing Mechanics
 
-        /// <summary>
-        /// Add a new timing function to an existing mechanic (move, ability, or item).
-        /// This is the core "add a function to an existing move" operation.
-        /// </summary>
         public static bool AddFunctionToMechanic(
             DecompiledCRO cro,
             int mechanicIndex,
@@ -337,10 +310,6 @@ namespace pk3DS.Core.CTR
 
         #region IV. Adding Entirely New Mechanics
 
-        /// <summary>
-        /// Add a completely new mechanic entry (new move, ability, or item).
-        /// Creates the call function, timing table, and all required relocation patches.
-        /// </summary>
         public static bool AddNewMechanic(
             DecompiledCRO cro,
             MechanicType type,
@@ -471,9 +440,6 @@ namespace pk3DS.Core.CTR
 
         #region V. BSS Allocation
 
-        /// <summary>
-        /// Allocate space in the BSS segment for runtime state storage.
-        /// </summary>
         public static BSSSlot AllocateBSS(DecompiledCRO cro, string name, int size, bool perPokemon)
         {
             uint currentBSSEnd = cro.Header.BSSSize;
@@ -509,10 +475,6 @@ namespace pk3DS.Core.CTR
 
         #region Stock Function Composition
 
-        /// <summary>
-        /// Clone an existing function's machine code for reuse in a new mechanic.
-        /// The cloned code has BL targets adjusted for the new location.
-        /// </summary>
         public static byte[] CloneFunction(DecompiledCRO cro, uint sourceOffset, uint destOffset)
         {
             byte[] data = cro.RawData;
@@ -549,12 +511,6 @@ namespace pk3DS.Core.CTR
             return clone;
         }
 
-        /// <summary>
-        /// Compose a new function by combining pieces of stock functions.
-        /// Each piece is a (sourceFunction, startOffset, length) tuple specifying
-        /// which bytes to extract. The pieces are concatenated and BL fixups applied.
-        /// A return instruction (POP {PC} or BX LR) is appended if not present.
-        /// </summary>
         public static byte[] ComposeFunction(
             DecompiledCRO cro,
             uint destOffset,
@@ -603,10 +559,6 @@ namespace pk3DS.Core.CTR
             return result.ToArray();
         }
 
-        /// <summary>
-        /// Generate a standard consumable item function.
-        /// Pattern from the ARM Research guide.
-        /// </summary>
         public static byte[] GenerateConsumableItemFunction(int itemId, uint blTarget1, uint blTarget2, uint funcOffset)
         {
             var asm = new List<byte>();
@@ -639,9 +591,6 @@ namespace pk3DS.Core.CTR
         #endregion
     }
 
-    /// <summary>
-    /// File backup utility for CRO/code.bin modifications.
-    /// </summary>
     public static class CROBackup
     {
         public static void CreateBackup(string filePath)

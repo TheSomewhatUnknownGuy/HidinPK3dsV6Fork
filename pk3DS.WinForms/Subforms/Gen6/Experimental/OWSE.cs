@@ -33,16 +33,6 @@ public sealed partial class OWSE : Form
     private byte[] masterZoneData;
     private bool debugToolDumping;
 
-    /// <summary>
-    /// Suppresses write-back while a dev dumper walks every location, and restores it even if the
-    /// walk throws.
-    /// <para>
-    /// The flag used to be cleared by an assignment at the end of each dumper, which a throw part
-    /// way through skipped. <see cref="SetEntry"/> checks this flag and returns early, so once it
-    /// was stuck on the editor silently stopped writing any further edits back - no error, no
-    /// symptom until the changes turned out to be missing.
-    /// </para>
-    /// </summary>
     private IDisposable DumpScope()
     {
         debugToolDumping = true;

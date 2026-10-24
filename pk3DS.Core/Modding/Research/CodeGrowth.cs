@@ -6,18 +6,12 @@ using pk3DS.Core.Modding;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Result of growing code.bin's executable text and matching exheader.</summary>
 public sealed record GrowResult(bool Ok, string Error, byte[] Code, byte[] ExHeader, byte[] Ncch0, int Pages);
 
-/// <summary>Guarded entry point for installer-driven .text growth.</summary>
 public static class CodeGrowth
 {
     private const int PageSize = 0x1000;
 
-    /// <summary>
-    /// Inserts enough full pages into .text to provide <paramref name="bytesNeeded"/> bytes.
-    /// This remains opt-in and is refused on Uhuru because every following code address moves.
-    /// </summary>
     public static GrowResult Grow(byte[] code, byte[] exheader, byte[]? ncch0, int bytesNeeded, string? journalBasePath = null)
     {
         if (!GameConfig.AllowGrowth) return Refuse("growth is off");
@@ -44,7 +38,6 @@ public static class CodeGrowth
         GrowResult Refuse(string error) => new(false, error, code ?? [], exheader ?? [], ncch0 ?? [], 0);
     }
 
-    /// <summary>Returns the end of allocated .text in code.bin, or the stock fallback for a missing header.</summary>
     public static int TextEndFor(byte[]? exheader)
     {
         if (exheader == null || exheader.Length < 0x18) return pk3DS.Core.Modding.ResearchEngine.CodeTextRegionEnd;
@@ -53,7 +46,6 @@ public static class CodeGrowth
         return end is < 0 or > int.MaxValue ? pk3DS.Core.Modding.ResearchEngine.CodeTextRegionEnd : (int)end;
     }
 
-    /// <summary>TextEndFor, but only when the exheader and code.bin agree (ModExport.CodeLayoutError); otherwise the stock constant, so a stale or foreign exheader never widens the allocator's scan.</summary>
     public static int TextEndFor(byte[]? exheader, long codeLength)
         => exheader != null && exheader.Length >= 0x38
             && pk3DS.Core.Modding.ModExport.CodeLayoutError(exheader.LongLength, exheader[..0x38], codeLength) == null

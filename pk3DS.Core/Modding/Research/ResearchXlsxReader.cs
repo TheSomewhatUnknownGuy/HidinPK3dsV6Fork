@@ -7,13 +7,8 @@ using System.Xml;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Reads .xlsx worksheets into a raw <see cref="ResearchGrid"/>, reporting problems instead of
-/// swallowing them.
-/// </summary>
 public static class ResearchXlsxReader
 {
-    /// <summary>Sheet names in workbook order.</summary>
     public static List<string> GetSheetNames(string xlsxPath, IList<string> diagnostics = null)
     {
         var names = new List<string>();
@@ -30,10 +25,6 @@ public static class ResearchXlsxReader
         return names;
     }
 
-    /// <summary>
-    /// Reads one sheet into a grid. Returns null (and records a diagnostic) when the sheet can't
-    /// be read at all; an empty grid is a legitimate result for a genuinely empty sheet.
-    /// </summary>
     public static ResearchGrid ReadSheet(string xlsxPath, string sheetName, IList<string> diagnostics = null)
     {
         if (!File.Exists(xlsxPath)) { diagnostics?.Add($"missing file: {xlsxPath}"); return null; }
@@ -154,17 +145,6 @@ public static class ResearchXlsxReader
         return fallback;
     }
 
-    /// <summary>
-    /// Reads sharedStrings.xml, grouping by &lt;si&gt; entry.
-    /// <para>
-    /// This is deliberately not a flat scan of every &lt;t&gt; node. A shared string containing rich
-    /// text is stored as multiple runs — <c>&lt;si&gt;&lt;r&gt;&lt;t&gt;Foo&lt;/t&gt;&lt;/r&gt;&lt;r&gt;&lt;t&gt;Bar&lt;/t&gt;&lt;/r&gt;&lt;/si&gt;</c>
-    /// is ONE string "FooBar". Treating each &lt;t&gt; as its own entry (as the previous reader did)
-    /// both splits that value and shifts the index of every subsequent shared string, so any sheet
-    /// with a single bit of bold/coloured text silently reads whole columns of wrong values from
-    /// then on. Several research workbooks use coloured runs heavily, so this mattered.
-    /// </para>
-    /// </summary>
     private static List<string> ReadSharedStrings(ZipArchive zip)
     {
         var list = new List<string>();

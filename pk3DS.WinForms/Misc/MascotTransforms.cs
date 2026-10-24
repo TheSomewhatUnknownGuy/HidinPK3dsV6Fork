@@ -8,48 +8,24 @@ using System.Linq;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Which shop item turns which mascot into which form.
-/// <para>
-/// This replaces a hand-written chain of "if species == X and the player owns Y then form = N".
-/// That chain could express only the simplest case, and three of the transforms asked for are not
-/// that shape: Zygardite is inert until the Zygarde Cube has already been bought, the Reins of
-/// Unity asks which rider the player wants, and two species change on accumulated friendship with
-/// no item involved at all. Encoding the conditions as data keeps all of them in one readable
-/// table instead of spreading special cases through the update path.
-/// </para>
-/// <para>
-/// Rules are evaluated in order and the last match wins, so a chained transform lists its stages
-/// in ascending order: Zygarde reaches Complete via the Cube, and only then can Zygardite take it
-/// to Mega.
-/// </para>
-/// </summary>
 public static class MascotTransforms
 {
-    /// <summary>Friendship at which the two friendship-gated forms unlock.</summary>
     public const int FriendshipFormThreshold = 200;
 
-    /// <summary>A transform from one mascot form to another.</summary>
     public sealed class Rule
     {
         public int Species { get; init; }
 
-        /// <summary>Item that triggers it, or null when the trigger is friendship alone.</summary>
         public string? Item { get; init; }
 
-        /// <summary>Item that MUST already be owned for <see cref="Item"/> to do anything.</summary>
         public string? Requires { get; init; }
 
-        /// <summary>Minimum friendship, or 0 when friendship is irrelevant.</summary>
         public int MinFriendship { get; init; }
 
-        /// <summary>Form the mascot becomes.</summary>
         public int Form { get; init; }
 
-        /// <summary>Only applies when the mascot is already in this form; -1 means any form.</summary>
         public int FromForm { get; init; } = -1;
 
-        /// <summary>Human-readable, used for the "what did this do" line in the shop.</summary>
         public string Describe => Item == null
             ? $"at {MinFriendship} friendship -> form {Form}"
             : $"{Item}{(Requires == null ? "" : $" (needs {Requires})")} -> form {Form}";
@@ -113,20 +89,13 @@ public static class MascotTransforms
         new() { Species = Terapagos, Item = "Stellar Tera Shard", MinFriendship = FriendshipFormThreshold, Form = 2 },
     ];
 
-    /// <summary>Item that asks the player which form they want rather than picking one.</summary>
     public const string ChoiceItem = "Reins of Unity";
 
-    /// <summary>The two outcomes <see cref="ChoiceItem"/> offers, in prompt order.</summary>
     public static readonly (string Label, int Form)[] ReinsChoices =
         [("Ice Rider", 1), ("Shadow Rider", 2)];
 
-    /// <summary>Species the choice item applies to.</summary>
     public const int ChoiceSpecies = Calyrex;
 
-    /// <summary>
-    /// Resolves the form a mascot should be in. <paramref name="chosenForm"/> carries a choice the
-    /// player already made for an item that prompts, and wins over the table when set.
-    /// </summary>
     public static int Resolve(int species, int baseForm, IReadOnlyCollection<string> owned, int friendship, int? chosenForm = null)
     {
         if (species == ChoiceSpecies && baseForm == 0 && chosenForm.HasValue && owned.Contains(ChoiceItem))
@@ -145,16 +114,6 @@ public static class MascotTransforms
         return form;
     }
 
-    /// <summary>
-    /// Theme name to the species and form it depicts, for every entry the theme menu offers.
-    /// <para>
-    /// This replaces a switch that only listed Gen 6 and Gen 7. Any theme it did not name fell to
-    /// the default of species 800, so every mascot added afterwards silently rendered as Necrozma -
-    /// including ones whose own sprite was present and loadable. A missing entry here is the single
-    /// point of failure for a mascot not appearing, so the table is kept in step with the menu by
-    /// the name check in <see cref="MissingFrom"/>.
-    /// </para>
-    /// </summary>
     public static readonly Dictionary<string, (int Species, int Form)> ThemeSpecies = new(StringComparer.OrdinalIgnoreCase)
     {
         // Gen 6
@@ -199,15 +158,12 @@ public static class MascotTransforms
         ["Ogerpon Cornerstone"] = (1017, 3),
     };
 
-    /// <summary>Theme names with no species mapping - each would render as the wrong Pokemon.</summary>
     public static IEnumerable<string> MissingFrom(IEnumerable<string> menuNames) =>
         menuNames.Where(n => !ThemeSpecies.ContainsKey(n));
 
-    /// <summary>Every item the table can consume, for stocking the shop.</summary>
     public static IEnumerable<string> AllItems() =>
         Rules.Select(r => r.Item).Where(i => i != null).Concat([ChoiceItem]).Distinct()!;
 
-    /// <summary>What a species can still become, for showing the player why an item matters.</summary>
     public static IEnumerable<string> DescribeFor(int species) =>
         Rules.Where(r => r.Species == species).Select(r => r.Describe);
 }

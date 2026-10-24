@@ -5,7 +5,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One move-ID bounds check found in code.bin.</summary>
 public sealed class MoveCeilingSite
 {
     public int Offset { get; init; }
@@ -41,28 +40,11 @@ public sealed class MoveCeilingResult
     }
 }
 
-/// <summary>
-/// Raises the move-ID bounds checks in code.bin past whatever this build already allows.
-/// <para>
-/// Retail USUM rejects move ids at or above 0x2D8 (728). The community Expansion Pack's own
-/// documented "MOVE LIMITS" `code_map.csv` rows (already confirmed applied in this session's
-/// reference ROM via <see cref="ExpansionPatchApplier"/>) raise four sites to 0x398 (920) - the
-/// move flag lookup, the move parameter lookup, move-record loading, and move name text. This class
-/// picks up from whichever of those two states is currently live and raises further, the same
-/// "widen past an already-verified baseline" shape <see cref="ItemCeilingPatcher"/> already uses for
-/// items.
-/// </para>
-/// </summary>
 public static class MoveCeilingPatcher
 {
     public const uint RetailCeiling = 0x2D8;     // 728
     public const uint ExpansionCeiling = 0x398;  // 920
 
-    /// <summary>
-    /// The four documented sites (US and UM addresses both listed - whichever doesn't match this
-    /// build's own layout simply fails <see cref="TryReadCeiling"/> and is skipped, exactly like
-    /// <see cref="ItemCeilingPatcher"/>'s own multi-version site list).
-    /// </summary>
     private static readonly int[] DocumentedSites =
     [
         0x226680, 0x2267D4, 0x226B04, // same offsets in both builds
@@ -107,7 +89,6 @@ public static class MoveCeilingPatcher
         return 0;
     }
 
-    /// <summary>Widens the move bounds checks so <paramref name="requiredMaxMoveId"/> is a valid move id.</summary>
     public static MoveCeilingResult Raise(byte[] code, int requiredMaxMoveId)
     {
         var result = new MoveCeilingResult();

@@ -20,9 +20,6 @@ public class SpeciesRandomizer
 
     public int[] AllowedSpecies { get; private set; } = [];
 
-    /// <summary>
-    /// To be called after the allowed species are provided.
-    /// </summary>
     public void Initialize()
     {
         AllowedSpecies = InitializeSpeciesList();
@@ -128,9 +125,6 @@ public class SpeciesRandomizer
         return newSpecies;
     }
 
-    /// <summary>
-    /// The next species straight off the shuffled cycle, ignoring every similarity filter.
-    /// </summary>
     public int GetEvenDistributionSpecies() => RandSpec.Next();
 
     public int GetRandomSpeciesType(int oldSpecies, int type)

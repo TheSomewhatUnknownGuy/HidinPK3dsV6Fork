@@ -253,10 +253,6 @@ public partial class EvolutionEditor7 : Form
         WinFormsUtil.Alert("All Pokémon's Evolutions have been randomized!");
     }
 
-    /// <summary>
-    /// Checks whether the Expansion Pack species are missing their evolution methods, and adds the
-    /// ones that are.
-    /// </summary>
     private void B_AddMissingEvos_Click(object sender, EventArgs e)
     {
         SetList();

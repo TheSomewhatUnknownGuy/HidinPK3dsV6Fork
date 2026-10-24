@@ -34,10 +34,6 @@ public class CompetitiveBuildEngine
 
     public LegalLearnsetAggregator Learnsets => LearnsetAggregator;
 
-    /// <summary>
-    /// Resolves a trainer Pokemon's ability *slot index* (0-3, matching TrainerPoke7.Ability)
-    /// to the actual ability name via the species' PersonalInfo.Abilities array.
-    /// </summary>
     public static string ResolveAbilityName(PersonalInfo pi, int abilitySlot, string[] abilityNames)
     {
         if (pi?.Abilities == null || pi.Abilities.Length == 0 || abilityNames == null) return "";
@@ -54,17 +50,8 @@ public class CompetitiveBuildEngine
         return (abilId > 0 && abilId < abilityNames.Length) ? (abilityNames[abilId] ?? "") : "";
     }
 
-    /// <summary>
-    /// Picks the best ability slot (1, 2, or 3=Hidden — all fully eligible) for a competitive
-    /// trainer Pokemon, preferring higher-tier competitive abilities. Returns a concrete slot
-    /// (never 0/"Any") so downstream moveset/item logic has a definite ability to build around.
-    /// </summary>
-    /// <summary>
-    /// The user's ability bans, honoured when picking a trainer Pokemon's ability slot.
-    /// </summary>
     public AbilityBanList BanList { get; set; }
 
-    /// <summary>Every tunable number (spec §4); the randomizer sets it from the weights file.</summary>
     public CompetitiveWeights Weights { get; set; } = new();
 
     public int ChooseCompetitiveAbilitySlot(PersonalInfo pi, string[] abilityNames)
@@ -125,7 +112,6 @@ public class CompetitiveBuildEngine
         return bestCandidates[Rnd.Next(bestCandidates.Count)].slot;
     }
 
-    /// <summary>How many of a finished set's moves are physical, and how many special.</summary>
     public (int Physical, int Special) CountAttackCategories(int[] moves)
     {
         var data = Config?.Moves;
@@ -141,7 +127,6 @@ public class CompetitiveBuildEngine
         return (phys, spec);
     }
 
-    /// <summary>Manifesto 0.7: Frail iff HP + Def + SpD <= 200.</summary>
     public static bool IsFrail(PersonalInfo pi)
     {
         if (pi?.Stats == null || pi.Stats.Length < 6) return false;
@@ -215,13 +200,6 @@ public class CompetitiveBuildEngine
             SpeedCreep: creep));
     }
 
-    /// <summary>
-    /// Generates optimal competitive IVs dynamically based on moves, role, and speed stat:
-    /// - 0 Spe IV for Trick Room, Gyro Ball users (Spe <= 80), or slow bulky pivots (Spe <= 65)
-    /// - 0 Atk IV for pure special attackers or defensive walls with 0 physical attacks (mitigates Foul Play, confusion self-damage, Strength Sap)
-    /// - 31 (or random when fullIvs is false) for remaining stats.
-    /// Format matches TrainerPoke7.IVs: [HP, Atk, Def, SpA, SpD, Spe]
-    /// </summary>
     public int[] BuildIvs(PersonalInfo pi, CompetitiveRole role, int[] moves, bool isTrickRoom = false, string[] moveNames = null, bool fullIvs = true)
     {
         int[] ivs = fullIvs
@@ -261,11 +239,6 @@ public class CompetitiveBuildEngine
         return ivs;
     }
 
-    /// <summary>
-    /// Dynamically adapts a team role to match the Pokemon's actual base stat distribution.
-    /// Prevents high-offense titans or Megas from being trapped in 0-offense defensive roles,
-    /// and prevents frail Pokemon from being assigned wall/tank roles.
-    /// </summary>
     public static CompetitiveRole AdaptRoleForPokemon(PersonalInfo pi, CompetitiveRole baseRole, bool isMega = false)
     {
         if (pi?.Stats == null) return baseRole;
@@ -1188,10 +1161,6 @@ public class CompetitiveBuildEngine
         return selected.Take(4).ToArray();
     }
 
-    /// <summary>
-    /// Last pass over a finished set: swaps out attacks that use the Pokemon's weaker attacking
-    /// stat, whenever the legal pool still holds a same-category replacement.
-    /// </summary>
     private void EnforceAttackCategory(
         List<int> selected, List<int> pool,
         string[] moveNames, Move[] moveData, int[] types,
@@ -1614,7 +1583,6 @@ public class CompetitiveBuildEngine
         }
     }
 
-    /// <summary>The manifesto's MUST NOT move rules, shared by every phase that picks a move.</summary>
     private static bool IsBannedMove(string name, PersonalInfo pi, List<int> selected, List<int> pool, string[] moveNames)
     {
         if (string.IsNullOrEmpty(name)) return false;
@@ -1682,7 +1650,6 @@ public class CompetitiveBuildEngine
         _ => false
     };
 
-    /// <summary>Which team jobs a set of moves can do (v2 spec §3 role coverage).</summary>
     public static TeamRoles RolesOf(IEnumerable<int> moves, string[] moveNames, bool trickRoomTeam)
     {
         var roles = TeamRoles.None;

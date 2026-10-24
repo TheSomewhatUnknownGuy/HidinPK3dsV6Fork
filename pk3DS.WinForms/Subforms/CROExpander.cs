@@ -111,11 +111,6 @@ namespace pk3DS.WinForms
             L_Status.Text = $"Loaded: code.bin ({Data.Length:X} bytes)";
         }
 
-        /// <summary>
-        /// Swaps the Expand tab's segment labels between CRO segments (.code/.data/.bss/relocation
-        /// table) and code.bin's real ExHeader segments (.text/.rodata/.data), and disables the
-        /// CRO-only Repoint/Move tab (it walks a CRO relocation-patch table code.bin doesn't have).
-        /// </summary>
         private void SetCodeBinMode(bool codeBinMode)
         {
             IsCodeBin = codeBinMode;
@@ -334,7 +329,6 @@ namespace pk3DS.WinForms
             LoadCROFromMemory();
         }
 
-        /// <summary>CRO segment (0 .code, 1 .rodata, 2 .data) whose file range holds <paramref name="fileOffset"/>.</summary>
         private int SegmentOf(uint fileOffset, uint segmentTableOffset, uint[] startTable)
         {
             uint codeLen = ReadU32((int)segmentTableOffset + 4);

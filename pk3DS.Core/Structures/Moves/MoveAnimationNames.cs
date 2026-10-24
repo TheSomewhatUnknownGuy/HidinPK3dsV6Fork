@@ -5,30 +5,16 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Structures;
 
-/// <summary>
-/// What each animation index in the move-animation GARC (a/0/8/8) actually plays.
-/// </summary>
 public static class MoveAnimationNames
 {
-    /// <summary>Highest animation index the vanilla GARC contains.</summary>
     public const int MaxIndex = 1236;
 
-    /// <summary>Animation indices below this are the move table; at or above it, engine effects.</summary>
     public const int FirstEngineIndex = 729;
 
-    /// <summary>
-    /// First index the battle engine owns. Writing at or above this breaks the game.
-    /// </summary>
     public const int FirstReservedIndex = 801;
 
-    /// <summary>Whether writing a move's animation at this index would clobber the engine's own.</summary>
     public static bool IsEngineReserved(int index) => index >= FirstReservedIndex && index <= MaxIndex;
 
-    /// <summary>
-    /// A readable label for an animation index.
-    /// </summary>
-    /// <param name="index">Index into the animation GARC.</param>
-    /// <param name="moveNames">The ROM's move names, used for indices that are moves.</param>
     public static string Describe(int index, string[]? moveNames)
     {
         if (index < 0 || index > MaxIndex) return $"{index} - (out of range)";
@@ -44,12 +30,8 @@ public static class MoveAnimationNames
         return Engine.TryGetValue(index, out string? d) ? $"{index} - {d}" : $"{index} - (unused)";
     }
 
-    /// <summary>Every index that is not a move, in order, for a picker.</summary>
     public static IEnumerable<KeyValuePair<int, string>> EngineAnimations => Engine;
 
-    /// <summary>
-    /// The engine's own animations, by index.
-    /// </summary>
     private static readonly Dictionary<int, string> Engine = Build();
 
     private static Dictionary<int, string> Build()

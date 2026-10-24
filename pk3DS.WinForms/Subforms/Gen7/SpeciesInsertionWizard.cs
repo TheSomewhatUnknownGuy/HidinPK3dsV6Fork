@@ -12,10 +12,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// UI for planning one or more species with InsertionPipeline, then applying each row's code.bin,
-/// icon, and cry changes before the user reviews and saves the result.
-/// </summary>
 public partial class SpeciesInsertionWizard : Form
 {
     private byte[][] personalReal;
@@ -47,9 +43,6 @@ public partial class SpeciesInsertionWizard : Form
         public bool TouchedCodeBin;
         public int SpeciesAdded;
 
-        /// <summary>Grown copy of TextName.SpeciesNames with every new species' typed-in name set -
-        /// SpeciesInsertionOrchestrator itself never touches text data, so this is built and saved
-        /// here in the wizard instead, the same way SMTE/MaisonEditor7 grow their own name lists.</summary>
         public string[] SpeciesNames = [];
     }
 
@@ -118,7 +111,6 @@ public partial class SpeciesInsertionWizard : Form
         SyncGridRowCount();
     }
 
-    /// <summary>Rebuilds the two dropdown columns' backing option lists from whatever GARC data is currently loaded.</summary>
     private void BuildDropdownOptionLists()
     {
         modelOptions = [NoneOption];
@@ -146,15 +138,6 @@ public partial class SpeciesInsertionWizard : Form
         }
     }
 
-    /// <summary>
-    /// Rebuilds the option lists and, if the grid's combo columns already exist, re-points them at
-    /// the fresh lists. Never assigns `DataSource = null` as an intermediate step - doing that while
-    /// existing rows still hold a value briefly leaves the column with zero valid items and throws
-    /// "DataGridViewComboBoxCell value is not valid" the moment the grid revalidates, confirmed the
-    /// first time this form was actually used. A direct reassignment to a new list object is always
-    /// picked up without that transient gap, and the `(none)`/-1 sentinel (always the first entry)
-    /// keeps any already-selected "(none)" cells valid across the swap either way.
-    /// </summary>
     private void PopulateDropdownSources()
     {
         BuildDropdownOptionLists();
@@ -185,12 +168,6 @@ public partial class SpeciesInsertionWizard : Form
 
     private void NUD_SpeciesCount_ValueChanged(object sender, EventArgs e) => SyncGridRowCount();
 
-    /// <summary>
-    /// Loads everything needed to show status and configure the grid - the small per-species GARCs
-    /// eagerly, but "models"/"cry" only far enough to get file 0 and a member count. Safe to call
-    /// as often as needed (constructor, every RefreshStatus) since it never touches the bulk of
-    /// either large archive.
-    /// </summary>
     private bool LoadGarcs(out string error)
     {
         error = "";
@@ -239,10 +216,6 @@ public partial class SpeciesInsertionWizard : Form
         return true;
     }
 
-    /// <summary>
-    /// Loads the optional cry and icon arrays for code-side edits. Model members are streamed by
-    /// the Core insertion plan and are never loaded into this form.
-    /// </summary>
     private bool LoadFullModelAndCryData(out string error)
     {
         error = "";

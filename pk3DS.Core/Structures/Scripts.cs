@@ -104,32 +104,6 @@ public static class Scripts
     }
 
     // Compression
-    /// <summary>
-    /// Compresses a flat stream of 4-byte LE instruction words (as produced by
-    /// <see cref="QuickDecompress"/>, or <see cref="GetBytes"/> over its output) back into the
-    /// same variable-length format the game's own scripts use.
-    /// <para>
-    /// This replaces an earlier, exploratory implementation that never actually worked: its outer
-    /// loop advanced `pos` inside the `Skip(pos += 4)` call, so every slice started one word later
-    /// than it was supposed to - the first word was silently skipped entirely, and the last
-    /// iteration walked past the array's end (confirmed by a real exception the first time this
-    /// method was exercised against actual script data this session; it had never been called
-    /// before). Its per-value logic (<c>CompressBytes</c>) also had branches its own comments
-    /// flagged as unverified ("Dunno if this ever naturally happens... needs verification").
-    /// </para>
-    /// <para>
-    /// Rather than debug that logic further, this is derived directly as the mathematical inverse
-    /// of <see cref="QuickDecompress"/>'s own (confirmed-correct) reading loop, which is a
-    /// big-endian base-128 varint: each value is split into the fewest 7-bit groups such that the
-    /// first (most-significant) group, sign-extended as a 7-bit signed number, combined with every
-    /// later group shifted in from the bottom, reproduces the original 32-bit value exactly; every
-    /// group but the last carries the 0x80 continuation bit. Verified this session against real
-    /// script data from this ROM (11 real `.xamx` files, several thousand instructions each) plus a
-    /// dedicated edge-case unit test (0, ±1, the ±64/±65/±128/±129 sign-extension boundaries,
-    /// int.MinValue/MaxValue): every value round-trips through decompress(compress(x)) == x, and
-    /// the compressed length matches the original file's compressed length exactly in every case.
-    /// </para>
-    /// </summary>
     internal static byte[] CompressScript(byte[] data)
     {
         if (data == null || data.Length % 4 != 0) // Bad Input
@@ -141,7 +115,6 @@ public static class Scripts
         return mn.ToArray();
     }
 
-    /// <summary>Encodes one 32-bit value into its big-endian base-128 varint form - see <see cref="CompressScript"/>.</summary>
     internal static byte[] CompressValue(int value)
     {
         int n = 1;
@@ -188,12 +161,6 @@ public static class Scripts
     }
 
     // Interpreting
-    /// <param name="nativeHashes">
-    /// The script's own native-function table (<see cref="Script.NativeFunctionHashes"/>), so a
-    /// SYSREQ.N/DoCommand? call's native-index argument can be shown by real name via
-    /// <see cref="AmxNatives"/> instead of a bare number. Null/omitted keeps the old numeric-only
-    /// display - safe for a caller that does not have (or does not care about) a Script instance.
-    /// </param>
     public static string[] ParseScript(uint[] cmd, int sanity = -1, uint[] nativeHashes = null)
     {
         // sub_148CBC Moon v1.0

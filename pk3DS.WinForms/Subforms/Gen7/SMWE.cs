@@ -218,7 +218,6 @@ public partial class SMWE : Form
     private byte[][] files;
     private ulong[] vanillaHashes;
 
-    /// <summary>FNV-1a over the file's bytes, used only to detect "differs from vanilla".</summary>
     private static ulong GetContentHash(byte[] data)
     {
         if (data == null) return 0;
@@ -261,9 +260,6 @@ public partial class SMWE : Form
         // RTB_EncounterChangelog.Text = sb.ToString();
     }
 
-    /// <summary>
-    /// Imports one version's exclusive list and files it under a heading the user supplies.
-    /// </summary>
     private bool PromptImportExclusives()
     {
         using var ofd = new OpenFileDialog
@@ -953,11 +949,6 @@ private void CopySOS_Click(object sender, EventArgs e)
     }
 
     // Utility
-    /// <summary>
-    /// Moves the sub-location names into the location name string entry.
-    /// </summary>
-    /// <param name="list">Raw location list</param>
-    /// <returns>Cleaned location list</returns>
     public static string[] GetGoodLocationList(string[] list)
     {
         var bad = list;

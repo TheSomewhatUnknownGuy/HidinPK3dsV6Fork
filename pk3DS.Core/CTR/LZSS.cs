@@ -40,21 +40,6 @@ public static class LZSS
         return output;
     }
 
-    /// <summary>
-    /// Decompresses the given stream, writing the decompressed data to the given output stream.
-    /// Assumes <c>Supports(instream)</c> returns <c>true</c>.
-    /// After this call, the input stream will be positioned at the end of the compressed stream,
-    /// or at the initial position + <c>inLength</c>, whichever comes first.
-    /// </summary>
-    /// <param name="instream">The stream to decompress. At the end of this method, the position
-    /// of this stream is directly after the compressed data.</param>
-    /// <param name="inLength">The length of the input data. Not necessarily all of the
-    /// input data may be read (if there is padding, for example), however never more than
-    /// this number of bytes is read from the input stream.</param>
-    /// <param name="outstream">The stream to write the decompressed data to.</param>
-    /// <returns>The length of the output data.</returns>
-    /// <exception cref="NotEnoughDataException">When the given length of the input data
-    /// is not enough to properly decompress the input.</exception>
     public static long Decompress(Stream instream, long inLength, Stream outstream)
     {
         #region Format definition in NDSTEK style
@@ -282,11 +267,6 @@ public static class LZSS
         return Compress(inStream, inStream.Length, outStream, true);
     }
     #region Original compression method
-    /// <summary>
-    /// Compresses the input using the 'original', unoptimized compression algorithm.
-    /// This algorithm should yield files that are the same as those found in the games.
-    /// (delegates to the optimized method if LookAhead is set)
-    /// </summary>
     internal static unsafe int Compress(Stream instream, long inLength, Stream outstream, bool original)
     {
         // make sure the decompressed size fits in 3 bytes.
@@ -408,11 +388,6 @@ public static class LZSS
         return compressedLength;
     }
     #region Dynamic Programming compression method
-    /// <summary>
-    /// Variation of the original compression method, making use of Dynamic Programming to 'look ahead'
-    /// and determine the optimal 'length' values for the compressed blocks. Is not 100% optimal,
-    /// as the flag-bytes are not taken into account.
-    /// </summary>
     internal static unsafe int CompressWithLA(Stream instream, long inLength, Stream outstream)
     {
         // save the input data in an array to prevent having to go back and forth in a file
@@ -517,17 +492,6 @@ public static class LZSS
     #endregion
 
     #region DP compression helper method; GetOptimalCompressionLengths
-    /// <summary>
-    /// Gets the optimal compression lengths for each start of a compressed block using Dynamic Programming.
-    /// This takes O(n^2) time, although in practice it will often be O(n^3) since one of the constants is 0x10110
-    /// (the maximum length of a compressed block)
-    /// </summary>
-    /// <param name="indata">The data to compress.</param>
-    /// <param name="inLength">The length of the data to compress.</param>
-    /// <param name="lengths">The optimal 'length' of the compressed blocks. For each byte in the input data,
-    /// this value is the optimal 'length' value. If it is 1, the block should not be compressed.</param>
-    /// <param name="disps">The 'disp' values of the compressed blocks. May be 0, in which case the
-    /// corresponding length will never be anything other than 1.</param>
     internal static unsafe void GetOptimalCompressionLengths(byte* indata, int inLength, out int[] lengths, out int[] disps)
     {
         lengths = new int[inLength];
@@ -581,16 +545,9 @@ public static class LZSS
     #endregion
 }
 #region Exceptions
-/// <summary>
-/// An exception indicating that the file cannot be compressed, because the decompressed size
-/// cannot be represented in the current compression format.
-/// </summary>
 [Serializable]
 public class InputTooLargeException : Exception
 {
-    /// <summary>
-    /// Creates a new exception that indicates that the input is too big to be compressed.
-    /// </summary>
     public InputTooLargeException()
         : base("The compression ratio is not high enough to fit the input "
                + "in a single compressed file.")
@@ -609,28 +566,13 @@ public class InputTooLargeException : Exception
     }
 }
 
-/// <summary>
-/// An exception that is thrown by the decompression functions when there
-/// is not enough data available in order to properly decompress the input.
-/// </summary>
 [Serializable]
 public class NotEnoughDataException : IOException
 {
-    /// <summary>
-    /// Gets the actual number of written bytes.
-    /// </summary>
     public long WrittenLength { get; }
 
-    /// <summary>
-    /// Gets the number of bytes that was supposed to be written.
-    /// </summary>
     public long DesiredLength { get; }
 
-    /// <summary>
-    /// Creates a new NotEnoughDataException.
-    /// </summary>
-    /// <param name="currentOutSize">The actual number of written bytes.</param>
-    /// <param name="totalOutSize">The desired number of written bytes.</param>
     public NotEnoughDataException(long currentOutSize, long totalOutSize)
         : base("Not enough data available; 0x" + currentOutSize.ToString("X")
                                                + " of " + (totalOutSize < 0 ? "???" : "0x" + totalOutSize.ToString("X"))
@@ -661,16 +603,9 @@ public class NotEnoughDataException : IOException
     }
 }
 
-/// <summary>
-/// An exception thrown by the compression or decompression function, indicating that the
-/// given input length was too large for the given input stream.
-/// </summary>
 [Serializable]
 public class StreamTooShortException : EndOfStreamException
 {
-    /// <summary>
-    /// Creates a new exception that indicates that the stream was shorter than the given input length.
-    /// </summary>
     public StreamTooShortException()
         : base("The end of the stream was reached "
                + "before the given amount of data was read.")
@@ -689,25 +624,11 @@ public class StreamTooShortException : EndOfStreamException
     }
 }
 
-/// <summary>
-/// An exception indication that the input has more data than required in order
-/// to decompress it. This may indicate that more sub-files are present in the file.
-/// </summary>
 [Serializable]
 public class TooMuchInputException : Exception
 {
-    /// <summary>
-    /// Gets the number of bytes read by the decompressed to decompress the stream.
-    /// </summary>
     public long ReadBytes { get; }
 
-    /// <summary>
-    /// Creates a new exception indicating that the input has more data than necessary for
-    /// decompressing th stream. It may indicate that other data is present after the compressed
-    /// stream.
-    /// </summary>
-    /// <param name="readBytes">The number of bytes read by the decompressor.</param>
-    /// <param name="totLength">The indicated length of the input stream.</param>
     public TooMuchInputException(long readBytes, long totLength)
         : base("The input contains more data than necessary. Only used 0x"
                + readBytes.ToString("X") + " of 0x" + totLength.ToString("X") + " bytes")
@@ -733,23 +654,8 @@ public class TooMuchInputException : Exception
 }
 #endregion
 #region Supplementary
-/// <summary>
-/// Class for I/O-related utility methods.
-/// </summary>
 public static class LZUtil
 {
-    /// <summary>
-    /// Determine the maximum size of a LZ-compressed block starting at newPtr, using the already compressed data
-    /// starting at oldPtr. Takes O(inLength * oldLength) = O(n^2) time.
-    /// </summary>
-    /// <param name="newPtr">The start of the data that needs to be compressed.</param>
-    /// <param name="newLength">The number of bytes that still need to be compressed.
-    /// (or: the maximum number of bytes that _may_ be compressed into one block)</param>
-    /// <param name="oldPtr">The start of the raw file.</param>
-    /// <param name="oldLength">The number of bytes already compressed.</param>
-    /// <param name="disp">The offset of the start of the longest block to refer to.</param>
-    /// <param name="minDisp">The minimum allowed value for 'disp'.</param>
-    /// <returns>The length of the longest sequence of bytes that can be copied from the already decompressed data.</returns>
     public static unsafe int GetOccurrenceLength(byte* newPtr, int newLength, byte* oldPtr, int oldLength, out int disp, int minDisp = 1)
     {
         disp = 0;
@@ -792,13 +698,6 @@ public static class LZUtil
 public static class IOUtils
 {
     #region byte[] <-> (u)int
-    /// <summary>
-    /// Returns a 4-byte unsigned integer as used on the NDS converted from four bytes
-    /// at a specified position in a byte array.
-    /// </summary>
-    /// <param name="buffer">The source of the data.</param>
-    /// <param name="offset">The location of the data in the source.</param>
-    /// <returns>The indicated 4 bytes converted to uint</returns>
     public static uint ToNDSu32(byte[] buffer, int offset)
     {
         return (uint)(buffer[offset]
@@ -807,13 +706,6 @@ public static class IOUtils
                       | (buffer[offset + 3] << 24));
     }
 
-    /// <summary>
-    /// Returns a 4-byte signed integer as used on the NDS converted from four bytes
-    /// at a specified position in a byte array.
-    /// </summary>
-    /// <param name="buffer">The source of the data.</param>
-    /// <param name="offset">The location of the data in the source.</param>
-    /// <returns>The indicated 4 bytes converted to int</returns>
     public static int ToNDSs32(byte[] buffer, int offset)
     {
         return buffer[offset]
@@ -822,10 +714,6 @@ public static class IOUtils
                | (buffer[offset + 3] << 24);
     }
 
-    /// <summary>
-    /// Converts a u32 value into a sequence of bytes that would make ToNDSu32 return
-    /// the given input value.
-    /// </summary>
     public static byte[] FromNDSu32(uint value)
     {
         return
@@ -837,13 +725,6 @@ public static class IOUtils
         ];
     }
 
-    /// <summary>
-    /// Returns a 3-byte integer as used in the built-in compression
-    /// formats in the DS, converted from three bytes at a specified position in a byte array,
-    /// </summary>
-    /// <param name="buffer">The source of the data.</param>
-    /// <param name="offset">The location of the data in the source.</param>
-    /// <returns>The indicated 3 bytes converted to an integer.</returns>
     public static int ToNDSu24(byte[] buffer, int offset)
     {
         return buffer[offset]

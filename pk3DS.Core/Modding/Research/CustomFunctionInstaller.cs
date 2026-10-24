@@ -9,10 +9,8 @@ namespace pk3DS.Core.Modding.Research;
 // win over global aliases - so this alias has to sit inside the namespace to take effect.
 using MechanicType = pk3DS.Core.CTR.MechanicType;
 
-/// <summary>Severity of a line in an install plan.</summary>
 public enum PlanSeverity { Info = 0, Warning = 1, Error = 2 }
 
-/// <summary>One resolved decision or action in an install plan.</summary>
 public sealed class PlanStep
 {
     public PlanSeverity Severity { get; init; } = PlanSeverity.Info;
@@ -22,25 +20,14 @@ public sealed class PlanStep
         Severity == PlanSeverity.Info ? $"[{Stage}] {Message}" : $"[{Stage}] {Severity.ToString().ToUpperInvariant()}: {Message}";
 }
 
-/// <summary>
-/// The full result of planning (and optionally performing) an install.
-/// <para>
-/// Planning is always done in full before anything is written, so a definition that would fail
-/// halfway — no space, unknown mechanic, un-assemblable code — is rejected with a complete
-/// explanation instead of leaving a half-patched ROM behind.
-/// </para>
-/// </summary>
 public sealed class InstallPlan
 {
     public CustomFunctionDefinition Definition { get; init; }
     public List<PlanStep> Steps { get; } = [];
 
     public int ResolvedMechanicIndex { get; set; } = -1;
-    /// <summary>Game id of the resolved target. This, not a list position, is what Commit acts on.</summary>
     public uint ResolvedId { get; set; }
-    /// <summary>The map the plan was resolved against; Commit needs the same view of the ROM.</summary>
     public BattleMechanicMap Map { get; set; }
-    /// <summary>Region new code goes into, and the first free byte in it.</summary>
     public (uint Offset, int Length) Reserve { get; set; }
     public uint Bump { get; set; }
 
@@ -60,23 +47,10 @@ public sealed class InstallPlan
     public string Describe() => string.Join(Environment.NewLine, Steps.Select(s => s.ToString()));
 }
 
-/// <summary>
-/// Installs a <see cref="CustomFunctionDefinition"/> into a decompiled CRO.
-/// <para>
-/// Split deliberately into <see cref="Plan"/> and <see cref="Commit"/>. Planning resolves every
-/// symbolic reference (mechanic name to index, timing to meaning, assembly to bytes, storage to
-/// BSS offsets, code to a concrete address) and reports exactly what it intends to do without
-/// touching the ROM. Only a plan with no errors can be committed.
-/// </para>
-/// </summary>
 public static class CustomFunctionInstaller
 {
-    /// <summary>Bytes per relocation entry in a CRO patch table.</summary>
     private const int RelocationEntrySize = 12;
 
-    /// <summary>
-    /// How many more relocation entries fit before the table runs into the next segment.
-    /// </summary>
     public static int RelocationHeadroom(DecompiledCRO cro)
     {
         if (cro?.Header == null || cro.Segments == null) return int.MaxValue;
@@ -99,16 +73,6 @@ public static class CustomFunctionInstaller
         return spare > int.MaxValue ? int.MaxValue : (int)spare;
     }
 
-    /// <summary>
-    /// Resolves a definition against a ROM and reports what installing it would do. Never mutates
-    /// <paramref name="cro"/>'s bytes; BSS/segment bookkeeping happens only in <see cref="Commit"/>.
-    /// </summary>
-    /// <param name="map">
-    /// Optional resolved view of the ROM. When supplied, the plan reports how the chosen timing
-    /// byte is already used elsewhere — far more useful than a nominal "meaning", since the timing
-    /// vocabulary is mostly undocumented and the reliable way to pick one is to copy a mechanic
-    /// that already fires when you want yours to.
-    /// </param>
     public static InstallPlan Plan(
         CustomFunctionDefinition def,
         DecompiledCRO cro,
@@ -320,10 +284,6 @@ public static class CustomFunctionInstaller
         return plan;
     }
 
-    /// <summary>
-    /// Performs an install previously produced by <see cref="Plan"/>. Refuses to act on a plan
-    /// carrying errors, and refuses to run twice.
-    /// </summary>
     public static bool Commit(InstallPlan plan, DecompiledCRO cro, Action<string> log = null)
     {
         log ??= _ => { };

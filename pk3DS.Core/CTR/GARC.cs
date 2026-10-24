@@ -720,20 +720,9 @@ public static class GARC
             }
         }
 
-        /// <summary>
-        /// Caches a new array WITHOUT packing it - callers doing `garc.Files[i] = ...` (mutating one
-        /// element of the array the getter already returned, a common pattern throughout this
-        /// codebase) never go through the setter above at all, so packing on every such mutation
-        /// would be both wrong to assume happened and wasteful to actually do eagerly. The real pack
-        /// happens once, in <see cref="GARCFile"/>'s own `Save()`, which reads whatever `Files`
-        /// currently holds - reflecting any in-place element mutations - right before writing.
-        /// </summary>
         public void SetFilesCached(byte[][] value) => _files = value;
     }
 
-    /// <summary>
-    /// GARC Class that is heavier on OOP to allow for compression tracking for faster edits
-    /// </summary>
     public class LazyGARC
     {
         public GARCFile garc;

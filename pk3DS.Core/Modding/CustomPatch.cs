@@ -2,11 +2,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding
 {
-    /// <summary>
-    /// Universal patch format for community-driven binary modifications.
-    /// Supports three modes: raw hex, inline ARM assembly (Keystone), and external .asm files.
-    /// Version-aware offsets allow a single patch file to target both US and UM.
-    /// </summary>
     public class UniversalPatch
     {
         public int FormatVersion { get; set; } = 1;
@@ -17,57 +12,31 @@ namespace pk3DS.Core.Modding
         public List<PatchEntry> Patches { get; set; } = new List<PatchEntry>();
     }
 
-    /// <summary>
-    /// A single patch entry targeting one binary file.
-    /// </summary>
     public class PatchEntry
     {
-        /// <summary>Target binary file: "code.bin", "Battle.cro", "Shop.cro", etc.</summary>
         public string TargetFile { get; set; } = "code.bin";
 
-        /// <summary>Input mode: "hex", "asm", or "asm_file"</summary>
         public string Mode { get; set; } = "hex";
 
-        /// <summary>
-        /// For mode="hex": space/newline-separated hex string (e.g. "E1A00000 00F020E3")
-        /// For mode="asm": ARM assembly text (e.g. "MOV R0, R0\nNOP")
-        /// For mode="asm_file": unused (see AsmFilePath)
-        /// </summary>
         public string Code { get; set; } = "";
 
-        /// <summary>For mode="asm_file": relative path to .asm file from the patches/ folder.</summary>
         public string AsmFilePath { get; set; } = "";
 
-        /// <summary>For mode="asm": base address for PC-relative instruction encoding.</summary>
         public string BaseAddress { get; set; } = "0x0";
 
-        /// <summary>Version-specific offset configuration. Keys are "US" and/or "UM".</summary>
         public Dictionary<string, VersionOffsets> Offsets { get; set; } = new Dictionary<string, VersionOffsets>();
     }
 
-    /// <summary>
-    /// Version-specific addresses for a patch entry.
-    /// </summary>
     public class VersionOffsets
     {
-        /// <summary>
-        /// Where to write the assembled code. "auto" = search for free space.
-        /// Otherwise, a hex address like "0x0055D100".
-        /// </summary>
         public string InjectAt { get; set; } = "auto";
 
-        /// <summary>
-        /// List of offsets to rewrite as branch instructions pointing to the injected code.
-        /// Prefix with "bl:" for Branch-with-Link, "b:" for Branch. Default is "bl:".
-        /// Examples: "bl:0x00341658", "b:0x003417D8", "0x00341658" (defaults to BL).
-        /// </summary>
         public List<string> Hooks { get; set; } = new List<string>();
     }
 
     // --- Legacy aliases for backward compatibility ---
     // These map to the old JSON format so existing patches still work.
 
-    /// <summary>Legacy patch format (v0). Automatically converted to UniversalPatch on load.</summary>
     public class CustomPatch
     {
         public string PatchName { get; set; } = "Unknown Patch";
@@ -76,7 +45,6 @@ namespace pk3DS.Core.Modding
         public string Description { get; set; } = "";
         public List<PatchPayload> Payloads { get; set; } = new List<PatchPayload>();
 
-        /// <summary>Convert legacy format to UniversalPatch.</summary>
         public UniversalPatch ToUniversal()
         {
             var up = new UniversalPatch
@@ -111,7 +79,6 @@ namespace pk3DS.Core.Modding
         }
     }
 
-    /// <summary>Legacy payload format.</summary>
     public class PatchPayload
     {
         public string TargetFile { get; set; } = "code.bin";

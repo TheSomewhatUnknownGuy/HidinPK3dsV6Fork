@@ -2,10 +2,6 @@ using System.Drawing;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Every colour a visual theme sets, in one place. WinFormsUtil.ApplyCyberSlateTheme and ApplyThemeToMenuItem read
-/// from here instead of branching on the theme, so retuning a theme means editing one block below.
-/// </summary>
 public sealed record ThemePalette
 {
     // Windows and containers

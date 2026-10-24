@@ -6,7 +6,6 @@ using System.Text.Json;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>The item/move/symbol half of a port, as written alongside the mechanic manifest.</summary>
 public sealed class PortDataFile
 {
     public List<PortedItem> Items { get; set; } = [];
@@ -14,14 +13,6 @@ public sealed class PortDataFile
     public List<string> CodeBinSymbols { get; set; } = [];
 }
 
-/// <summary>
-/// Every part of a port, loaded from a folder.
-/// <para>
-/// The three files describe different binaries — Battle.cro, the item/move GARCs, and code.bin —
-/// so they are classified by what they contain rather than by filename, and applied in an order
-/// that respects their dependencies.
-/// </para>
-/// </summary>
 public sealed class PortBundle
 {
     public string Folder { get; private set; } = "";
@@ -29,15 +20,6 @@ public sealed class PortBundle
     public PortDataFile Data { get; private set; }
     public CodeBinPort CodeBin { get; private set; }
 
-    /// <summary>
-    /// Definitions authored in the Research Center's Custom function tab.
-    /// <para>
-    /// These are the fourth file shape a port folder can hold. They were classified as "not
-    /// recognised" and dropped, because the bundle keys off the property names the other three use
-    /// and a definition shares none of them — so a perfectly valid function saved from the editor
-    /// went silently missing from its own port.
-    /// </para>
-    /// </summary>
     public List<CustomFunctionDefinition> CustomFunctions { get; } = [];
 
     public List<string> Notes { get; } = [];
@@ -49,7 +31,6 @@ public sealed class PortBundle
         AllowTrailingCommas = true,
     };
 
-    /// <summary>Loads every .json in a folder, working out what each one is from its contents.</summary>
     public static PortBundle Load(string folder)
     {
         var bundle = new PortBundle { Folder = folder };
@@ -112,14 +93,6 @@ public sealed class PortBundle
         return bundle;
     }
 
-    /// <summary>
-    /// Applies everything present, in dependency order: Battle.cro, then code.bin, then game data.
-    /// <para>
-    /// Nothing is written unless <paramref name="commit"/> is set, and a failure in any stage stops
-    /// the later ones — a half-applied port is worse than none, because the parts that did land are
-    /// no longer described by anything.
-    /// </para>
-    /// </summary>
     public PortResult ApplyAll(GameConfig cfg, ResearchDatabase db, bool commit,
                                string battleCroPath = null, string codeBinPath = null,
                                Dictionary<CustomMechanicKind, string[]> nameTables = null)

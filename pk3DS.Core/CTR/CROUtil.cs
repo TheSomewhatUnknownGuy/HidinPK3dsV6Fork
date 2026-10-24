@@ -17,14 +17,6 @@ namespace pk3DS.Core.CTR
 
     public static class CROUtil
     {
-        /// <summary>
-        /// Filler written into space an expansion creates but nothing has claimed yet.
-        /// 0xCC is the project-wide "this is free" marker: every blank-space scanner in the
-        /// codebase (CodeRelocator.IsRangeFree/FindReserve, CodeSpaceAllocator.PaddingBytes,
-        /// MechanicEditor, MartLayout, ResearchEngine.FindFreeExecutableSpace) already accepts
-        /// 0xCC and 0x00 interchangeably, so writing it costs nothing and makes the new arena
-        /// obvious in a hex editor instead of indistinguishable from real zeroed data.
-        /// </summary>
         public const byte FreeSpaceFill = 0xCC;
 
         public static uint ReadU32(byte[] data, int offset) => BitConverter.ToUInt32(data, offset);
@@ -218,9 +210,6 @@ namespace pk3DS.Core.CTR
             return newData;
         }
 
-        /// <summary>
-        /// Writes a CRO to disk with its hashes brought up to date first.
-        /// </summary>
         public static void SaveCro(string path, byte[] data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -231,7 +220,6 @@ namespace pk3DS.Core.CTR
             System.IO.File.WriteAllBytes(path, data);
         }
 
-        /// <summary>Whether a buffer actually is a CRO, by its magic rather than its file name.</summary>
         public static bool IsCro(byte[] data) =>
             data is { Length: >= 0x84 } &&
             data[0x80] == (byte)'C' && data[0x81] == (byte)'R' && data[0x82] == (byte)'O' && data[0x83] == (byte)'0';

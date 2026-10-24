@@ -6,7 +6,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>What one binary's half of the level cap install did.</summary>
 public sealed record LevelCapSite(string Binary, bool Applied, uint BlockOffset, uint HookOffset, string Detail)
 {
     public override string ToString() =>
@@ -15,22 +14,14 @@ public sealed record LevelCapSite(string Binary, bool Applied, uint BlockOffset,
             : $"{Binary}: not applied - {Detail}";
 }
 
-/// <summary>
-/// Installs the level cap: a routine that answers "may this Pokemon reach this level yet?", plus
-/// the two call sites that ask.
-/// </summary>
 public static class LevelCapPatch
 {
-    /// <summary>Address of the story-flag block in the loaded save data.</summary>
     public const uint SaveFlagBase = 0x330138D0;
 
-    /// <summary>Bytes of routine before the table starts.</summary>
     public const int PrologueSize = 0x6C;
 
-    /// <summary>Entry point for the battle path, relative to the block.</summary>
     private const int EntryBattle = 0x00;
 
-    /// <summary>Entry point for the Rare Candy path, relative to the block.</summary>
     private const int EntryCandy = 0x0C;
 
     // The routine, as assembled words. Displacements are fixed because the table always begins at
@@ -66,7 +57,6 @@ public static class LevelCapPatch
         SaveFlagBase,
     ];
 
-    /// <summary>The three words the battle hook expects to find before it is patched.</summary>
     private static readonly uint[] BattleOriginal =
     [
         0xE3500064, // cmp r0, #100
@@ -74,7 +64,6 @@ public static class LevelCapPatch
         0xAA000004, // bge +0x10
     ];
 
-    /// <summary>The four words the Rare Candy hook expects to find before it is patched.</summary>
     internal static readonly uint[] CandyOriginal =
     [
         0xE3550064, // cmp   r5, #100
@@ -83,13 +72,10 @@ public static class LevelCapPatch
         0x0A00001E, // beq   +0x78
     ];
 
-    /// <summary>Offset of the exp-calculation hook in Battle.cro. Identical in all four builds.</summary>
     public const uint BattleHook = 0x015AD4;
 
-    /// <summary>Offset of the Rare Candy hook in code.bin. Identical in all four builds.</summary>
     public const uint CandyHook = 0x225ACC;
 
-    /// <summary>The routine plus the table, ready to drop into a binary.</summary>
     public static byte[] BuildBlock(LevelCapTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
@@ -102,10 +88,6 @@ public static class LevelCapPatch
         return block;
     }
 
-    /// <summary>
-    /// Installs both halves. Either may be skipped without affecting the other; passing null for a
-    /// binary skips it deliberately.
-    /// </summary>
     public static List<LevelCapSite> Install(byte[]? battleCro, byte[]? codeBin, LevelCapTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
@@ -165,7 +147,6 @@ public static class LevelCapPatch
         return new("code.bin", true, at, CandyHook + 8, $"{block.Length} bytes, Rare Candy now asks the cap");
     }
 
-    /// <summary>End of the executable segment of a CRO, from its own segment table.</summary>
     private static uint CroTextEnd(byte[] cro)
     {
         if (cro.Length < 0xD0 || BitConverter.ToUInt32(cro, 0x80) != 0x304F5243) return (uint)cro.Length;
@@ -184,10 +165,6 @@ public static class LevelCapPatch
         return (uint)cro.Length;
     }
 
-    /// <summary>
-    /// Somewhere in <paramref name="bin"/> to put the block: a 4-byte-aligned run of zero fill,
-    /// large enough, after <paramref name="after"/>, and inside the executable region.
-    /// </summary>
     private static uint? FindFreeSpace(byte[] bin, int need, uint limit, uint after, uint preferredEnd)
     {
         int want = (need + 3) & ~3;
@@ -222,7 +199,6 @@ public static class LevelCapPatch
         return runs.OrderByDescending(r => r.End - r.Start).First().Start;
     }
 
-    /// <summary>Whether the word just before <paramref name="at"/> returns from a function.</summary>
     private static bool EndsFunction(byte[] bin, uint at)
     {
         if (at < 4) return false;

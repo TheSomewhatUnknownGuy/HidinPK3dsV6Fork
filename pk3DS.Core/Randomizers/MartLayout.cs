@@ -8,12 +8,8 @@ using pk3DS.Core.Modding;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// Where every shop's item list actually lives in Shop.cro, and how many slots it has.
-/// </summary>
 public sealed class MartLayout
 {
-    /// <summary>Relocation patch address for each regular shop's list, in editor order.</summary>
     public static readonly uint[] MartPatchAddrs =
     [
         0x594, 0x5A0, 0x5AC, 0x5B8, 0x5C4, 0x5D0, 0x5DC, 0x5E8, // trial stages 0-7
@@ -46,16 +42,13 @@ public sealed class MartLayout
         0x54C,                // Big Wave Beach
     ];
 
-    /// <summary>Relocation patch holding the regular slot-count table.</summary>
     private const uint CountsPatch = 0x024;
 
-    /// <summary>Relocation patch holding the BP slot-count table.</summary>
     private const uint CountsBPPatch = 0x030;
 
     public int CountsOffset { get; private set; } = -1;
     public int CountsBPOffset { get; private set; } = -1;
 
-    /// <summary>File offset of each regular shop's list; -1 when it could not be resolved.</summary>
     public int[] ShopOffsets { get; private set; } = [];
     public int[] ShopCounts { get; private set; } = [];
     public int[] BPOffsets { get; private set; } = [];
@@ -63,7 +56,6 @@ public sealed class MartLayout
 
     public bool Valid => CountsOffset > 0 && ShopOffsets.Any(o => o > 0);
 
-    /// <summary>Reads the layout out of a Shop.cro.</summary>
     public static MartLayout Read(byte[] cro)
     {
         var l = new MartLayout();
@@ -88,7 +80,6 @@ public sealed class MartLayout
         return l;
     }
 
-    /// <summary>Problems that would make a write unsafe, as plain sentences. Empty when it is sound.</summary>
     public List<string> Validate(byte[] cro)
     {
         var bad = new List<string>();
@@ -116,7 +107,6 @@ public sealed class MartLayout
         return bad;
     }
 
-    /// <summary>Why a list of this size at this offset would not be readable, or null if it is fine.</summary>
     private static string? Placement(byte[] cro, int offset, int length)
     {
         if (offset + length > cro.Length)
@@ -135,9 +125,6 @@ public sealed class MartLayout
         return "is not inside any segment the loader maps";
     }
 
-    /// <summary>
-    /// Points a shop at a new list and records its new length.
-    /// </summary>
     public static bool Repoint(byte[] cro, uint patchAddr, int newOffset, int intoSegment = -1)
     {
         try
@@ -163,7 +150,6 @@ public sealed class MartLayout
         catch { return false; }
     }
 
-    /// <summary>The segment the shop lists themselves resolve against, taken from their own patches.</summary>
     private static int ListSegment(byte[] cro)
     {
         uint rpt = BitConverter.ToUInt32(cro, 0x128);
@@ -177,15 +163,11 @@ public sealed class MartLayout
         return -1;
     }
 
-    /// <summary>A run of unused bytes at the tail of a segment.</summary>
     private readonly record struct FreeSpace(int Segment, uint SegStart, int Start, int End)
     {
         public int Size => End - Start;
     }
 
-    /// <summary>
-    /// The unused tail of the segment the shop lists live in.
-    /// </summary>
     private static FreeSpace FindFreeSpace(byte[] cro, int segIdx)
     {
         uint tbl = BitConverter.ToUInt32(cro, 0xC8);
@@ -219,9 +201,6 @@ public sealed class MartLayout
         return new FreeSpace(segIdx, segStart, start, free);
     }
 
-    /// <summary>
-    /// Grows shops to the requested sizes and rewrites every list, returning the new Shop.cro.
-    /// </summary>
     public static byte[] Rebuild(byte[] cro, IReadOnlyList<int[]> regularLists, IReadOnlyList<int[]> bpLists,
                                  out List<string> log, ushort bpPrice = 0)
     {
@@ -321,7 +300,6 @@ public sealed class MartLayout
         return data;
     }
 
-    /// <summary>Writes a shop's slot count into the table the game reads.</summary>
     public bool SetCount(byte[] cro, int shopIdx, int count, bool isBP = false)
     {
         int table = isBP ? CountsBPOffset : CountsOffset;

@@ -4,7 +4,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Outcome of one <see cref="IconEggSentinelPatcher.Raise"/> call.</summary>
 public sealed class IconEggSentinelResult
 {
     public bool Success;
@@ -35,33 +34,6 @@ public sealed class IconEggSentinelResult
     }
 }
 
-/// <summary>
-/// Raises TWO separate hardcoded limits inside code.bin's own icon-lookup routine (the same one
-/// <see cref="SpeciesIconTable"/> reads its tables from) - found by tracing the routine's actual ARM
-/// logic after a live bug report ("a newly-inserted species still shows an Egg icon/model even
-/// though its cloned data is confirmed byte-identical on disk").
-/// <para>
-/// 1. <b>The Egg sentinel</b> - the routine's very first real check computes
-/// <c>ip = species - 1026</c> (as two separate immediate SUBs) and, if <c>ip &lt; 2</c> (species is
-/// exactly 1026 or 1027), returns the literal Egg icon member UNCONDITIONALLY, before any real
-/// lookup runs at all.
-/// </para>
-/// <para>
-/// 2. <b>The expansion-formula width</b> - once past the sentinel, species &gt;= 808 use a small
-/// formula (member = 1154 + (species-808)), but ONLY while (species-808) &lt;= a second hardcoded
-/// width (217 originally) - species past that width fall through to `mov r0, #0` instead, returning
-/// icon member 0 (an invalid/blank placeholder - the "blank Pokeball" look, distinct from the Egg
-/// sentinel's look). Confirmed live: fixing #1 alone changed a newly-inserted species' icon from an
-/// Egg to a blank Pokeball rather than the real cloned icon - this second, independent limit is why.
-/// </para>
-/// <para>
-/// Both are hand-written code the Expansion Pack community added from scratch (not modified retail
-/// instructions), so neither was ever in `code_map.csv`'s "SPECIES LIMITS" section and
-/// <see cref="SpeciesCeilingPatcher"/> never touches either - both were correctly calibrated ONCE,
-/// for the community's own historical 807-&gt;1025 species raise (sentinel = 1026, width = 217 =
-/// 1025-808), and never needed raising again until species insertion started going past 1025.
-/// </para>
-/// </summary>
 public static class IconEggSentinelPatcher
 {
     private const int FirstSubRelOffset = 0x18; // sub ip, r0, #firstImm   (relative to the routine's own start)
@@ -69,18 +41,6 @@ public static class IconEggSentinelPatcher
     private const int WidthCmpRelOffset = 0x68;  // cmp r2, #formulaWidth  (species-808 must be <= this or the formula returns member 0)
     public const int FormulaBaseSpecies = 808;
 
-    /// <summary>
-    /// Locates the icon-lookup routine's own start offset in <paramref name="codeBin"/>,
-    /// byte-verifying its documented 204-byte body first - the same row <see cref="SpeciesIconTable"/>
-    /// verifies, tried against every "POKEMON ICONS" row regardless of which US/UM file tag it
-    /// carries (offsets differ slightly between the two builds; matching by live bytes rather than
-    /// by version tag is what actually decides it). Deliberately EXCLUDES the two 4-byte words this
-    /// patcher itself ever writes (<see cref="FirstSubRelOffset"/>, <see cref="WidthCmpRelOffset"/>)
-    /// from that comparison - a species insertion batch calls this once per row on the SAME evolving
-    /// code.bin, so a second call must still recognize the routine after the first call's own edits,
-    /// not just on a pristine binary (the same multi-call scenario <see cref="SpeciesCeilingPatcher"/>
-    /// already has to handle).
-    /// </summary>
     public static bool TryFindVerifiedRoutine(byte[] codeBin, out int routineStart, out string error)
     {
         routineStart = 0; error = "";
@@ -113,11 +73,6 @@ public static class IconEggSentinelPatcher
         return false;
     }
 
-    /// <summary>
-    /// Raises both limits so every species id up to and including <paramref name="requiredMaxSpeciesId"/>
-    /// gets a real icon lookup result instead of an Egg shortcut or a blank/invalid one. Mutates
-    /// <paramref name="codeBin"/> in place. Already-sufficient values are left untouched.
-    /// </summary>
     public static IconEggSentinelResult Raise(byte[] codeBin, int requiredMaxSpeciesId)
     {
         var result = new IconEggSentinelResult();
@@ -190,14 +145,12 @@ public static class IconEggSentinelPatcher
     private const uint RemapAddWord = 0xE0880002;              // add   r0, r8, r2
     private const uint RemapIncWord = 0xE2800001;              // add   r0, r0, #1
 
-    /// <summary>True when the routine at <paramref name="routineStart"/> already carries the remap.</summary>
     public static bool IsRemapped(byte[] codeBin, int routineStart) =>
         routineStart + WidthCmpRelOffset + 16 <= codeBin.Length &&
         BitConverter.ToUInt32(codeBin, routineStart + WidthCmpRelOffset + 4) == RemapSkipWord &&
         BitConverter.ToUInt32(codeBin, routineStart + WidthCmpRelOffset + 8) == RemapAddWord &&
         BitConverter.ToUInt32(codeBin, routineStart + WidthCmpRelOffset + 12) == RemapIncWord;
 
-    /// <summary>Remap state of <paramref name="codeBin"/>'s icon routine; null when the routine isn't recognized.</summary>
     public static bool? IsRemapped(byte[] codeBin) =>
         TryFindVerifiedRoutine(codeBin, out int start, out _) ? IsRemapped(codeBin, start) : null;
 

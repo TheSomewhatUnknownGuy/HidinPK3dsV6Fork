@@ -123,9 +123,6 @@ public static class CTRUtil
         return NCCH;
     }
 
-    /// Patch ExHeader .text/.rodata/.data segment sizes so their sum matches
-    /// the actual code.bin packed in ExeFS.  Expansion mods enlarge code.bin;
-    /// the kernel maps exactly what the ExHeader declares → size mismatch = crash.
     private static void PatchExheaderCodeSize(Exheader exh, ExeFS exeFS, string exefsPath, RichTextBox TB_Progress)
     {
         // Determine actual code.bin size from ExeFS.

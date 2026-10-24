@@ -5,7 +5,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Outcome of applying a <see cref="PortManifest"/> to a ROM.</summary>
 public sealed class PortResult
 {
     public bool Success { get; set; } = true;
@@ -13,10 +12,8 @@ public sealed class PortResult
     public List<string> Errors { get; } = [];
     public byte[] Output { get; set; }
 
-    /// <summary>A master table, .data or a segment moved: anything holding a literal address into it would break.</summary>
     public bool TableRelocated { get; set; }
 
-    /// <summary>Ported routine name -> where it ended up, so hooks can be aimed at it.</summary>
     public Dictionary<string, uint> Placed { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal void Say(string s) => Log.Add(s);
@@ -24,23 +21,8 @@ public sealed class PortResult
     public string Describe() => string.Join(Environment.NewLine, Log.Concat(Errors.Select(e => "ERROR: " + e)));
 }
 
-/// <summary>
-/// Reproduces a set of edits on a different build of the same game.
-/// <para>
-/// Nothing is copied by address. Master tables are located by id fingerprint, borrowed routines are
-/// resolved through the stock mechanic that owns them, new routines are rebased to wherever they
-/// land, and hooks are re-encoded against the target's own reserve. The only thing taken literally
-/// is a site patch's <em>original</em> bytes, which are checked before anything is written — a build
-/// that has shifted its code fails the check instead of being silently corrupted.
-/// </para>
-/// </summary>
 public static class PortInstaller
 {
-    /// <summary>Applies <paramref name="manifest"/> to <paramref name="targetRom"/>.</summary>
-    /// <param name="nameTables">
-    /// Optional id -> name lists per kind, so every id can be confirmed to name what the manifest
-    /// claims before an effect is attached to it.
-    /// </param>
     public static PortResult Apply(
         byte[] targetRom,
         PortManifest manifest,
@@ -292,7 +274,6 @@ public static class PortInstaller
         return result;
     }
 
-    /// <summary>True for the specific "ran out of reserve space" failure, not any other kind.</summary>
     private static bool ReserveExhausted(IEnumerable<string> errors) =>
         errors.Any(e => e.Contains("reserve exhausted", StringComparison.OrdinalIgnoreCase));
 
@@ -317,29 +298,6 @@ public static class PortInstaller
         return dataStart + shift + dataSize > rom.LongLength;
     }
 
-    /// <summary>
-    /// Grows the code reserve on demand, right when a specific install needs more of it, instead of
-    /// guessing a size upfront for everyone to share.
-    /// <para>
-    /// A blanket pre-expansion was tried and measured to make things slightly WORSE (one fewer
-    /// package installed in a controlled before/after test across all 77 real patch-packages):
-    /// whichever packages happen to run first in the install order consume the shared new space a
-    /// little each, so by the time a package that genuinely needs a large chunk in one go comes
-    /// up, the room has already been nibbled away by everyone before it - regardless of how much
-    /// was added. Growing exactly when and where a specific install falls short gives that
-    /// install its own dedicated room instead of a shared pool others can crowd out.
-    /// </para>
-    /// <para>
-    /// Always expands at the real end of segment 1 (rodata) - <c>cro.CodeEnd</c>, not the reserve's
-    /// own end and never a blind mid-segment point. That boundary is guaranteed to have no real ARM
-    /// code sitting past it (by definition of what "the segment's declared end" means), so there is
-    /// no risk of splitting a stock, untracked raw branch the way inserting behind an
-    /// arbitrarily-chosen reserve boundary could - CROUtil.ExpandSegment only re-encodes the CRO's
-    /// own relocation table, pointer tables and header fields, not literal ARM branch instructions
-    /// baked into already-placed code, so anywhere content could legitimately still follow after the
-    /// insertion point is exactly the risk this specific point avoids.
-    /// </para>
-    /// </summary>
     private static bool TryGrowReserve(
         ref DecompiledCRO cro, ref BattleMechanicMap map, ref (uint Offset, int Length) reserve,
         ref uint bump, ResearchDatabase db, PortResult result)
@@ -388,14 +346,6 @@ public static class PortInstaller
         return true;
     }
 
-    /// <summary>
-    /// Confirms a written file really contains what was intended, by re-reading it.
-    /// <para>
-    /// Worth doing every time: compiling from a decompiled image and editing a caller-owned copy of
-    /// the bytes are easy to confuse, and when they diverge the in-memory report looks perfect while
-    /// the file on disk is missing the code entirely.
-    /// </para>
-    /// </summary>
     public static bool VerifyOnDisk(string path, PortManifest manifest, ResearchDatabase db, Action<string> log = null)
     {
         log ??= _ => { };

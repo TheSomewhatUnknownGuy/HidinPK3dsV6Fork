@@ -8,24 +8,17 @@ using System.Text.Json;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>One named list of species, as supplied by the user for a particular version.</summary>
 public sealed class ExclusiveSet
 {
-    /// <summary>Heading the user gave this set, e.g. "Ultra Sun" or "My Hack - Red Version".</summary>
     public string Header { get; set; } = "";
 
-    /// <summary>Species names exactly as they were read from the file.</summary>
     public List<string> Species { get; set; } = [];
 
-    /// <summary>Where it came from, kept so the guide can say what produced the list.</summary>
     public string Source { get; set; } = "";
 
     public DateTime Imported { get; set; } = DateTime.Now;
 }
 
-/// <summary>
-/// User-supplied version-exclusive lists, imported from a Poképaste, text, JSON or CSV file.
-/// </summary>
 public static class VersionExclusiveSets
 {
     private static readonly List<ExclusiveSet> Sets = [];
@@ -45,7 +38,6 @@ public static class VersionExclusiveSets
         get { EnsureLoaded(); return Sets; }
     }
 
-    /// <summary>Adds a set, replacing any existing one with the same heading.</summary>
     public static void Add(ExclusiveSet set)
     {
         EnsureLoaded();
@@ -62,11 +54,6 @@ public static class VersionExclusiveSets
         return n > 0;
     }
 
-    /// <summary>
-    /// Reads species names out of a file, choosing the reader by extension and, for text, by shape.
-    /// </summary>
-    /// <param name="path">File to read.</param>
-    /// <param name="unmatched">Lines that produced no name, for reporting back.</param>
     public static List<string> Parse(string path, out List<string> unmatched)
     {
         unmatched = [];
@@ -81,7 +68,6 @@ public static class VersionExclusiveSets
         };
     }
 
-    /// <summary>JSON as either a bare array of names or an object whose values are arrays.</summary>
     private static List<string> ParseJson(string text, List<string> unmatched)
     {
         try
@@ -112,7 +98,6 @@ public static class VersionExclusiveSets
         return [];
     }
 
-    /// <summary>CSV taking the first column of each row, skipping an obvious header row.</summary>
     private static List<string> ParseCsv(string text)
     {
         var names = new List<string>();
@@ -137,14 +122,6 @@ public static class VersionExclusiveSets
         return names;
     }
 
-    /// <summary>
-    /// Plain text or a Poképaste.
-    /// <para>
-    /// A paste puts the species on the first line of each block, optionally as "Name @ Item" and
-    /// optionally with a nickname as "Nickname (Species)". Lines starting with a set's keywords are
-    /// skipped so only the species survives. A plain one-name-per-line list also works.
-    /// </para>
-    /// </summary>
     private static List<string> ParseText(string text)
     {
         var names = new List<string>();

@@ -7,24 +7,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Decode/encode for `partyicon`'s (a257) per-species image container - confirmed live against real
-/// ROM data to be a bespoke, non-standard wrapper (NOT a real BCLIM/BFLIM - it has no CLIM/FLIM
-/// footer at all), built by whatever internal tool produced this asset originally: a fixed 0x80
-/// (128) byte header - a `13 12 04 15` tag, a literal ASCII "texture\0" chunk name, a few
-/// mostly-constant fields (one of which, at header offset 0x18, IS content-dependent: the pixel
-/// payload's own byte length), the embedded original art filename (ASCII, null-terminated, e.g.
-/// "poke_icon_001_m_001.tga" or "poke_icon_exp_0982.tga" - see <see cref="PartyIconCatalog"/>,
-/// which reads this same filename as its ground truth for species/form identification) starting at
-/// offset 0x28, width/height/format fields at 0x68 (confirmed 64/32/RGB5A1 on every real sample
-/// checked), then 0xFF padding out to the fixed 0x80 header length - followed by a 4096-byte RGB5A1
-/// pixel payload, CTR-tile-swizzled (see <see cref="XLIMOrienter"/>) with
-/// <see cref="XLIMOrientation.None"/> (confirmed live: decoding with the SAME swizzle algorithm
-/// already proven correct for `menuicon`'s real BFLIM data, but with Orientation=None instead of
-/// menuicon's Rotate90, produces a clean, correctly-shaped Bulbasaur - visually confirmed by the
-/// user). The whole thing is then usually (every real sample checked) LZ11-compressed on disk, same
-/// as `menuicon` and most other per-file GARC members in this ROM.
-/// </summary>
 public static class PartyIconImage
 {
     public const int HeaderLength = 0x80;
@@ -35,7 +17,6 @@ public static class PartyIconImage
     public const int Height = 32;
     public const int PixelDataLength = Width * Height * 2; // RGB5A1 = 2 bytes/pixel = 4096
 
-    /// <summary>Decodes a raw (possibly LZ11-compressed) partyicon member to a 64x32 Bitmap - both animation frames side by side, uncropped, matching what <see cref="Encode"/> expects back.</summary>
     public static Bitmap Decode(byte[] rawMember)
     {
         byte[] data = rawMember[0] == 0x11 ? LZSS.Decompress(rawMember) : rawMember;
@@ -56,13 +37,6 @@ public static class PartyIconImage
         return bmp;
     }
 
-    /// <summary>
-    /// Encodes a 64x32 (already a full sheet) or 32x32 (single pose, auto-centered) Bitmap into a
-    /// fresh, uncompressed partyicon member - same header shape
-    /// as every real entry, with a caller-supplied embedded filename (purely cosmetic metadata as far
-    /// as this codebase can tell - nothing reads it back at runtime - but kept realistic:
-    /// "poke_icon_&lt;id&gt;_m_001" for a stock-range replacement, matching the real convention).
-    /// </summary>
     public static byte[] Encode(Bitmap img, string embeddedFilename)
     {
         Bitmap sheet = img.Width == Width && img.Height == Height ? img : MakeSheet(img);
@@ -110,21 +84,6 @@ public static class PartyIconImage
         }
     }
 
-    /// <summary>
-    /// Auto-fits any source image into the required 64x32 canvas: a wide (~2:1 or wider) source is
-    /// assumed to already be an explicit full-canvas sheet and is stretched directly onto it;
-    /// anything else (square or tall) is assumed to be a single pose and is centered horizontally at
-    /// its natural 32x32 aspect within the 64-wide canvas.
-    /// <para>
-    /// This used to stretch a single pose into BOTH 32x32 halves identically, on the assumption the
-    /// canvas held two independent side-by-side animation frames - confirmed wrong by decoding real
-    /// ROM data (Bulbasaur, Marowak, ...): every real party/menu icon is ONE continuous sprite
-    /// centered across the full 64px width (spanning roughly x=16-48, not confined to either half),
-    /// not two separate 32x32 frames. Duplicating a single-pose import into both halves therefore
-    /// visibly rendered it twice side by side in-game - the exact "cloned itself twice" bug report
-    /// this centering fix addresses.
-    /// </para>
-    /// </summary>
     private static Bitmap MakeSheet(Bitmap frame)
     {
         var sheet = new Bitmap(Width, Height);

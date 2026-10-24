@@ -2,22 +2,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Per-AC-file placement slot -> character/NPC name, transcribed verbatim from the user's own
-/// community reference spreadsheet (the "model/file" sheet, not the zone/area-name sheet -
-/// see <see cref="OverworldZoneReference"/> for that one). Keyed by the raw numeric AC file
-/// index exactly as used by <c>OverworldModelSwapper</c>'s own area-file-index field (the sheet's
-/// own "NNNN_AC" column headers, parsed with the leading zeros stripped as an int).
-/// <para>
-/// This is NOT exhaustive - it's exactly the set of AC files the community happened to already
-/// chart out (a few hundred, spanning early-game Melemele/Akala scenes through late-game Ultra
-/// Space/Rainbow Rocket cutscenes), not every AC file in the archive. A handful of AC indices
-/// appear twice in the source sheet (e.g. cutscene reuse across two different story beats) -
-/// where that happened, both sets of names are kept (concatenated), not deduplicated, since a
-/// slot number can genuinely mean something different in each context and this is a browsing
-/// aid, not authoritative game data.
-/// </para>
-/// </summary>
 public static class OverworldCharacterReference
 {
     public static readonly Dictionary<int, List<(string Name, int Slot)>> SlotsByAcIndex = new()
@@ -298,7 +282,6 @@ public static class OverworldCharacterReference
         [3688] = new() { ("Giovanni", 0), ("Lusamine", 2), ("Lillie (ponytail)", 3) },
     };
 
-    /// <summary>Looks up a specific slot's character name within a specific AC file, if the sheet recorded one - null otherwise (an unlisted AC file, or a slot number the sheet didn't chart for a listed one).</summary>
     public static string TryResolveSlotName(int acFileIndex, int slot)
     {
         if (!SlotsByAcIndex.TryGetValue(acFileIndex, out var entries)) return null;

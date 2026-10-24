@@ -6,9 +6,6 @@ using pk3DS.Core.Modding;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Assigns an unused move flag to an ability and a power multiplier.
-/// </summary>
 public sealed class AbilityFlagBindingDialog : Form
 {
     private readonly ComboBox CB_Trigger;

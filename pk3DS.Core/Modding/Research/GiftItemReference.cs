@@ -2,11 +2,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// One community-documented NPC item gift inside `amxscript` (a/0/9/2) - <see cref="File"/> is the
-/// xamx member index (e.g. 11 for "011.xamx"), <see cref="ItemId"/>/<see cref="Qty"/> are the two
-/// values a "give item" call pushes as arguments in that script's decompiled instruction stream.
-/// </summary>
 public sealed class GiftItemEntry
 {
     public int File;
@@ -20,28 +15,6 @@ public sealed class GiftItemEntry
     }
 }
 
-/// <summary>
-/// The community's own hand-compiled list of NPC item gifts found across USUM's 759 real
-/// `amxscript` files - originally documented as a plain markdown table (file/item name/item
-/// id/quantity/location), built by mass-searching for a "give item" call pattern the author found
-/// empirically (confirmed independently this session - decoding these same files with
-/// <see cref="Scripts.ParseScript"/>/<see cref="ScriptEditing"/> shows the giveaway shape
-/// <c>PushConst(qty); PushConst(itemId); ...; CallFunc</c>, though the exact wrapper instructions
-/// around that pair vary from script to script since each xamx file is its own separate compiled
-/// unit). The original list has many duplicate rows (same file/item/qty found via more than one
-/// search pass, or genuinely two separate reward instances) - duplicates from the SAME real
-/// instance were removed here; entries that differ only in quantity are kept as separate real
-/// instances. One row (file 657, item 5000, qty -1, "Unknown Item") was dropped outright - item id
-/// 5000 doesn't exist and a negative quantity isn't a real gift, so it's almost certainly an
-/// unrelated false-positive match rather than a real reward.
-/// <para>
-/// This is reference data, NOT a verified byte-offset map - <see cref="GiftItemLocator"/> re-finds
-/// each entry's actual instruction position fresh, in the live ROM's own script data, every time
-/// it's used, rather than trusting a hardcoded offset. Several entries are themselves the original
-/// author's best guess at location only ("probably", "test yourself") - kept verbatim in
-/// <see cref="GiftItemEntry.Notes"/> so the editor can show that uncertainty instead of hiding it.
-/// </para>
-/// </summary>
 public static class GiftItemReference
 {
     public static readonly List<GiftItemEntry> Entries =

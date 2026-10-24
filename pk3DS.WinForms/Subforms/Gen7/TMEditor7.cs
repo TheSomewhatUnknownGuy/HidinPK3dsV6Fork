@@ -38,7 +38,6 @@ public partial class TMEditor7 : Form
         dgvTM.CellValueChanged += (_, _) => dirty = true;
     }
 
-    /// <summary>code.bin as it is on disk now, if its TM table is still where this form opened it; otherwise null, with the error shown.</summary>
     private byte[] FreshCodeBin()
     {
         // The form is non-modal, so a randomizer run or an install may have rewritten code.bin since it opened.

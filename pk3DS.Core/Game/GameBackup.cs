@@ -6,9 +6,6 @@ namespace pk3DS.Core;
 
 public static class GameBackup
 {
-    /// <summary>
-    /// A GARC path flattened into something usable as a file name.
-    /// </summary>
     public static string FlattenGarcName(string garcPath) =>
         (garcPath ?? "").Replace("/", "").Replace("\\", "");
 

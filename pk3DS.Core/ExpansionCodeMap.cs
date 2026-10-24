@@ -12,9 +12,6 @@ using System.Text;
 
 namespace pk3DS.Core
 {
-    /// <summary>
-    /// One documented difference between a retail US/UM file and the Expansion Pack's version of it.
-    /// </summary>
     public class CodeMapEntry
     {
         public string File { get; set; } = string.Empty;
@@ -25,7 +22,6 @@ namespace pk3DS.Core
         public string Instruction { get; set; } = string.Empty;
         public string Purpose { get; set; } = string.Empty;
 
-        /// <summary>The file this row targets, without the game suffix - e.g. "Battle.cro".</summary>
         public string TargetFile
         {
             get
@@ -38,23 +34,15 @@ namespace pk3DS.Core
         public bool ForUltraSun => File.Contains("Ultra Sun", StringComparison.OrdinalIgnoreCase);
         public bool ForUltraMoon => File.Contains("Ultra Moon", StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// True when retail had nothing here and the pack added code. Such a row has new bytes to
-        /// verify but no original pattern to restore, so "revert" is not meaningful for it.
-        /// </summary>
         public bool IsAddedSpace =>
             RetailBytes.Trim().Equals("ADDED SPACE", StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>False when the Offset column is prose rather than an address.</summary>
         public bool HasAddress => TryParseRange(Offset, out _, out _);
 
-        /// <summary>First byte this row covers. Check <see cref="HasAddress"/> first - 0 is a real address.</summary>
         public uint StartOffset => TryParseRange(Offset, out uint start, out _) ? start : 0;
 
-        /// <summary>Last byte this row covers, inclusive. Equals <see cref="StartOffset"/> for a bare address.</summary>
         public uint EndOffset => TryParseRange(Offset, out uint start, out uint end) ? end : 0;
 
-        /// <summary>Byte span the Offset column describes, or 0 when it is prose.</summary>
         public uint Length => TryParseRange(Offset, out uint start, out uint end) ? end - start + 1 : 0;
 
         public bool TryGetCurrentBytes([NotNullWhen(true)] out byte[]? bytes) => TryParseHex(CurrentBytes, out bytes);
@@ -64,19 +52,13 @@ namespace pk3DS.Core
 
         private static bool Fail(out byte[]? bytes) { bytes = null; return false; }
 
-        /// <summary>The pack's bytes for this row, or empty when the column is not hex.</summary>
         public byte[] GetCurrentByteArray() => TryGetCurrentBytes(out var b) ? b : Array.Empty<byte>();
 
-        /// <summary>The retail bytes for this row, or empty when the region was added space.</summary>
         public byte[] GetRetailByteArray() => TryGetRetailBytes(out var b) ? b : Array.Empty<byte>();
 
         public bool Contains(uint address) =>
             TryParseRange(Offset, out uint start, out uint end) && address >= start && address <= end;
 
-        /// <summary>
-        /// Reads "0x1D4C2C", "0x1D4C2C-0x1D4C2F" or "0x0FD000 insertion". The range is inclusive of
-        /// its end, matching how the map writes a 4-byte word as 0x...2C-0x...2F.
-        /// </summary>
         private static bool TryParseRange(string text, out uint start, out uint end)
         {
             start = end = 0;
@@ -89,7 +71,6 @@ namespace pk3DS.Core
             return true;
         }
 
-        /// <summary>Takes the leading hex address and ignores any trailing note such as "insertion".</summary>
         private static bool TryParseAddress(string text, out uint value)
         {
             value = 0;
@@ -107,11 +88,6 @@ namespace pk3DS.Core
             return uint.TryParse(s[..len], System.Globalization.NumberStyles.HexNumber, null, out value);
         }
 
-        /// <summary>
-        /// Strict hex-pair parse. Util.StringToByteArray strips spaces before checking length, which
-        /// turns "ADDED SPACE" into a 10-character string that passes its even-length guard and then
-        /// throws on the pair "DS". Validating the characters first is what keeps prose rows inert.
-        /// </summary>
         private static bool TryParseHex(string text, [NotNullWhen(true)] out byte[]? bytes)
         {
             bytes = null;
@@ -135,10 +111,6 @@ namespace pk3DS.Core
             $"{TargetFile} {Offset} [{Section}] {Purpose}";
     }
 
-    /// <summary>
-    /// The Expansion Pack's code map for Ultra Sun / Ultra Moon: every offset the pack changed,
-    /// what was there in retail, what is there now, and why.
-    /// </summary>
     public static class ExpansionCodeMap
     {
         private static readonly List<CodeMapEntry> _entries = new();
@@ -154,7 +126,6 @@ namespace pk3DS.Core
             }
         }
 
-        /// <summary>True when the map was found and parsed. False means every query returns nothing.</summary>
         public static bool IsAvailable
         {
             get { EnsureLoaded(); return _entries.Count > 0; }
@@ -289,10 +260,6 @@ namespace pk3DS.Core
             return result;
         }
 
-        /// <summary>
-        /// Rows for a file. <paramref name="version"/> selects between the separate US and UM
-        /// code.bin maps; pass <see cref="GameVersion.USUM"/> or Invalid to accept either.
-        /// </summary>
         public static IEnumerable<CodeMapEntry> GetEntriesForFile(string targetFileName, GameVersion version = GameVersion.Invalid)
         {
             EnsureLoaded();
@@ -320,18 +287,12 @@ namespace pk3DS.Core
             return _entries.Where(e => e.Section.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>Every section name present for a file, in map order.</summary>
         public static IEnumerable<string> GetSections(string targetFileName, GameVersion version = GameVersion.Invalid) =>
             GetEntriesForFile(targetFileName, version).Select(e => e.Section).Distinct(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// The rows covering an address, innermost first. This is the lookup an editor wants: point
-        /// at an offset and find out what the pack put there and why.
-        /// </summary>
         public static IEnumerable<CodeMapEntry> GetEntriesAt(string targetFileName, uint address, GameVersion version = GameVersion.Invalid) =>
             GetEntriesForFile(targetFileName, version).Where(e => e.Contains(address)).OrderBy(e => e.Length);
 
-        /// <summary>One-line description of what lives at an address, or null when it is unmapped.</summary>
         public static string? Describe(string targetFileName, uint address, GameVersion version = GameVersion.Invalid)
         {
             var entry = GetEntriesAt(targetFileName, address, version).FirstOrDefault();
@@ -341,10 +302,6 @@ namespace pk3DS.Core
                 : $"[{entry.Section}] {entry.Purpose}";
         }
 
-        /// <summary>
-        /// Whether a loaded file already carries the Expansion Pack's changes, by sampling rows that
-        /// have both a real address and real bytes.
-        /// </summary>
         public static bool IsExpansionPatched(byte[] fileData, string targetFileName, GameVersion version = GameVersion.Invalid)
         {
             EnsureLoaded();

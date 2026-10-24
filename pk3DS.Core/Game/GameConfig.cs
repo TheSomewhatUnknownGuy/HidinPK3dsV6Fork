@@ -12,10 +12,8 @@ public class GameConfig
 {
     public static bool ExpandedAbilities { get; set; } = false;
 
-    /// <summary>Turns passives on or off (see <see cref="PassiveGuard"/>). Returns null on success, else the refusal reason.</summary>
     public static string TrySetPassiveAbilities(bool on) => PassiveGuard.TrySet(on, ExpandedAbilities);
 
-    /// <summary>Turns Expanded Abilities on or off. Returns null on success, else the refusal reason (passives own the same bits).</summary>
     public static string TrySetExpandedAbilities(bool on)
     {
         if (PassiveGuard.RefuseExpanded(on) is { } why) return why;
@@ -23,7 +21,6 @@ public class GameConfig
         return null;
     }
 
-    /// <summary>Allows installer-implicit growth of code.bin and CROs. Experimental and not boot-proven.</summary>
     public static bool AllowGrowth { get; set; } = false;
     private const int FILECOUNT_XY = 271;
     private const int FILECOUNT_ORASDEMO = 301;
@@ -38,12 +35,6 @@ public class GameConfig
     public TextReference[] GameText { get; private set; }
     public GameInfo Info { get; private set; }
 
-    /// <summary>
-    /// Whether or not to remap characters in text files to proper unicode. Defaults to false.
-    /// </summary>
-    /// <remarks>
-    /// This will enable the display of ♂ and ♀, but may interfere with text editing. Set this to true if you're not going to change any text, otherwise set it to false.
-    /// </remarks>
     public bool RemapCharacters { get; set; } = false;
 
     public GameConfig(int fileCount)
@@ -361,13 +352,6 @@ public class GameConfig
         Files == GARCReference.GARCReference_UM ||
         LooksLikeUltraMoonPath(RomFS);
 
-    /// <summary>
-    /// Best-effort fallback for telling a UM dump from a US one when the caller only knows
-    /// GameVersion.USUM. Matches whole path segments ("...\UM\..." or "...\Ultra Moon\...")
-    /// rather than raw substrings, so an unrelated folder that merely contains "UM" inside a
-    /// longer word (e.g. "Museum", "Album") won't false-positive. Not a real version check -
-    /// prefer passing GameVersion.US/UM explicitly wherever the actual version is known.
-    /// </summary>
     private static bool LooksLikeUltraMoonPath(string path)
     {
         if (string.IsNullOrEmpty(path)) return false;

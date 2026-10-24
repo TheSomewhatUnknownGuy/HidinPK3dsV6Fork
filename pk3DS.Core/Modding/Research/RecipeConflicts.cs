@@ -5,15 +5,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Known-bad recipe combinations that each install cleanly on their own - no byte-range overlap,
-/// no branch-target collision among their own listed hook writes - but corrupt each other at
-/// runtime because one of them patches the BODY of a widely-shared vanilla code.bin function that
-/// the other calls into by address, expecting it untouched. Neither <see cref="IpsPatch.FindConflicts"/>
-/// (byte-range overlap) nor a branch-target scan of a patch's own hook writes can see this class of
-/// conflict, since it only shows up by disassembling an injected trampoline's BODY for references
-/// into a sibling patch's write territory - so confirmed cases are recorded here by hand.
-/// </summary>
 public static class RecipeConflicts
 {
     private sealed record Conflict(string[] GroupA, string[] GroupB, string Reason);
@@ -36,12 +27,6 @@ public static class RecipeConflicts
 
     private sealed record Unsafe(string[] Names, string Reason);
 
-    /// <summary>
-    /// Recipes confirmed to overwrite LIVE pristine code.bin functions at their own injection site -
-    /// not free/reserved space - so they corrupt the base game even installed completely alone, with
-    /// nothing else selected. Distinct from <see cref="Known"/>, which is two recipes that are each
-    /// fine alone and only collide with each other.
-    /// </summary>
     private static readonly Unsafe[] AlwaysUnsafe =
     [
         new(
@@ -68,10 +53,6 @@ public static class RecipeConflicts
                     "installed alone, regardless of any other recipe."),
     ];
 
-    /// <summary>
-    /// True if <paramref name="candidateName"/> is confirmed to corrupt live vanilla code.bin at its
-    /// own injection site, independent of anything else installed.
-    /// </summary>
     public static bool TryFindUnsafe(string candidateName, out string reason)
     {
         foreach (var u in AlwaysUnsafe)
@@ -86,12 +67,6 @@ public static class RecipeConflicts
         return false;
     }
 
-    /// <summary>
-    /// True if <paramref name="candidateName"/> is known to conflict with anything already present in
-    /// <paramref name="installedNames"/>. Matching is case-insensitive and exact against recipe names
-    /// as they appear in the research database; a conflict group with several names (e.g. PC
-    /// Anywhere's three interchangeable hook-site variants) matches any one of them.
-    /// </summary>
     public static bool TryFindConflict(string candidateName, IEnumerable<string> installedNames, out string reason)
     {
         foreach (var c in Known)
@@ -114,15 +89,6 @@ public static class RecipeConflicts
         return false;
     }
 
-    /// <summary>
-    /// Same check as <see cref="TryFindConflict(string,IEnumerable{string},out string)"/>, but also
-    /// looks at the ACTUAL current code.bin bytes for the one conflict this class knows a byte
-    /// signature for (PC Anywhere / Move Relearner Replaces Cafe), so the pair is caught even when
-    /// the two sides were installed in different Research Center sessions - a plain in-run name list
-    /// can't see that, since the Research Center's own "mixed .ips + other kinds can't be batched"
-    /// rule forces exactly this pair to be installed as two separate single-recipe applies, not one
-    /// batch call.
-    /// </summary>
     public static bool TryFindConflict(string candidateName, IEnumerable<string> installedNames, byte[]? codeBin, out string reason)
     {
         if (TryFindConflict(candidateName, installedNames, out reason)) return true;

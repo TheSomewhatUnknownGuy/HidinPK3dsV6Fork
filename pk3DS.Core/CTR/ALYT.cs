@@ -4,10 +4,6 @@ using System.Text;
 
 namespace pk3DS.Core.CTR;
 
-/// <summary>
-/// Archive LaYouT container
-/// </summary>
-/// <remarks> File length is padded to nearest 0x80 </remarks>
 public class ALYT
 {
     private const string Identifier = nameof(ALYT);
@@ -127,18 +123,12 @@ public class ALYT
         }
     }
 
-    /// <summary>
-    /// Rips out the data portion of the ALYT, assuming the ALYT is partially valid.
-    /// </summary>
     public static byte[] GetData(string path)
     {
         using var br = new BinaryReader(File.OpenRead(path));
         return GetData(br);
     }
 
-    /// <summary>
-    /// Rips out the data portion of the ALYT, assuming the ALYT is partially valid.
-    /// </summary>
     public static byte[] GetData(byte[] data)
     {
         using var ms = new MemoryStream(data);
@@ -146,9 +136,6 @@ public class ALYT
         return GetData(br);
     }
 
-    /// <summary>
-    /// Rips out the data portion of the ALYT, assuming the ALYT is partially valid.
-    /// </summary>
     public static byte[] GetData(Stream ms)
     {
         using var br = new BinaryReader(ms);

@@ -5,9 +5,6 @@ using Newtonsoft.Json;
 
 namespace pk3DS.Core.Modding
 {
-    /// <summary>
-    /// Represents the UI control type for a patch.
-    /// </summary>
     public enum PatchUIType
     {
         Toggle,     // CheckBox (True/False)
@@ -15,9 +12,6 @@ namespace pk3DS.Core.Modding
         Number      // NumericUpDown (Value injection)
     }
 
-    /// <summary>
-    /// Represents a single atomic write operation (either hex or assembly).
-    /// </summary>
     public class PatchInstruction
     {
         [JsonProperty("offset")]
@@ -30,9 +24,6 @@ namespace pk3DS.Core.Modding
         public string Assembly { get; set; }
     }
 
-    /// <summary>
-    /// Represents a specific choice in a dropdown option.
-    /// </summary>
     public class PatchOption
     {
         [JsonProperty("name")]
@@ -42,9 +33,6 @@ namespace pk3DS.Core.Modding
         public List<PatchInstruction> Instructions { get; set; } = new List<PatchInstruction>();
     }
 
-    /// <summary>
-    /// A structured definition for applying pre-defined binary patches to executables/CROs.
-    /// </summary>
     public class PatchDefinition
     {
         [JsonProperty("name")]
@@ -83,9 +71,6 @@ namespace pk3DS.Core.Modding
         [JsonProperty("defaultValue")]
         public decimal DefaultValue { get; set; }
 
-        /// <summary>
-        /// Validates that the patch has necessary fields defined based on its UIType.
-        /// </summary>
         public bool IsValid()
         {
             if (string.IsNullOrEmpty(Name)) return false;

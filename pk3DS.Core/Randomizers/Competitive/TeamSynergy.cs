@@ -5,14 +5,9 @@ using System.Numerics;
 
 namespace pk3DS.Core.Randomizers.Competitive;
 
-/// <summary>Team jobs the synergy score rewards filling (v2 spec §3).</summary>
 [Flags]
 public enum TeamRoles { None = 0, Hazards = 1, HazardRemoval = 2, Pivot = 4, SpeedControl = 8 }
 
-/// <summary>
-/// How much a candidate species adds to a trainer's team so far (v2 spec §3). Pure: depends only on
-/// TypeChart.cs and CompetitiveWeights, so tests/CompetitiveCheck compiles it on its own.
-/// </summary>
 public static class TeamSynergy
 {
     public static double Score(int[] candidateTypes, TeamRoles candidateRoles,

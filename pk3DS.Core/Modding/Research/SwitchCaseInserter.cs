@@ -4,32 +4,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Adds a new case to an existing multi-case `switch` (AMX opcode 0x82/CASETBL) - the mechanism a
-/// per-zone "ZS" script uses to dispatch on <see cref="pk3DS.Core.Structures.FieldNpcEntry.ScriptId"/>
-/// (confirmed live this session: Iki Town's real ZS[0] script contains exactly this shape, a switch
-/// whose case values are 1-26, matching every non-zero `ScriptId` seen in that zone's real NPC
-/// placement data).
-/// <para>
-/// <see cref="AddAliasCase"/> is the safe, immediately-useful v1 capability: it adds a brand-new case
-/// value that dispatches to the SAME target an already-existing case (or the switch's own default)
-/// already uses - no new code is written or cloned, so there's nothing new to get wrong about
-/// unfamiliar case-block boundaries. This gives a new NPC a real, distinct `ScriptId` that reuses a
-/// known-working behavior, the same "reuse a real example" philosophy this session has used
-/// throughout (cloning CM model data, trainer collision/path offsets, etc.) - just applied to a
-/// dispatch table instead of a data blob. Wiring a BRAND NEW behavior (e.g. a custom item gift) still
-/// needs new code spliced in and pointed at from a new case - not built by this class, which only
-/// ever aliases to something that already exists and already works.
-/// </para>
-/// <para>
-/// Reuses <see cref="AmxRelocation.InsertWords"/> for the actual splice and delta relocation (both
-/// for every OTHER delta in the script that shifts because of this insertion, and for the new case's
-/// own jmp via <c>extraDeltaRefs</c>/<c>extraOriginalTargets</c>) rather than re-deriving relocation
-/// logic - the CASETBL's own word layout (<c>[opcode][count][jmp0][value0][jmp1][value1]...
-/// [default_jmp]</c>, each case's jmp delta relative to ONE WORD BEFORE its own position) is exactly
-/// what <see cref="AmxRelocation.FindDeltaRefs"/> already models for this opcode.
-/// </para>
-/// </summary>
 public static class SwitchCaseInserter
 {
     public sealed class AddCaseResult
@@ -40,7 +14,6 @@ public static class SwitchCaseInserter
         public int WordsAdded;
     }
 
-    /// <summary>Every multi-case `switch` (0x82) instruction's own flat word index in a decoded script - candidates to extend.</summary>
     public static List<int> FindSwitchCaseTables(List<DecodedInstruction> decoded)
     {
         var result = new List<int>();
@@ -53,10 +26,8 @@ public static class SwitchCaseInserter
         return result;
     }
 
-    /// <summary>One decoded case entry: the value it matches (null for the trailing default) and the real, already-resolved absolute word index its jmp points at.</summary>
     public readonly record struct CaseInfo(int? Value, int TargetWordIndex, int JmpSlotFlatIndex);
 
-    /// <summary>Decodes every case (and the default) of one CASETBL instruction into real target word indices - for the caller to pick which existing target to alias a new case to.</summary>
     public static List<CaseInfo> DecodeCases(uint[] cmd, List<DecodedInstruction> decoded, int caseTblFlatIndex)
     {
         var instr = decoded.First(d => d.FlatIndex == caseTblFlatIndex);
@@ -83,11 +54,6 @@ public static class SwitchCaseInserter
         return cases;
     }
 
-    /// <summary>
-    /// Adds a new case (<paramref name="newCaseValue"/>) to the CASETBL at
-    /// <paramref name="caseTblFlatIndex"/>, aliasing it to the same real target
-    /// <paramref name="aliasTargetWordIndex"/> an existing case or the default already uses.
-    /// </summary>
     public static AddCaseResult AddAliasCase(uint[] cmd, List<DecodedInstruction> decoded, int caseTblFlatIndex, int newCaseValue, int aliasTargetWordIndex)
     {
         var instr = decoded.FirstOrDefault(d => d.FlatIndex == caseTblFlatIndex);
@@ -138,41 +104,9 @@ public static class SwitchCaseInserter
         public bool Success;
         public string Error = "";
         public uint[] NewScriptCommands = [];
-        /// <summary>Where the cloned code landed, in the RETURNED array's own word-index space - informational, and useful if the caller wants to inspect/further edit the clone afterward.</summary>
         public int ClonedBodyFlatIndex;
     }
 
-    /// <summary>
-    /// Clones an existing case's own self-contained code span (<paramref name="templateBodyStart"/>
-    /// to <paramref name="templateBodyEnd"/>, exclusive - e.g. a `Begin(0)...Return(0)` subroutine
-    /// body a simple case dispatches to) as brand-new code appended at the very end of the script,
-    /// optionally overwriting some of the clone's own argument values first (<paramref name="argOverrides"/>,
-    /// keyed by that argument's 0-based position among every arg slot the clone's OWN instructions
-    /// expose, in order - matching how <see cref="GiftItemInserter.AddAnotherGift"/> already rewrites
-    /// a cloned gift's item id/quantity via <see cref="ScriptEditing.SetArgValue"/>, just generalized
-    /// to any argument position rather than assuming a fixed (qty, itemId) shape), then adds a new
-    /// case to the CASETBL at <paramref name="caseTblFlatIndex"/> pointing directly at the clone.
-    /// <para>
-    /// Appending at the very end of the whole script is deliberately the simplest possible insertion
-    /// point - nothing in the script lives after it, so this insertion alone can never split any
-    /// existing self/delta pair the way inserting into the CASETBL's own case list can (see
-    /// <see cref="AddAliasCase"/>'s remarks and <see cref="AmxRelocation.InsertWords"/>'s own fix for
-    /// that specific, different edge case) - the CASETBL extension this method ALSO performs (via
-    /// <see cref="AddAliasCase"/>, once the clone's final position is known) is exactly as safe as
-    /// any other alias, since by then the clone is just another already-existing target.
-    /// </para>
-    /// <para>
-    /// Any delta-bearing instruction WITHIN the cloned span (e.g. a `CallFunc` to a shared helper
-    /// subroutine elsewhere in the script, confirmed live to be how real "give a reward" cases like
-    /// Iki Town's case 6/7/8 call their own shared `0x1768` helper) is re-targeted correctly regardless
-    /// of whether its real target sits inside the clone or elsewhere in the original script - computed
-    /// from the template's own ORIGINAL absolute position, then run through the same
-    /// <see cref="AmxRelocation.InsertWords"/> shift logic as everything else, so a cloned CallFunc
-    /// keeps calling the SAME real shared helper the template did. A nested multi-case `switch`
-    /// WITHIN the cloned span is not supported (real case bodies this session has found are simple,
-    /// linear code - Begin/PushConst/CallFunc/ClearAll/Return - never another switch of their own).
-    /// </para>
-    /// </summary>
     public static AddClonedCaseResult AddClonedCase(
         uint[] cmd, List<DecodedInstruction> decoded, int caseTblFlatIndex, int newCaseValue,
         int templateBodyStart, int templateBodyEnd,
@@ -244,32 +178,8 @@ public static class SwitchCaseInserter
         return new AddClonedCaseResult { Success = true, NewScriptCommands = addResult.NewScriptCommands, ClonedBodyFlatIndex = insertPos };
     }
 
-    /// <summary>
-    /// One numbered case whose own dispatched body looks like a "give a reward" pattern: a short,
-    /// self-contained `Begin...ClearAll/Return` block with 2+ `PushConst` arguments feeding exactly
-    /// one `CallFunc` to some shared helper subroutine - confirmed live this session for Iki Town's
-    /// real case 6/7/8 (each an 11-word block differing in exactly one pushed value, all three
-    /// calling the SAME shared helper). <see cref="SharedHelperTarget"/> being used by 2+ different
-    /// numbered cases is the actual signal this is a reusable "reward" mechanism rather than one-off
-    /// zone-specific code - a single isolated match isn't enough to tell the two apart, so
-    /// <see cref="FindRewardLikeCases"/> only returns cases that clear that bar.
-    /// <para>
-    /// Read plainly: this is a structural pattern match (several near-identical cases differing in
-    /// exactly one argument, converging on one shared helper), not a confirmed understanding of what
-    /// that helper does at the ARM level - it's presented to the user as "reward-shaped", not
-    /// asserted to definitely be a Bag item id.
-    /// </para>
-    /// <para>
-    /// <see cref="VaryingArgIndex"/> and <see cref="AllArgValues"/> are indexed the SAME way
-    /// <see cref="AddClonedCase"/>'s own <c>argOverrides</c> parameter expects - every argument slot
-    /// in body order (including `Begin`/`ClearAll`/`Return`'s own packed zero args, not just the
-    /// `PushConst`s) - so a caller can pass <see cref="VaryingArgIndex"/> straight through as an
-    /// `argOverrides` key without any re-indexing.
-    /// </para>
-    /// </summary>
     public sealed record RewardLikeCase(int CaseValue, int BodyStart, int BodyEnd, int SharedHelperTarget, List<int> AllArgValues, int VaryingArgIndex);
 
-    /// <summary>Finds every numbered case in the CASETBL at <paramref name="caseTblFlatIndex"/> that looks reward-shaped, per <see cref="RewardLikeCase"/>'s own remarks.</summary>
     public static List<RewardLikeCase> FindRewardLikeCases(uint[] cmd, List<DecodedInstruction> decoded, int caseTblFlatIndex)
     {
         var cases = DecodeCases(cmd, decoded, caseTblFlatIndex);

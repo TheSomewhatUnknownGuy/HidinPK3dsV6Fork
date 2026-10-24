@@ -4,12 +4,6 @@ using System.Windows.Forms;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// A quick reference for what the Item Editor itself can (and can't) actually make a custom item
-/// do, written from the real, byte-level dispatch mechanics this project's research uncovered -
-/// not generic advice. Anything past this belongs in the Research Center, which can write real
-/// engine hooks (Battle.cro/code.bin/Bag.cro patches) instead of just item-table fields.
-/// </summary>
 public sealed class ItemGuideDialog : Form
 {
     public ItemGuideDialog()

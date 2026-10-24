@@ -4,15 +4,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Keeps "who can learn it" with a TM's move when moves change slots. Personal TM bits belong to slots
-/// (offset 0x28, 128 bits); a move that moved slots takes its old slot's bits, a brand-new move keeps the slot's.
-/// </summary>
 public static class TMCompat
 {
     private const int BitsOffset = 0x28;
 
-    /// <summary>For each slot of <paramref name="after"/>, the slot of <paramref name="before"/> that held the same move, else -1.</summary>
     public static int[] FromSlots(ushort[] before, ushort[] after)
     {
         var r = new int[after.Length];
@@ -21,11 +16,6 @@ public static class TMCompat
         return r;
     }
 
-    /// <summary>
-    /// With passive abilities on, TM slots 104+ have no learnability bits (bytes 0x35-0x37 are passives). Returns why the change from
-    /// <paramref name="before"/> to <paramref name="after"/> cannot be saved, or null: any change to a slot 104+, or a slot below 104
-    /// that would take its learnability from one. Check before writing code.bin, since <see cref="Remap"/> runs after it.
-    /// </summary>
     public static string? PassiveRefusal(ushort[] before, ushort[] after)
     {
         if (!PassiveGuard.Enabled) return null;
@@ -38,9 +28,6 @@ public static class TMCompat
         return null;
     }
 
-    /// <summary>
-    /// Applies <paramref name="fromSlot"/> to every personal entry, then <see cref="SyncMaster"/>. Returns entries changed.
-    /// </summary>
     public static int Remap(byte[][] garcFiles, int[] fromSlot)
     {
         int len = garcFiles[0].Length;
@@ -62,10 +49,6 @@ public static class TMCompat
         return changed;
     }
 
-    /// <summary>
-    /// Copies the personal entries over the trailing master table in place, keeping any bytes past them
-    /// (Uhuru's master has 93 junk entries and a 36-byte tail). A master too short for the entries is rebuilt.
-    /// </summary>
     public static void SyncMaster(byte[][] garcFiles)
     {
         int len = garcFiles[0].Length, last = garcFiles.Length - 1;

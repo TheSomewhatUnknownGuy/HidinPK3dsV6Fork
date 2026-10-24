@@ -5,12 +5,8 @@ using pk3DS.Core.Structures;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// Works out what type, if any, a trainer's whole team should share.
-/// </summary>
 public static class TrainerThemes
 {
-    /// <summary>Modes, matching <see cref="UniversalSettings.TrainerPokemonMode"/>.</summary>
     public const int Unchanged = 0;
     public const int RandomMode = 1;
     public const int RandomEvenDistribution = 2;
@@ -19,7 +15,6 @@ public static class TrainerThemes
     public const int KeepThemed = 5;
     public const int KeepThemeOrPrimary = 6;
 
-    /// <summary>Labels for the Trainer Pokemon dropdown, in value order.</summary>
     public static readonly string[] Labels =
     [
         "Unchanged",
@@ -31,15 +26,10 @@ public static class TrainerThemes
         "Keep Themes Or Primary",
     ];
 
-    /// <summary>Whether the mode re-picks species at all.</summary>
     public static bool Randomizes(int mode) => mode > Unchanged;
 
-    /// <summary>Whether the mode involves type themes in any form.</summary>
     public static bool UsesThemes(int mode) => mode >= TypeThemed;
 
-    /// <summary>
-    /// A trainer's own theme in the vanilla data, or -1 when their team has no shared type.
-    /// </summary>
     public static int VanillaTheme(GameConfig config, IReadOnlyList<int> speciesBefore)
     {
         if (config == null || speciesBefore == null || speciesBefore.Count < 2) return -1;
@@ -59,17 +49,12 @@ public static class TrainerThemes
         return shared is { Count: > 0 } ? shared.Min() : -1;
     }
 
-    /// <summary>The primary type of the team's first Pokemon, or -1 if it cannot be read.</summary>
     public static int PrimaryTypeOf(GameConfig config, int species)
     {
         var types = TypeRestrictions.TypesOf(config, species).ToList();
         return types.Count > 0 ? types[0] : -1;
     }
 
-    /// <summary>
-    /// The type this trainer's new team should share, or -1 for no theme.
-    /// </summary>
-    /// <param name="speciesBefore">The team's species as the ROM shipped them, before any mapping.</param>
     public static int ThemeFor(GameConfig config, int mode, TrainerData7 trainer, int index,
                                IReadOnlyList<int> speciesBefore)
     {

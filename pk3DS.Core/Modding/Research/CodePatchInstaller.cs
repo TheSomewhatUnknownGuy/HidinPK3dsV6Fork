@@ -5,35 +5,23 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>A branch planted over an existing instruction, diverting into new code.</summary>
 public sealed class CodeHook
 {
     public string Name { get; set; } = "";
-    /// <summary>Instruction replaced by the branch.</summary>
     public uint Site { get; set; }
-    /// <summary>
-    /// Body of the diverted-to block, one instruction per line. Assembled at the address the block
-    /// actually lands on, so absolute branch targets written by hand resolve correctly.
-    /// </summary>
     public List<string> Assembly { get; set; } = [];
-    /// <summary>Raw machine code, as an alternative to <see cref="Assembly"/>.</summary>
     public string HexCode { get; set; }
-    /// <summary>Use BL rather than B, when the block is meant to return to the site.</summary>
     public bool Link { get; set; }
 }
 
-/// <summary>A run of instructions to neutralise.</summary>
 public sealed class CodeNop
 {
     public string Name { get; set; } = "";
     public uint Offset { get; set; }
-    /// <summary>Bytes to blank; must be a multiple of 4.</summary>
     public int Length { get; set; }
-    /// <summary>When set, the bytes must currently match or the patch is refused.</summary>
     public byte[] ExpectedOriginal { get; set; }
 }
 
-/// <summary>Outcome of a hook / nop / corpus patch run.</summary>
 public sealed class CodePatchResult
 {
     public bool Success { get; set; } = true;
@@ -51,22 +39,8 @@ public sealed class CodePatchResult
         string.Join(Environment.NewLine, Log.Concat(Errors.Select(e => "ERROR: " + e)));
 }
 
-/// <summary>
-/// Applies the two kinds of patch that are not master-table work: neutralising existing code, and
-/// hooking a site so it detours through new code in the reserve.
-/// <para>
-/// This is the shape almost every behavioural tweak takes. Turning Hail into Snow, for instance, is
-/// three NOPs over the chip-damage call plus a branch at the damage-calculation site into a short
-/// block that adds the Ice Defense boost — no new mechanic, no table growth, just a redirect. Doing
-/// that by hand means assembling the block, working out where it landed, and encoding a branch with
-/// the right displacement; all three are done here so the author only writes the instructions.
-/// </para>
-/// </summary>
 public static class CodePatchInstaller
 {
-    /// <summary>
-    /// Writes patches the research notes recorded, straight into a binary.
-    /// </summary>
     public static CodePatchResult ApplyRecorded(
         byte[] rom, IEnumerable<ResearchPatch> patches, bool expectOriginal = false, byte[] original = null)
     {
@@ -117,7 +91,6 @@ public static class CodePatchInstaller
         return result;
     }
 
-    /// <summary>Replaces instructions with <c>MOV R0,R0</c>, optionally verifying what was there.</summary>
     public static CodePatchResult Nop(byte[] rom, IEnumerable<CodeNop> nops)
     {
         var result = new CodePatchResult();
@@ -151,14 +124,6 @@ public static class CodePatchInstaller
         return result;
     }
 
-    /// <summary>
-    /// Places <paramref name="hook"/>'s block in the reserve and branches to it from the hook site.
-    /// <para>
-    /// The block is assembled at its final address rather than at zero, because these blocks are
-    /// written with absolute targets — a hand-authored <c>bne 0x0001FA68</c> means that address in
-    /// the ROM, and only assembling in place makes the displacement come out right.
-    /// </para>
-    /// </summary>
     public static CodePatchResult InstallHook(
         byte[] rom, CodeHook hook, (uint Offset, int Length) reserve, ref uint bump)
     {
@@ -207,10 +172,6 @@ public static class CodePatchInstaller
         return result;
     }
 
-    /// <summary>
-    /// Checks a corpus patch list against the binary without changing anything — the "does this ROM
-    /// look like the one the notes were written against" test that has to pass before applying.
-    /// </summary>
     public static (int Matched, int Total, List<string> Mismatches) Verify(byte[] rom, IEnumerable<ResearchPatch> expected)
     {
         var mismatches = new List<string>();
@@ -231,11 +192,6 @@ public static class CodePatchInstaller
         return (matched, total, mismatches);
     }
 
-    /// <summary>
-    /// Writes a corpus patch list. When <paramref name="expected"/> is supplied every site must
-    /// currently hold its documented original, so a ROM the notes do not describe is rejected
-    /// outright instead of being half-patched.
-    /// </summary>
     public static CodePatchResult Apply(
         byte[] rom, IEnumerable<ResearchPatch> patches, IEnumerable<ResearchPatch> expected = null, bool requireAllExpected = true)
     {

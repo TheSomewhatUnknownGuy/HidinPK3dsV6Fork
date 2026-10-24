@@ -54,7 +54,6 @@ public partial class ZoneDataEditor7 : Form
         Grid.SelectedObject = zones[entry];
     }
 
-    /// <summary>Writes every zone's (possibly-edited) bytes back into the flat zone-array blob.</summary>
     private void SaveAll()
     {
         byte[] blob = new byte[zones.Length * ZoneData7.SIZE];

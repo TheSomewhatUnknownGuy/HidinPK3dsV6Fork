@@ -31,15 +31,10 @@ public class MartRandomizer
     private static readonly int[] entries = [9, 11, 13, 15, 17, 19, 20, 21, 9, 4, 8, 12, 5, 4, 11, 3, 10, 6, 10, 6, 4, 5, 7, 1];
     private static readonly int[] entriesBP = [8, 7, 18, 12, 21, 16];
 
-    /// <summary>Items every regular Poke Mart list ends with (Repel, Super Repel).</summary>
     private static readonly ushort[] MartTerminator = [78, 79];
 
-    /// <summary>Number of trial-stage lists, which are the same mart at successive stages.</summary>
     private const int TrialStages = 8;
 
-    /// <summary>
-    /// The real per-location slot counts, read out of Shop.cro rather than assumed.
-    /// </summary>
     public static int[] ResolveEntryCounts(byte[] shopCro, int listStart, int listEnd, string croPath = null)
     {
         if (croPath != null && LoadCounts(croPath) is { } saved) return saved.Regular;
@@ -81,9 +76,6 @@ public class MartRandomizer
         return counts;
     }
 
-    /// <summary>
-    /// The shops, in the order <see cref="MartLayout.MartPatchAddrs"/> addresses them.
-    /// </summary>
     private static readonly string[] locations =
     [
         "No Trials", "1 Trial", "2 Trials", "3 Trials", "4 Trials", "5 Trials", "6 Trials", "7 Trials",
@@ -125,21 +117,13 @@ public class MartRandomizer
 
     private const int MaxExpandedSlots = 128;
 
-    /// <summary>
-    /// Why slot expansion was skipped on the last run, or null if it was not skipped.
-    /// </summary>
     public static string ExpansionSkipped { get; private set; }
 
-    /// <summary>Whether to grow shops to fit their whole category list.</summary>
     public static bool ExpandSlots { get; set; } = true;
 
-    /// <summary>
-    /// Where the post-expansion slot counts are recorded, beside Shop.cro.
-    /// </summary>
     private static string CountsPath(string croPath) =>
         Path.Combine(Path.GetDirectoryName(croPath) ?? "", "Shop.slotcounts.txt");
 
-    /// <summary>Records the live counts beside Shop.cro so the editor reads the same file the same way.</summary>
     public static void SaveCounts(string croPath, int[] regular, int[] bp)
     {
         try
@@ -153,7 +137,6 @@ public class MartRandomizer
         catch { /* the ROM is already correct; losing the note only affects display */ }
     }
 
-    /// <summary>The recorded counts, or null when there are none.</summary>
     public static (int[] Regular, int[] BP)? LoadCounts(string croPath)
     {
         try
@@ -186,7 +169,6 @@ public class MartRandomizer
         RandomizeAllShops = randomizeAllShops;
     }
 
-    /// <summary>Z-Crystals for the ROM being randomized; shops never stock them.</summary>
     private ZCrystalFilter ZFilter = new(null);
 
     private int RandomItemId(int maxItemID)
@@ -230,9 +212,6 @@ public class MartRandomizer
         File.WriteAllBytes(croPath, data);
     }
 
-    /// <summary>
-    /// Restocks every shop from its category list, growing shops when asked.
-    /// </summary>
     public (int[] Regular, int[] BP) ExecuteCompetitive(int maxItemID, GameConfig config)
     {
         string croPath = Path.Combine(RomFSPath, "Shop.cro");
@@ -411,7 +390,6 @@ public class MartRandomizer
         return null;
     }
 
-    /// <summary>How many regular shops draw from the rotation, so the BP shops can continue it.</summary>
     private static int RotatingRegularShopCount
     {
         get
@@ -426,16 +404,8 @@ public class MartRandomizer
         }
     }
 
-    /// <summary>
-    /// What a BP shop charges. Always nothing.
-    /// </summary>
     private static ushort GetBPPrice(int entry, bool flatRandom) => 0;
 
-    /// <summary>
-    /// Grows every mapped location's slot list inside Shop.cro so it can hold its whole category,
-    /// capped at <see cref="MaxExpandedSlots"/>. Mutates liveEntries/liveEntriesBP with the new
-    /// counts.
-    /// </summary>
     private static byte[] ExpandMartSlots(
         byte[] data,
         string[][] regularCategoryFor, string[][] bpCategoryFor,
@@ -514,9 +484,6 @@ public class MartRandomizer
         return data;
     }
 
-    /// <summary>
-    /// The Nature Mints present in this ROM, or an empty array when it has none.
-    /// </summary>
     private static string[] BuildMintPool(string[] itemNames)
     {
         var mints = new List<string>();

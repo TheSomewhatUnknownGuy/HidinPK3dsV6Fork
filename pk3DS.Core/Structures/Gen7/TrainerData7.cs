@@ -11,8 +11,6 @@ public class TrainerData7
     public int ID { get; set; }
     public string Name { get; set; }
 
-    /// <param name="count">Team size to read from <paramref name="tp"/> instead of trdata byte 3, or -1 for byte 3.
-    /// Uhuru trpoke blocks 5/6 share block 3/4's trdata record but can hold more Pokémon (TrainerBlocks.TeamSizeOverride).</param>
     public TrainerData7(byte[] tr = null, byte[] tp = null, int count = -1)
     {
         tr ??= new byte[0x14];
@@ -42,7 +40,6 @@ public class TrainerData7
     public bool Flag { get => trdata[0x0D] == 1; set => trdata[0x0D] = value ? (byte)1 : (byte)0; }
     public int Money { get => trdata[0x11]; set => trdata[0x11] = (byte)value; }
 
-    /// <summary>Uhuru: signed level offset applied in modes 4/5 (trainer-format.md); 0 = none.</summary>
     public int LevelOffset { get => (sbyte)trdata[0x13]; set => trdata[0x13] = (byte)(sbyte)value; }
 
     public void Write(out byte[] tr, out byte[] pk)

@@ -5,7 +5,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>A single verification finding.</summary>
 public sealed class VerifyFinding
 {
     public PlanSeverity Severity { get; init; } = PlanSeverity.Warning;
@@ -14,7 +13,6 @@ public sealed class VerifyFinding
     public override string ToString() => $"[{Check}] {Severity.ToString().ToUpperInvariant()}: {Message}";
 }
 
-/// <summary>Outcome of verifying a CRO.</summary>
 public sealed class VerifyReport
 {
     public List<VerifyFinding> Findings { get; } = [];
@@ -41,17 +39,8 @@ public sealed class VerifyReport
     }
 }
 
-/// <summary>
-/// Structural checks for a CRO, intended to run immediately after any write.
-/// <para>
-/// The point is to catch a bad patch here rather than as a crash in Citra, where the failure gives
-/// no indication of which edit caused it. Everything checked is an invariant of the format itself,
-/// so it holds for vanilla and heavily-modded ROMs alike.
-/// </para>
-/// </summary>
 public static class CroVerifier
 {
-    /// <summary>Validates relocation entries and mechanic chains.</summary>
     public static VerifyReport Verify(DecompiledCRO cro, int maxFindings = 50)
     {
         var report = new VerifyReport();
@@ -185,11 +174,6 @@ public static class CroVerifier
         return report;
     }
 
-    /// <summary>
-    /// Round-trip check: recompiling an unmodified decompile must reproduce the original bytes.
-    /// A mismatch means the decompile/compile pair is lossy, and any edit made through it risks
-    /// corrupting parts of the file nobody touched.
-    /// </summary>
     public static VerifyReport VerifyRoundTrip(byte[] original, string sourcePath = null)
     {
         var report = new VerifyReport();

@@ -8,18 +8,10 @@ using pk3DS.Core.Structures;
 
 namespace pk3DS.Core.CTR
 {
-    /// <summary>
-    /// Bidirectional synchronization bridge between pk3DS and PawnGarcEditor (PGE).
-    /// Provides VFS cache invalidation for live ROM reloading and .pgeif placement export/import.
-    /// </summary>
     public static class PawnGarcBridge
     {
         private static readonly byte[] PgeifMagic = [(byte)'P', (byte)'G', (byte)'E', (byte)'I'];
 
-        /// <summary>
-        /// <summary>
-        /// Attempts to locate the PawnGarcEditor VFS directory by scanning standard workspace paths.
-        /// </summary>
         public static string FindPgeVfsDir()
         {
             string[] baseDirs =
@@ -68,13 +60,6 @@ namespace pk3DS.Core.CTR
             return null;
         }
 
-        /// <summary>
-        /// Invalidates and deletes PawnGarcEditor's local VFS cache files for encdata (a/0/8/2).
-        /// When worldID >= 0, targets only the member files associated with that zone group.
-        /// When worldID &lt; 0, clears all cached encdata members.
-        /// </summary>
-        /// <param name="worldID">The zone group index (0..142 for USUM), or -1 for all zones.</param>
-        /// <returns>True if cache files were located and cleared, otherwise false.</returns>
         public static bool InvalidatePgeCache(int worldID = -1)
         {
             string vfs = FindPgeVfsDir();
@@ -126,9 +111,6 @@ namespace pk3DS.Core.CTR
             return anyCleared;
         }
 
-        /// <summary>
-        /// Exports the active zone's NPC and Trainer placements into a binary .pgeif file package.
-        /// </summary>
         public static byte[] ExportPgeif(FieldNpcTable npcTable, OWTrainerFile trFile, int groupIndex)
         {
             var root = new JsonObject
@@ -220,9 +202,6 @@ namespace pk3DS.Core.CTR
             return pgeif;
         }
 
-        /// <summary>
-        /// Imports and applies placements from a .pgeif package into the active FieldNpcTable and OWTrainerFile.
-        /// </summary>
         public static bool ImportPgeif(byte[] pgeifBytes, FieldNpcTable npcTable, OWTrainerFile trFile, out string report)
         {
             report = "";

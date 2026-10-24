@@ -18,59 +18,40 @@ public class Wild7Randomizer
     public bool ModifyLevel { get; set; } = false;
     public bool AllCanCallAllies { get; set; } = false;
 
-    /// <summary>
-    /// How widely one original species may be replaced by different things.
-    /// </summary>
     public int ReplacementsPerSpecies { get; set; } = 0;
 
-    /// <summary>Give each encounter type in a set its own mapping (One Per Map only).</summary>
     public bool SplitByEncounterType { get; set; } = false;
 
-    /// <summary>0 None, 1 Random Zone Themes, 2 Keep Primary Type.</summary>
     public int TypeRestriction { get; set; } = 0;
 
-    /// <summary>Keep a zone's own shared type instead of rolling a new theme.</summary>
     public bool KeepZoneThemes { get; set; } = false;
 
-    /// <summary>0 None, 1 Only Basic Pokemon, 2 Same Evolution Stage.</summary>
     public int EvolutionRestriction { get; set; } = 0;
 
-    /// <summary>Map a family onto one replacement family, keeping stage relations.</summary>
     public bool KeepEvolutionRelations { get; set; } = false;
 
-    /// <summary>
-    /// Prefer a species the current encounter table does not already hold.
-    /// </summary>
     public bool AvoidRepeats { get; set; } = false;
 
-    /// <summary>Needed by the type and evolution restrictions; leave null to disable both.</summary>
     public GameConfig Config { get; set; }
 
-    /// <summary>Species already placed in the encounter table being filled.</summary>
     private HashSet<int> TableSpecies;
 
     private WildRestrictions Restrictions;
 
-    /// <summary>Scope names, matching <see cref="ReplacementsPerSpecies"/>.</summary>
     public const int ScopeMaximum = 0;
     public const int ScopePerEncounterSet = 1;
     public const int ScopePerMap = 2;
     public const int ScopePerNamedLocation = 3;
     public const int ScopeWholeGame = 4;
 
-    /// <summary>One species-to-species mapping, for whichever scope is currently in force.</summary>
     private Dictionary<int, int> ScopeMap;
 
-    /// <summary>Whole-game scope keeps one map for the entire run.</summary>
     private readonly Dictionary<int, int> GameMap = [];
 
-    /// <summary>Named-location scope keeps one map per location name.</summary>
     private readonly Dictionary<string, Dictionary<int, int>> LocationMaps = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Family root to family root, for Keep Evolution Relations.</summary>
     private readonly Dictionary<int, int> FamilyMap = [];
 
-    /// <summary>Theme type currently in force, or -1 for none.</summary>
     private int CurrentTheme = -1;
 
     private bool RestrictionsActive =>
@@ -78,9 +59,6 @@ public class Wild7Randomizer
                                  EvolutionRestriction != WildRestrictions.EvoNone ||
                                  KeepEvolutionRelations);
 
-    /// <summary>
-    /// The scope actually in force, reconciling the new setting with the old mode radio buttons.
-    /// </summary>
     private int EffectiveScope
     {
         get
@@ -95,9 +73,6 @@ public class Wild7Randomizer
         }
     }
 
-    /// <summary>
-    /// Picks a replacement for one species under the current scope, theme and restrictions.
-    /// </summary>
     private int GetSpecies(int oldSpecies)
     {
         if (oldSpecies == 0) return 0;
@@ -114,16 +89,12 @@ public class Wild7Randomizer
         return Remember(picked);
     }
 
-    /// <summary>Records what this table now holds, and passes the species straight through.</summary>
     private int Remember(int species)
     {
         if (species > 0) TableSpecies?.Add(species);
         return species;
     }
 
-    /// <summary>
-    /// One draw that satisfies the type and evolution restrictions, or the best available.
-    /// </summary>
     private int PickConstrained(int oldSpecies)
     {
         if (KeepEvolutionRelations && Restrictions != null)
@@ -188,7 +159,6 @@ public class Wild7Randomizer
         return fallback;
     }
 
-    /// <summary>Walks a family down to the requested stage, stopping at whatever it can reach.</summary>
     private int AtStage(int root, int wantedStage)
     {
         var evos = Config?.Evolutions;
@@ -270,7 +240,6 @@ public class Wild7Randomizer
         ScopeMap = outerScope;
     }
 
-    /// <summary>Every species a table currently holds, for reading its vanilla theme.</summary>
     private static IEnumerable<int> SpeciesIn(EncounterTable table)
     {
         foreach (var set in table.Encounter7s)

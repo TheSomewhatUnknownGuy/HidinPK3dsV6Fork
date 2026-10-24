@@ -5,7 +5,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One ability-ID bounds check found in code.bin.</summary>
 public sealed class AbilityCeilingSite
 {
     public int Offset { get; init; }
@@ -41,25 +40,11 @@ public sealed class AbilityCeilingResult
     }
 }
 
-/// <summary>
-/// Raises the ability name-text bounds check in code.bin past whatever this build already allows.
-/// <para>
-/// Retail USUM only names abilities up to 0xEA (234). The community Expansion Pack's own documented
-/// "ABILITY LIMITS" `code_map.csv` row (already confirmed applied in this session's reference ROM
-/// via <see cref="ExpansionPatchApplier"/>) raises it to 0x140 (320) - separately, the "NINTH
-/// ABILITY BIT" family of patches (also already applied) lets ability IDs themselves carry a 9th
-/// bit, so IDs up to 511 can be stored and read back correctly even though only 320 currently have a
-/// name-text slot reserved. This class only widens the name-text ceiling (the one bounds check this
-/// session found and verified) - it does not touch the 9th-bit storage patches themselves, which
-/// need no further widening on their own.
-/// </para>
-/// </summary>
 public static class AbilityCeilingPatcher
 {
     public const uint RetailCeiling = 0xEA;      // 234
     public const uint ExpansionCeiling = 0x140;  // 320
 
-    /// <summary>US and UM addresses both listed; whichever doesn't match this build fails <see cref="TryReadCeiling"/> and is skipped.</summary>
     private static readonly int[] DocumentedSites = [0x2D30BC, 0x2D30C0];
 
     public static List<AbilityCeilingSite> Analyze(byte[] code)
@@ -100,7 +85,6 @@ public static class AbilityCeilingPatcher
         return 0;
     }
 
-    /// <summary>Widens the ability name-text bounds check so <paramref name="requiredMaxAbilityId"/> gets a name slot.</summary>
     public static AbilityCeilingResult Raise(byte[] code, int requiredMaxAbilityId)
     {
         var result = new AbilityCeilingResult();

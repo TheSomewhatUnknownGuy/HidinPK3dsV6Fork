@@ -6,10 +6,8 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One value the author supplies when instantiating a template.</summary>
 public sealed class TemplateParameter
 {
-    /// <summary>Placeholder token as it appears in the body, without braces.</summary>
     public string Key { get; init; } = "";
 
     public string Label { get; init; } = "";
@@ -17,10 +15,6 @@ public sealed class TemplateParameter
     public string Help { get; init; } = "";
 }
 
-/// <summary>
-/// A starting point for a custom function: the shape of a common effect, with the parts that vary
-/// left as parameters and the parts that must come from research left as marked gaps.
-/// </summary>
 public sealed class FunctionTemplate
 {
     public string Name { get; init; } = "";
@@ -28,36 +22,20 @@ public sealed class FunctionTemplate
     public CustomMechanicKind Kind { get; init; }
     public ResearchTarget Target { get; init; } = ResearchTarget.BattleCro;
 
-    /// <summary>Workbook that documents the real implementation of this shape.</summary>
     public string CorpusReference { get; init; } = "";
 
-    /// <summary>Suggested timing, and why. Empty when it must be looked up.</summary>
     public string TimingHint { get; init; } = "";
 
-    /// <summary>
-    /// The stock element this shape reproduces, so the timing can be read from the ROM instead of
-    /// chosen by the author. Null for shapes that are not modelled on one particular element.
-    /// </summary>
     public TemplateModel? ModelledOn { get; init; }
 
-    /// <summary>
-    /// The timing this shape must use, where the engine itself settles it rather than a stock
-    /// element does.
-    /// </summary>
     public byte? FixedTiming { get; init; }
 
     public List<TemplateParameter> Parameters { get; init; } = [];
 
-    /// <summary>ARM body with <c>{Key}</c> placeholders.</summary>
     public List<string> Body { get; init; } = [];
 
-    /// <summary>What the author must confirm before this can work.</summary>
     public List<string> Verify { get; init; } = [];
 
-    /// <summary>
-    /// Loads an arbitrary 32-bit constant into a register using only instructions this assembler
-    /// supports.
-    /// </summary>
     public static List<string> EmitLoadConstant(string reg, uint value)
     {
         var outp = new List<string>();
@@ -87,9 +65,6 @@ public sealed class FunctionTemplate
         return outp;
     }
 
-    /// <summary>
-    /// Multiplies <paramref name="reg"/> by a fraction, exactly, with no division instruction.
-    /// </summary>
     public static List<string> EmitScale(string reg, string scratch, double factor)
     {
         uint q12 = (uint)Math.Round(factor * 4096.0);
@@ -108,9 +83,6 @@ public sealed class FunctionTemplate
         return outp;
     }
 
-    /// <summary>
-    /// Emits the paired type and flag test used by abilities that qualify a move two ways.
-    /// </summary>
     public static List<string> EmitMatch(string mode, int type, int bit)
     {
         bool wantType = type is >= 0 and < 255;
@@ -154,7 +126,6 @@ public sealed class FunctionTemplate
         return outp;
     }
 
-    /// <summary>Fills the placeholders and produces a definition ready to edit and dry-run.</summary>
     public CustomFunctionDefinition Build(string functionName, IDictionary<string, string>? values = null)
     {
         var v = values ?? new Dictionary<string, string>();
@@ -327,7 +298,6 @@ public sealed class FunctionTemplate
     }
 }
 
-/// <summary>The built-in template library.</summary>
 public static class FunctionTemplates
 {
     public static IReadOnlyList<FunctionTemplate> All => Templates;

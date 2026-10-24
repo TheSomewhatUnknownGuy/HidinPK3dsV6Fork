@@ -11,18 +11,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Battle engine research and editing, built on the resolved-mechanic stack rather than on raw
-/// offsets.
-/// <para>
-/// The previous Research Center, the Mechanic Editor and the code.bin editor all asked the user to
-/// supply addresses and trusted whatever came back. That does not survive contact with a modified
-/// ROM: the tables move between builds, corpus routines are recorded at addresses that are occupied
-/// here, and a relocation table can quietly grow over the segment behind it. Everything in this form
-/// therefore goes through <see cref="BattleMechanicMap"/> (tables located by id fingerprint) and
-/// ends with <see cref="CroVerifier"/>, and every write is preceded by a dry run and a backup.
-/// </para>
-/// </summary>
 public sealed class ResearchCenter7 : Form
 {
     // Loaded state
@@ -110,10 +98,6 @@ public sealed class ResearchCenter7 : Form
         }
     }
 
-    /// <summary>
-    /// Wraps related pages in one top-level tab, with a line saying what the group is for.
-    /// </summary>
-    /// <summary>Inner tab strips by group title, so a page can send you to a sibling.</summary>
     private static readonly Dictionary<string, TabControl> _groupTabs = [];
 
     private static TabPage Group(string title, string blurb, params TabPage[] pages)
@@ -301,7 +285,6 @@ public sealed class ResearchCenter7 : Form
     private readonly TextBox _fnLog = Mono(readOnly: true);
     private CustomFunctionDefinition _fnCurrent;
 
-    /// <summary>Binaries a custom function can install into, with the file each one is.</summary>
     private static readonly (ResearchTarget Target, string Label, string File)[] FunctionTargets =
     [
         (ResearchTarget.BattleCro,  "Battle.cro",   "Battle.cro"),
@@ -314,9 +297,6 @@ public sealed class ResearchCenter7 : Form
         (ResearchTarget.EvolutionCro, "Evolution.cro", "Evolution.cro"),
     ];
 
-    /// <summary>
-    /// A front door for the Create group: what each page is for, and a button that opens it.
-    /// </summary>
     private TabPage BuildStartHereTab()
     {
         var page = new TabPage("Where do I start?");
@@ -428,7 +408,6 @@ public sealed class ResearchCenter7 : Form
         return page;
     }
 
-    /// <summary>Reads the form into the portable definition the installer consumes.</summary>
     private CustomFunctionDefinition GatherCustomFunction()
     {
         var def = _fnCurrent ?? new CustomFunctionDefinition();
@@ -449,14 +428,6 @@ public sealed class ResearchCenter7 : Form
         return def;
     }
 
-    /// <summary>
-    /// Starts a definition from a template rather than an empty pane.
-    /// <para>
-    /// The template supplies the structure, the register conventions and the corpus sheet that
-    /// documents the real thing. The addresses it needs arrive as "TODO" lines, because those are
-    /// build-specific and a plausible-looking guess would assemble cleanly and corrupt the module.
-    /// </para>
-    /// </summary>
     private void NewFromTemplate()
     {
         // Hand the picker this ROM's symbols so its preview shows the addresses that will actually
@@ -532,14 +503,6 @@ public sealed class ResearchCenter7 : Form
         catch (Exception ex) { _fnLog.Text = "Could not save: " + ex.Message; }
     }
 
-    /// <summary>
-    /// Plans the install and, when asked, commits it.
-    /// <para>
-    /// The dry run is not decoration: it resolves the mechanic, assembles the code and allocates
-    /// space without touching the file, so a definition that cannot work says so before anything
-    /// is written.
-    /// </para>
-    /// </summary>
     private void RunCustomFunction(bool commit)
     {
         if (_map?.Cro == null) { _fnLog.Text = "Load a CRO on the Overview tab first."; return; }
@@ -633,15 +596,6 @@ public sealed class ResearchCenter7 : Form
     private readonly TextBox _portPath = new() { Width = 420 };
     private readonly TextBox _portLog = Mono(readOnly: true);
 
-    /// <summary>
-    /// Re-applies a saved manifest to whatever binary is currently loaded.
-    /// <para>
-    /// Deliberately two-stage. "Preview" runs the whole install in memory and prints exactly what it
-    /// would do; only "Apply" writes, and it writes a backup first and re-reads the file afterwards.
-    /// Every failure this kit guards against was a case where the in-memory result looked correct
-    /// and the file on disk did not match it.
-    /// </para>
-    /// </summary>
     private TabPage BuildPortTab()
     {
         var page = new TabPage("Port");
@@ -667,10 +621,6 @@ public sealed class ResearchCenter7 : Form
         return page;
     }
 
-    /// <summary>
-    /// Applies every recognised .json in the chosen folder — Battle.cro, code.bin and game data —
-    /// in one pass, stopping at the first stage that fails.
-    /// </summary>
     private void RunPort(bool commit)
     {
         if (Main.Config == null) { _portLog.Text = "Load a ROM in the main window first."; return; }
@@ -722,13 +672,6 @@ public sealed class ResearchCenter7 : Form
     private readonly TextBox _noteDetail = Mono(readOnly: true);
     private readonly Label _noteSummary = new() { AutoSize = true, Padding = new Padding(12, 6, 0, 0), ForeColor = Color.Gray };
 
-    /// <summary>
-    /// Recipes to browse (highlight drives the detail pane) and recipes to batch-apply (the check
-    /// boxes) are two different things now, so this is a <see cref="CheckedListBox"/> rather than a
-    /// plain <see cref="ListBox"/> with Ctrl/Shift multi-select. <see cref="CheckedListBox"/> only
-    /// accepts <see cref="SelectionMode.One"/> or <see cref="SelectionMode.MultiSimple"/> for
-    /// highlighting - One is exactly what the single-item detail pane already assumes.
-    /// </summary>
     private readonly CheckedListBox _recipeList = new()
     {
         Dock = DockStyle.Fill,
@@ -743,7 +686,6 @@ public sealed class ResearchCenter7 : Form
 
     private readonly Button _bLevelCaps = new();
 
-    /// <summary>Category filter and free-text search over the recipe list.</summary>
     private readonly ComboBox _recipeCategory = new()
     {
         Width = 150, DropDownStyle = ComboBoxStyle.DropDownList,
@@ -751,29 +693,18 @@ public sealed class ResearchCenter7 : Form
     private readonly TextBox _recipeSearch = new() { Width = 170 };
     private readonly Label _recipeCount = new() { AutoSize = true, ForeColor = Color.Gray, Padding = new Padding(8, 6, 0, 0) };
 
-    /// <summary>Everything discovered, before the category/search filter narrows it.</summary>
     private List<Recipe> _allRecipes = [];
 
-    /// <summary>Set while the Binary selector is moved programmatically.</summary>
     private bool _suppressAnalyze;
 
-    /// <summary>Binary the selected recipe writes that the Binary selector cannot display, or null.</summary>
     private string _unselectableTarget;
 
-    /// <summary>The level cap progression, as edited. Defaults to the researched Fly/ride flags.</summary>
-    /// <summary>
-    /// The level cap progression shown and edited here. Backed by <see cref="LevelCapSettings"/>
-    /// rather than held locally, because that is what the installer reads — a table kept only in
-    /// this form was edited, displayed, and then quietly ignored when Add to ROM assembled the
-    /// defaults instead.
-    /// </summary>
     private static LevelCapTable _levelCaps
     {
         get => LevelCapSettings.Table;
         set => LevelCapSettings.Table = value;
     }
 
-    /// <summary>One labelled id box per package parameter, rebuilt when the selection changes.</summary>
     private readonly FlowLayoutPanel _recipeParams = new();
     private readonly Dictionary<string, TextBox> _recipeParamBoxes = new(StringComparer.OrdinalIgnoreCase);
 
@@ -856,10 +787,6 @@ public sealed class ResearchCenter7 : Form
         return page;
     }
 
-    /// <summary>
-    /// Fills the list: the hand-written recipes, plus one per research sheet that records real
-    /// byte writes.
-    /// </summary>
     private void RefreshRecipes()
     {
         // The version decides which .ips set is offered at all: US and UM share patch names but
@@ -883,9 +810,6 @@ public sealed class ResearchCenter7 : Form
 
     private const string AllCategories = "All";
 
-    /// <summary>
-    /// Narrows the list to the chosen category and search text, grouped by category within.
-    /// </summary>
     private void ApplyRecipeFilter()
     {
         var keep = _recipeList.SelectedItem as Recipe;
@@ -929,7 +853,6 @@ public sealed class ResearchCenter7 : Form
         if (i >= 0) _recipeList.SelectedIndex = i;
     }
 
-    /// <summary>A non-selectable divider row naming the group that follows it.</summary>
     private sealed record CategoryHeading(string Name)
     {
         public override string ToString() => "── " + Name.ToUpperInvariant() + " ──";
@@ -1018,13 +941,6 @@ public sealed class ResearchCenter7 : Form
         _recipeDetail.Text = string.Join(Environment.NewLine, lines);
     }
 
-    /// <summary>
-    /// The bytes a recipe writes, as offset + hex + disassembly, or a plain statement that it
-    /// writes none.
-    /// </summary>
-    /// <summary>
-    /// Applies several .ips patches as one operation — the equivalent of merging them first.
-    /// </summary>
     private void RunIpsBatch(List<Recipe> patches, bool commit)
     {
         var log = new List<string> { $"{(commit ? "Add" : "Dry run")}: {patches.Count} .ips patches", "" };
@@ -1136,13 +1052,6 @@ public sealed class ResearchCenter7 : Form
         _recipeDetail.Text = ErrorWindow.Redact(string.Join(Environment.NewLine, log));
     }
 
-    /// <summary>
-    /// Applies several package/data/corpus recipes as one operation. Unlike the .ips batch above,
-    /// these go through <see cref="RecipeInstaller"/> one at a time (its own dry-run/backup/verify
-    /// discipline per recipe), but ids are assigned automatically via <see cref="RecipeIdAllocator"/>
-    /// instead of asking for them one at a time in the parameter boxes - the whole point of checking
-    /// more than one box together, and consistent with new items already auto-claiming free slots.
-    /// </summary>
     private void RunRecipeBatch(List<Recipe> recipes, bool commit)
     {
         var log = new List<string> { $"{(commit ? "Add" : "Dry run")}: {recipes.Count} patches together", "" };
@@ -1240,13 +1149,6 @@ public sealed class ResearchCenter7 : Form
         _recipeDetail.Text = ErrorWindow.Redact(string.Join(Environment.NewLine, log));
     }
 
-    /// <summary>
-    /// Shows the id(s) this recipe will actually use - one read-only row per package parameter, or
-    /// a single "assigned id" row for a plain multi-slot recipe. Nothing here is typed in: the value
-    /// comes straight from <see cref="RecipeIdAllocator.AssignIds"/>, the exact call <see
-    /// cref="RunRecipe"/> makes again at Apply time, so what is shown is guaranteed to match what
-    /// gets written rather than being a separate, possibly-stale guess.
-    /// </summary>
     private void BuildRecipeParamBoxes(Recipe r)
     {
         foreach (Control c in _recipeParams.Controls) c.Dispose();
@@ -1324,7 +1226,6 @@ public sealed class ResearchCenter7 : Form
         try { return Convert.FromHexString(hex); } catch { return []; }
     }
 
-    /// <summary>Disassembles a package's code, addressed from the base it was assembled for.</summary>
     private static IEnumerable<string> Disassemble(byte[] code, string sourceBase)
     {
         uint at = 0;
@@ -1784,7 +1685,6 @@ public sealed class ResearchCenter7 : Form
         return File.Exists(cro) ? cro : null;
     }
 
-    /// <summary>True while the corpus is being parsed on a worker thread.</summary>
     private bool _loadingCorpus;
 
     private void Analyze()
@@ -1822,9 +1722,6 @@ public sealed class ResearchCenter7 : Form
         Describe(log, corpus);
     }
 
-    /// <summary>
-    /// Parses the corpus on a worker thread, then re-runs <see cref="Analyze"/> with it in hand.
-    /// </summary>
     private void BeginCorpusLoad(string corpus, string version)
     {
         _loadingCorpus = true;
@@ -1874,7 +1771,6 @@ public sealed class ResearchCenter7 : Form
         Analyze();
     }
 
-    /// <summary>Everything after the corpus is loaded. Milliseconds, so it stays on the UI thread.</summary>
     private void Describe(List<string> log, string corpus)
     {
         // code.bin is not a CRO: report what can be reported and stop.
@@ -1950,7 +1846,6 @@ public sealed class ResearchCenter7 : Form
         _ => CustomMechanicKind.Move,
     };
 
-    /// <summary>The four things this ROM's Battle.cro can be browsed as.</summary>
     private enum MechView { Effects, Timings, Tables, Routines }
 
     private MechView SelectedView => (_kind.SelectedItem as string) switch
@@ -1961,10 +1856,6 @@ public sealed class ResearchCenter7 : Form
         _ => MechView.Effects,
     };
 
-    /// <summary>
-    /// Counts per kind and the next unused id, so adding an entry does not start with a hunt for
-    /// somewhere to put it.
-    /// </summary>
     private readonly Label _mechSummary = new()
     {
         AutoSize = true,
@@ -2007,7 +1898,6 @@ public sealed class ResearchCenter7 : Form
         _mechSummary.Text = string.Join("   ", parts) + next;
     }
 
-    /// <summary>Rebuilds the column headers, since each view shows different fields.</summary>
     private void SetColumns(params (string Header, int Width)[] cols)
     {
         _list.Columns.Clear();
@@ -2055,10 +1945,6 @@ public sealed class ResearchCenter7 : Form
         }
     }
 
-    /// <summary>
-    /// The engine's event vocabulary: which timing bytes this ROM actually dispatches on, how
-    /// heavily each is used, and what the corpus says each one means.
-    /// </summary>
     private void FillTimings(Func<string[], bool> matches)
     {
         SetColumns(("Timing", 70), ("Uses", 60), ("Moves", 60), ("Abilities", 70), ("Items", 60), ("Meaning", 320));
@@ -2086,9 +1972,6 @@ public sealed class ResearchCenter7 : Form
         }
     }
 
-    /// <summary>
-    /// The master tables themselves — where each one landed in this build, and how confidently.
-    /// </summary>
     private void FillTables(Func<string[], bool> matches)
     {
         SetColumns(("Table", 260), ("Kind", 80), ("Address", 90), ("Entries", 70), ("Match", 90), ("Documented", 90));
@@ -2109,9 +1992,6 @@ public sealed class ResearchCenter7 : Form
         }
     }
 
-    /// <summary>
-    /// Every routine the corpus documents in this binary — the palette a custom function calls into.
-    /// </summary>
     private void FillRoutines(Func<string[], bool> matches)
     {
         SetColumns(("Address", 90), ("Name", 480), ("Origin", 90));
@@ -2260,14 +2140,6 @@ public sealed class ResearchCenter7 : Form
         return lines;
     }
 
-    /// <summary>
-    /// Disassembles until the routine returns, annotating calls with documented names. Stopping at
-    /// the return keeps the pane readable and avoids running off into the next function.
-    /// </summary>
-    /// <summary>
-    /// Disassembles a routine in the same shape the research workbooks use: offset, hex, the
-    /// instruction, then a note.
-    /// </summary>
     private List<string> Disassemble(uint at, int maxWords)
     {
         var lines = new List<string>();
@@ -2299,9 +2171,6 @@ public sealed class ResearchCenter7 : Form
         return lines;
     }
 
-    /// <summary>
-    /// What a compared-against constant probably means, when it matches an engine enumeration.
-    /// </summary>
     private static string AnnotateImmediate(uint w)
     {
         // Data-processing immediate, opcode CMP (1010), S set.
@@ -2360,11 +2229,6 @@ public sealed class ResearchCenter7 : Form
         catch { return null; }
     }
 
-    /// <summary>
-    /// Reports what the entered id actually names in this build. Picking an id by reasoning rather
-    /// than lookup is how two abilities once landed on Intrepid Sword and Dauntless Shield, so the
-    /// answer is shown before anything is installed.
-    /// </summary>
     private void DescribeId()
     {
         var note = _tabs.TabPages.Cast<TabPage>()
@@ -2586,7 +2450,6 @@ public sealed class ResearchCenter7 : Form
 
     #region Writing
 
-    /// <summary>Backs up, writes, then re-verifies. A CRO that fails verification is rolled back.</summary>
     private void Commit(byte[] bytes, List<string> log)
     {
         if (pk3DS.Core.Modding.UhuruGuard.RefusalFor(_romPath ?? "") is { } uhuruCommit) { log.Insert(0, uhuruCommit); return; }

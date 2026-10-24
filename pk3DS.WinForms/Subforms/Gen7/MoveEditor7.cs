@@ -659,18 +659,8 @@ public partial class MoveEditor7 : Form
         System.Media.SystemSounds.Asterisk.Play();
     }
 
-    /// <summary>Move slots are allocated in blocks of this many.</summary>
     private const int MoveSlotBlock = 4;
 
-    /// <summary>
-    /// Adds move slots, keeping the total a multiple of four.
-    /// <para>
-    /// The table this writes into is read by the engine in groups of four, so a count that is not a
-    /// multiple of four leaves a partial trailing group. Rather than let the caller land on one, the
-    /// requested number is rounded up to the next whole block and the padding slots are created as
-    /// ordinary blank moves.
-    /// </para>
-    /// </summary>
     private void B_AddMove_Click(object sender, EventArgs e)
     {
         SetEntry();
@@ -703,7 +693,6 @@ public partial class MoveEditor7 : Form
             $"Total moves is now {files.Length}, a multiple of {MoveSlotBlock}.");
     }
 
-    /// <summary>Creates one blank move slot at the end of every table that tracks moves.</summary>
     private void AppendMoveSlot()
     {
         const int moveSize = 0x28;
@@ -797,12 +786,6 @@ public partial class MoveEditor7 : Form
         WinFormsUtil.Alert($"Successfully updated Z-Move data for {count} expansion move(s)!");
     }
 
-    /// <summary>
-    /// Moves that carry the "Slicing" category in the games this ROM's move roster is descended
-    /// from (Sharpness reads this for its 1.5x power boost). Matched by name rather than a fixed id
-    /// range so it also catches any Gen 8/9 move a patch package has already installed under its
-    /// real name (Stone Axe, Ceaseless Edge, etc.) without needing to know its assigned id.
-    /// </summary>
     private static readonly HashSet<string> SlicingMoveNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Cut", "Razor Leaf", "Razor Wind", "Slash", "Fury Cutter", "False Swipe",
@@ -811,10 +794,6 @@ public partial class MoveEditor7 : Form
         "Stone Axe", "Ceaseless Edge", "Bitter Blade", "Kowtow Cleave", "Tachyon Cutter",
     };
 
-    /// <summary>
-    /// Moves that carry the "Wind" category (what Wind Power and Wind Rider react to when the
-    /// holder is hit by one, and what Tailwind/Sandstorm-adjacent wind checks key off).
-    /// </summary>
     private static readonly HashSet<string> WindMoveNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Gust", "Razor Wind", "Whirlwind", "Twister", "Tailwind", "Hurricane", "Icy Wind",
@@ -822,12 +801,6 @@ public partial class MoveEditor7 : Form
         "Bleakwind Storm", "Sandsear Storm", "Springtide Storm", "Wildbolt Storm",
     };
 
-    /// <summary>
-    /// Sets the Slicing/WindPower/WindRider flag bits (see MoveFlag7.cs) on every move in this ROM
-    /// that is actually slicing or wind, by name. WindPower and WindRider are both set together on
-    /// every wind move - they're separate bits because they're two distinct abilities, not because
-    /// a wind move is only "some" wind moves' worth of windy.
-    /// </summary>
     private void B_SetSlicingWindFlags_Click(object sender, EventArgs e)
     {
         if (WinFormsUtil.Prompt(MessageBoxButtons.YesNo,
@@ -945,10 +918,6 @@ public partial class MoveEditor7 : Form
         WinFormsUtil.Alert("Move GARC (a/0/1/1) repacked and saved!", bindingNote);
     }
 
-    /// <summary>
-    /// Writes the ability/item flag bindings into Battle.cro as part of a normal save.
-    /// Returns a line describing what happened, for the save confirmation.
-    /// </summary>
     private string WriteFlagBindings()
     {
         int bound = AbilityMoveFlags.All.Count(b => b.IsBound);
@@ -973,9 +942,6 @@ public partial class MoveEditor7 : Form
             : $"{bound} flag binding(s) not written: {result.Message}";
     }
 
-    /// <summary>
-    /// Says what the chosen animation index actually plays, next to the number.
-    /// </summary>
     private void NUD_AnimID_ValueChanged(object sender, EventArgs e) => ShowAnimationName();
 
     private void ShowAnimationName()
@@ -1177,14 +1143,6 @@ public partial class MoveEditor7 : Form
         CLB_Flags.Items.AddRange(flagnames);
     }
 
-    /// <summary>
-    /// Binds an unused move flag to an ability, so the flag becomes a move category that ability
-    /// acts on - the same relationship Iron Fist already has with the Punch bit.
-    /// <para>
-    /// Renaming alone only ever relabelled the list. What makes a flag mean something is recording
-    /// which ability reads it and by how much it multiplies power; that pairing is what this stores.
-    /// </para>
-    /// </summary>
     private void B_RenameFlags_Click(object sender, EventArgs e)
     {
         int sel = CLB_Flags.SelectedIndex;
@@ -1223,7 +1181,6 @@ public partial class MoveEditor7 : Form
     private void B_FlagBindings_Click(object sender, EventArgs e) => ShowFlagBindings();
 
 
-    /// <summary>Lists every flag currently acting as an ability category.</summary>
     private void ShowFlagBindings()
     {
         var bound = AbilityMoveFlags.All.Where(b => b.IsBound).OrderBy(b => b.Bit).ToList();

@@ -7,29 +7,14 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Makes the game act on the bindings held in <see cref="AbilityMoveFlags"/>.
-/// </summary>
 public static class AbilityFlagPatcher
 {
-    /// <summary>Fixed-point scale for the multiplier; ARM here has no floating point available.</summary>
     public const int FixedPointShift = 12;
 
-    /// <summary>
-    /// Marker written ahead of the table so a previous patch can be found and replaced.
-    /// <para>
-    /// Ends in a version digit. Records gained a trigger-kind field when items were added, so a
-    /// table written by the earlier build has a different record size - reading one with the new
-    /// layout would misinterpret every field after the first. The differing signature makes an old
-    /// table simply not match rather than be parsed wrongly.
-    /// </para>
-    /// </summary>
     private static readonly byte[] Signature = "PK3DSAF2"u8.ToArray();
 
-    /// <summary>Bytes per record: bit, trigger kind, trigger id, multiplier.</summary>
     private const int RecordSize = 16;
 
-    /// <summary>What a patch attempt produced.</summary>
     public sealed class Result
     {
         public bool Applied { get; init; }
@@ -38,11 +23,6 @@ public static class AbilityFlagPatcher
         public uint TableOffset { get; init; }
     }
 
-    /// <summary>
-    /// Builds the binding table: a count followed by one 12-byte record per bound flag.
-    /// Each record is bit index, ability id, and the multiplier in <see cref="FixedPointShift"/>
-    /// fixed point, all little-endian 32-bit.
-    /// </summary>
     public static byte[] BuildBindingTable()
     {
         var bound = AbilityMoveFlags.All.Where(b => b.IsBound).OrderBy(b => b.Bit).ToList();
@@ -63,15 +43,6 @@ public static class AbilityFlagPatcher
         return [.. bytes];
     }
 
-    /// <summary>
-    /// The contract the engine-side routine must satisfy, documented for whoever writes it.
-    /// <para>
-    /// Deliberately not generated here. Emitting the hook needs the address of the power
-    /// calculation in this specific Battle.cro and the register layout at that point; neither can
-    /// be derived from the table, and a branch written to a guessed address corrupts the module
-    /// exactly the way this tool's approval gate exists to prevent.
-    /// </para>
-    /// </summary>
     public const string RoutineContract =
         "Entry: r0 = move flag word, r1 = attacker ability id, r2 = table address,\n"
         + "       r3 = attacker held item id (-1 when none).\n"
@@ -82,19 +53,15 @@ public static class AbilityFlagPatcher
         + "Match: a record applies when bit bitIndex is set in r0 and triggerId equals r1\n"
         + "       (kind 1) or r3 (kind 2). Multiple matches multiply together.";
 
-    /// <summary>A run of unused bytes in a binary, offered as somewhere the table could live.</summary>
     public sealed class FreeRegion
     {
         public uint Offset { get; init; }
         public int Length { get; init; }
 
-        /// <summary>The byte the run is filled with - 0x00 padding or 0xFF erased space.</summary>
         public byte Filler { get; init; }
 
-        /// <summary>True when the run reaches the end of the file, the safest kind to use.</summary>
         public bool AtEndOfFile { get; init; }
 
-        /// <summary>Already holds a table written by this tool, so reusing it is free.</summary>
         public bool IsExistingTable { get; init; }
 
         public override string ToString()
@@ -106,9 +73,6 @@ public static class AbilityFlagPatcher
         }
     }
 
-    /// <summary>
-    /// Finds places in a binary big enough to hold the table.
-    /// </summary>
     public static List<FreeRegion> FindFreeRegions(string path, int minLength)
     {
         var found = new List<FreeRegion>();
@@ -173,19 +137,9 @@ public static class AbilityFlagPatcher
         return Math.Max(n, fallback);
     }
 
-    /// <summary>Bytes the table currently needs, so a caller can size its search.</summary>
     public static int RequiredBytes() =>
         Signature.Length + 4 + (AbilityMoveFlags.All.Count(b => b.IsBound) * RecordSize);
 
-    /// <summary>
-    /// Writes the binding table into Battle.cro, replacing any table this wrote before.
-    /// </summary>
-    /// <param name="battleCroPath">Path to Battle.cro.</param>
-    /// <param name="reserveOffset">
-    /// File offset of a region known to be free in this build. Nothing is guessed: if the region is
-    /// not blank, the patch is refused rather than written over something.
-    /// </param>
-    /// <param name="reserveLength">How many bytes are available there.</param>
     public static Result ApplyTable(string battleCroPath, uint reserveOffset, int reserveLength)
     {
         if (!File.Exists(battleCroPath))
@@ -250,7 +204,6 @@ public static class AbilityFlagPatcher
         };
     }
 
-    /// <summary>Reads back what is currently in the ROM, to confirm a patch took.</summary>
     public static string ReadBack(string battleCroPath, uint reserveOffset)
     {
         try

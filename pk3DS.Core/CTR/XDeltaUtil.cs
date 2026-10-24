@@ -6,13 +6,6 @@ namespace pk3DS.Core.CTR
 {
     public static class XDeltaUtil
     {
-        /// <summary>
-        /// Applies an XDelta3 / VCDIFF patch to a target file.
-        /// </summary>
-        /// <param name="sourceFile">Path to the original unpatched file (e.g. romfs/a/0/9/4)</param>
-        /// <param name="patchFile">Path to the .xdelta patch file (e.g. 4.xdelta)</param>
-        /// <param name="outputFile">Path to output the patched file</param>
-        /// <returns>True if patch succeeded, false otherwise</returns>
         public static bool ApplyPatch(string sourceFile, string patchFile, string outputFile)
         {
             if (!File.Exists(sourceFile))

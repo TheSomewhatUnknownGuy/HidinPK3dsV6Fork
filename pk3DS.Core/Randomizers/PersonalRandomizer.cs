@@ -768,7 +768,6 @@ public class PersonalRandomizer : IRandomizer
     }
 
     public bool TrulyRandomTMs { get; set; } = true;
-    /// <summary>TM compatibility favors moves sharing the species' types (needs <see cref="MoveIDsTMs"/>).</summary>
     public bool PreferSameTypeTMs { get; set; }
     private int LearnTMChance => TrulyRandomTMs ? 50 : (int)LearnTMPercent;
 
@@ -1511,9 +1510,6 @@ public class PersonalRandomizer : IRandomizer
     }
 
     private int GetRandomEggGroup() => rnd.Next(1, eggGroupCount);
-    /// <summary>
-    /// A wild held item. Never a Z-Crystal.
-    /// </summary>
     private int GetRandomHeldItem()
     {
         var pool = Game.Info.HeldItems;
@@ -1524,12 +1520,8 @@ public class PersonalRandomizer : IRandomizer
     private ZCrystalFilter ZItems;
     private readonly IReadOnlyList<int> BannedAbilities = [];
 
-    /// <summary>
-    /// The user's ban toggles, resolved to ids. Null means nothing extra is banned.
-    /// </summary>
     public AbilityBanList BanList { get; set; }
 
-    /// <summary>Every user ban at once: Wonder Guard toggle, the ban list, and the defaults.</summary>
     private bool IsAbilityAllowed(int id)
     {
         const int WonderGuard = 25;

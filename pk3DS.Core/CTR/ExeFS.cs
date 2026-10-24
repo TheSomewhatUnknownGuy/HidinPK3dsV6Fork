@@ -32,7 +32,6 @@ public class ExeFS
         SuperBlockHash = SHA256.HashData(Data.AsSpan(0, 200));
     }
 
-    /// <summary>The ExeFS code segment, under any of the names this program gives it.</summary>
     public static bool IsCodeSection(string path)
     {
         string n = Path.GetFileName(path);
@@ -41,9 +40,6 @@ public class ExeFS
             || n.Equals(".code", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// The ExeFS code image on disk, under whichever of its two names is actually there.
-    /// </summary>
     public static string ResolveCodeBin(string exefsFolder)
     {
         string canonical = Path.Combine(exefsFolder ?? "", ".code.bin");
@@ -62,7 +58,6 @@ public class ExeFS
         return pi.LastWriteTimeUtc > ci.LastWriteTimeUtc ? plain : canonical;
     }
 
-    /// <summary>Byte comparison used only to decide whether two code images are the same file.</summary>
     private static bool FilesMatch(string a, string b)
     {
         try
@@ -83,16 +78,12 @@ public class ExeFS
         catch { return false; }
     }
 
-    /// <summary>Whether a file in an ExeFS folder is one of its sections.</summary>
     private static bool IsExeFSSection(string name) =>
         !name.EndsWith(".bak", StringComparison.OrdinalIgnoreCase) &&
         !name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) &&
         !name.Equals("Header.bin", StringComparison.OrdinalIgnoreCase) &&
         (!name.StartsWith(".") || IsCodeSection(name));
 
-    /// <summary>
-    /// Sections in packing order: the code segment first, and only once.
-    /// </summary>
     private static string[] OrderSections(string[] files)
     {
         string code = files.FirstOrDefault(f => Path.GetFileName(f).Equals(".code.bin", StringComparison.OrdinalIgnoreCase))

@@ -8,29 +8,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Workstream 4 - automates the manual "unpack, swap the CM .bins, repack CM, rename over the old
-/// file, repack CP, rename, repack AC" dance the community already does by hand for overworld model
-/// swapping, using <see cref="NestedModelContainer"/> (this session's own from-scratch decode of the
-/// real AC/CP/CM format inside `a/0/8/2`, verified 3 levels deep against real ROM data).
-/// <para>
-/// This only swaps a model that ALREADY EXISTS somewhere in `a/0/8/2` into a different placement
-/// slot - it can't import a brand new model from outside the game, matching the community guide
-/// this was built from exactly ("This only works for swapping pre-existing models, not importing new
-/// ones"). The target and source can be the same area file (borrow a different NPC's model into
-/// another slot in the same zone) or two different area file indices (borrow a model from a
-/// completely different zone) - both are just "which GARC member" to the code, so there's no real
-/// difference either way.
-/// </para>
-/// <para>
-/// A separate, curated "model library" GARC the user's own notes mentioned wasn't found in this ROM
-/// at the expected index (it decoded as a genuinely empty, zero-byte file) - most likely because that
-/// index is this ROM's Ultra Moon-side counterpart of the same encounter/model data ("encdata"/
-/// "owmodels" are registered at 082 for Ultra Sun and 083 for Ultra Moon - this ROM is Sun-based, so
-/// 083 is simply unused reserved space here, not a relocated library). Left for later; swapping
-/// between two already-known area-file/slot combinations covers the confirmed, real use case.
-/// </para>
-/// </summary>
 public partial class OverworldModelSwapper : Form
 {
     private readonly LazyGARCFile owGarc;
@@ -65,7 +42,6 @@ public partial class OverworldModelSwapper : Form
         L_Status.Text = $"Archive loaded ({owGarc.FileCount} members). Pick a Known zone (auto-fills the area file index) or use Custom for anything else from your own zone reference sheet, then Load.";
     }
 
-    /// <summary>Fills a zone ComboBox from <see cref="OverworldZoneReference.KnownZones"/>, plus a trailing "Custom" entry (selected by default, so the numeric field stays exactly as it was before this dropdown existed unless the user actively picks a known zone).</summary>
     private static void PopulateZoneCombo(ComboBox cb)
     {
         cb.Items.Clear();
@@ -75,7 +51,6 @@ public partial class OverworldModelSwapper : Form
         cb.SelectedIndex = cb.Items.Count - 1;
     }
 
-    /// <summary>True if the selection is one of the known zones (not the trailing "Custom" entry).</summary>
     private static bool TryGetSelectedZoneBase(ComboBox cb, out int zoneBaseIndex)
     {
         int idx = cb.SelectedIndex;
@@ -114,7 +89,6 @@ public partial class OverworldModelSwapper : Form
         }
     }
 
-    /// <summary>Fills a character ComboBox from the user's own transcribed sheet data (<see cref="OverworldCharacterReference"/>) for one specific loaded area file, sorted by slot - or a single disabled placeholder entry if this area file isn't in that sheet at all. Entries whose slot doesn't actually exist in the loaded file (<paramref name="cpCount"/> placement slots, 0-based) are dropped rather than shown - this is meant to be a list of characters genuinely placed and swappable in THIS area, not a raw, unfiltered transcription of the sheet that could include a stale/mistyped slot number. Returns the (possibly empty, already-filtered) entry list so the caller can drive the slot NUD/name field without re-parsing the combo's own display text.</summary>
     private static List<(string Name, int Slot)> PopulateCharacterCombo(ComboBox cb, int areaIdx, int cpCount)
     {
         cb.Items.Clear();
@@ -137,7 +111,6 @@ public partial class OverworldModelSwapper : Form
         return entries;
     }
 
-    /// <summary>Fills the "Character name" text field from the sheet data for this exact area+slot, if the sheet recorded one - leaves whatever's already there untouched otherwise (so a manually-typed override for an uncataloged slot never gets silently cleared).</summary>
     private static void UpdateResolvedCharacterName(int areaIdx, int slot, TextBox noteBox)
     {
         string resolved = OverworldCharacterReference.TryResolveSlotName(areaIdx, slot);
@@ -189,7 +162,6 @@ public partial class OverworldModelSwapper : Form
         }
     }
 
-    /// <summary>The index of the one child within a CP entry that's itself a "CM" container - found by tag, not assumed to always be a fixed position, since a CP's real child count varies (this session only confirmed count=2/1-real-child on one sample).</summary>
     private static int? FindCmChildIndex(NestedModelContainer cp)
     {
         for (int i = 0; i < cp.Children.Count; i++)
@@ -281,7 +253,6 @@ public partial class OverworldModelSwapper : Form
         B_SaveAll.Enabled = true;
     }
 
-    /// <summary>Builds a human-readable "area X (Zone Name) slot Y (Character Name)" description instead of bare numbers, per the user's explicit request. The character name comes from <see cref="OverworldCharacterReference"/> (the user's own transcribed sheet data) whenever this exact area+slot is cataloged there - that's the authoritative source, not whatever happens to be typed in the override text field. The typed field is only consulted as a fallback for a slot the sheet doesn't cover.</summary>
     private static string DescribeAreaSlot(int areaIdx, int slot, string slotNote)
     {
         string zoneName = OverworldZoneReference.TryResolveZoneName(areaIdx);

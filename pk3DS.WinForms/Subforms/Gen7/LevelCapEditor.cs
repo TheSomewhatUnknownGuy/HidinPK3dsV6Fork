@@ -7,9 +7,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Edits the level cap progression: which story flag raises the cap, and to what.
-/// </summary>
 public sealed class LevelCapEditor : Form
 {
     private readonly DataGridView _grid = new()
@@ -27,7 +24,6 @@ public sealed class LevelCapEditor : Form
         ScrollBars = ScrollBars.Vertical, Font = new Font(FontFamily.GenericMonospace, 8.25f),
     };
 
-    /// <summary>The edited table, or null if the dialog was cancelled.</summary>
     public LevelCapTable Result { get; private set; }
 
     public LevelCapEditor(LevelCapTable start)

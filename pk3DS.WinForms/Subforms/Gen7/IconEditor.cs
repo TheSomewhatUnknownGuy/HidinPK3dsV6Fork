@@ -11,32 +11,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Lets any species' box/party-list icon (`partyicon`, a257) and summary-screen icon (`menuicon`,
-/// a/0/6/2) be viewed, replaced with another existing species/form's icon already in the ROM, or
-/// replaced with a brand-new image imported from disk.
-/// <para>
-/// Member resolution is driven by <see cref="SpeciesIconTable"/> - code.bin's OWN icon-lookup ARM
-/// routine's real data tables, disassembled and verified this session - not a filename/ordinal guess.
-/// That correction came from two real, live bugs the user caught: "Mewtwo is actually Marowak" (a
-/// naive "member == species id" assumption, wrong for every stock species past the first Mega
-/// Evolution) and, after switching to a filename-derived catalog as a first fix, "Gen 6/7 forms
-/// across the board are messed up" and "Gen 8/9 alternative forms do not show" - the catalog's
-/// best-effort ordinal form-matching turned out wrong for ~12% of stock species (Pikachu's 8 costume
-/// forms, for one, are stored in a completely different physical order than their real form number),
-/// and it had no way at all to find Gen 8/9 alt-form icons (Dudunsparce's second segment, Zacian's
-/// Crowned form, ...), which turn out to live in a separate "compact added form icon" table the game
-/// itself falls back to. <see cref="SpeciesIconTable"/> reads both of code.bin's real tables directly
-/// instead, verified against real ROM data (every one of 1330 real personal-table species/form
-/// combinations in this ROM resolves to a real icon member through it, including previously
-/// "invisible" cases like Chespin/Greninja and Dudunsparce's second form).
-/// </para>
-/// <para>
-/// If no ExeFS is loaded (or this pk3DS build's documented code.bin routine doesn't match what's
-/// actually in the ROM), falls back to <see cref="PartyIconCatalog"/>'s filename-derived best-effort
-/// matching instead of refusing to work - clearly flagged as degraded, not silently assumed correct.
-/// </para>
-/// </summary>
 public partial class IconEditor : Form
 {
     private byte[][] curPartyIconFiles, curMenuIconFiles;
@@ -182,7 +156,6 @@ public partial class IconEditor : Form
         cb.DataSource = opts;
     }
 
-    /// <summary>Resolves a species' Nth form (0 = base) to an icon member - code.bin's own authoritative table when available, otherwise a best-effort fallback.</summary>
     private int ResolveMember(int speciesId, int form)
     {
         if (useAuthoritative)
@@ -205,7 +178,6 @@ public partial class IconEditor : Form
         return idx >= 0 && idx < alts.Count ? alts[idx].Member : -1;
     }
 
-    /// <summary>Every selectable form for a species: "(default)" plus every real alt form the personal table records, each resolved to an icon member.</summary>
     private List<Option> GetFormOptions(int speciesId)
     {
         var opts = new List<Option> { new() { Value = ResolveMember(speciesId, 0), Display = "(default)" } };

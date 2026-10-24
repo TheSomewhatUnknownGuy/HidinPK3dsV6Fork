@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>Options for the code, icon, and cry work performed after the Core insertion plan.</summary>
 public sealed class SpeciesInsertionRequest
 {
     public int ExtraFormGroups;
@@ -15,7 +14,6 @@ public sealed class SpeciesInsertionRequest
     public int LowestEvolutionSpeciesId = -1;
 }
 
-/// <summary>Code-side outputs for one planned species insertion.</summary>
 public sealed class SpeciesInsertionResult
 {
     public bool Success;
@@ -36,7 +34,6 @@ public sealed class SpeciesInsertionResult
     public string Describe() => string.Join(Environment.NewLine, Log);
 }
 
-/// <summary>Applies code.bin, icon, and cry changes for a species already planned by InsertionPipeline.</summary>
 public static class SpeciesInsertionOrchestrator
 {
     public static SpeciesInsertionResult ApplyCodeSide(

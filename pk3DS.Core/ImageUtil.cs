@@ -8,17 +8,8 @@ using static pk3DS.Core.CTR.Images.XLIMUtil;
 
 namespace pk3DS.Core;
 
-/// <summary>
-/// Image Utility class using <see cref="System.Drawing"/>.
-/// </summary>
 public static class ImageUtil
 {
-    /// <summary>
-    /// Converts a <see cref="BFLIM"/> to <see cref="Bitmap"/> via the 32bit/pixel data.
-    /// </summary>
-    /// <param name="bflim">Image data</param>
-    /// <param name="crop">Crop the image area to the actual dimensions</param>
-    /// <returns>Human visible data</returns>
     public static Bitmap GetBitmap(this BXLIM bflim, bool crop = true)
     {
         if (bflim.Format is XLIMEncoding.ETC1 or XLIMEncoding.ETC1A4)

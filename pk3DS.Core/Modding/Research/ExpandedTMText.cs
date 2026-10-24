@@ -4,27 +4,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Grows the item name and description tables in every language so the expansion's new item IDs
-/// resolve to real text.
-/// <para>
-/// The item-name bounds check in code.bin is a single global limit, but the text itself lives in a
-/// separate GARC per language. On the checked UM Expansion build only English carries 1024 item
-/// names; the other nine stop at 960. Raising the bound so the game will look up TM101-128 without
-/// also lengthening those tables asks it to read past the end of nine of the ten files.
-/// </para>
-/// <para>
-/// New slots are filled from English rather than left blank, because a French player seeing "TM101"
-/// is strictly better than a missing entry, and there is no translation to draw on for an item the
-/// game never shipped.
-/// </para>
-/// </summary>
 public static class ExpandedTMText
 {
-    /// <summary>Language index whose text is used to fill new slots in the others.</summary>
     public const int SourceLanguage = 2; // English
 
-    /// <summary>Language slots a Gen 7 build can carry.</summary>
     private const int LanguageCount = 10;
 
     public sealed class LanguageResult
@@ -51,14 +34,6 @@ public static class ExpandedTMText
             string.Join(Environment.NewLine, Languages.Select(l => "  " + l));
     }
 
-    /// <summary>
-    /// Ensures every language's item name and description tables hold at least
-    /// <paramref name="requiredCount"/> entries.
-    /// <para>
-    /// The caller's language is restored before returning, so this can run from an editor without
-    /// leaving the loaded config pointing somewhere else.
-    /// </para>
-    /// </summary>
     public static Result EnsureCapacity(GameConfig cfg, int requiredCount)
     {
         var result = new Result();

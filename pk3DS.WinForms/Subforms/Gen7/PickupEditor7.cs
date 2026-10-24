@@ -36,7 +36,6 @@ public partial class PickupEditor7 : Form
         WinFormsUtil.SetImage(PB_Item, WinFormsUtil.getIcon(itemId, 0, Main.Config));
     }
 
-    /// <summary>The id in a "Name - 123" label, or -1 when there is none.</summary>
     private static int ParseTrailingId(string label)
     {
         if (string.IsNullOrEmpty(label)) return -1;

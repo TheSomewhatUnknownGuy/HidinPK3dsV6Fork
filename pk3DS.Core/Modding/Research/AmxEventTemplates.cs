@@ -3,33 +3,21 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research
 {
-    /// <summary>
-    /// Supported AMX Event Script Template Archetypes reverse-engineered for Pokémon USUM/SM.
-    /// </summary>
     public enum AmxTemplateType
     {
-        /// <summary>Template 560: Clean baseline for nameless lore/dialogue NPCs (no speaker tag, no flags, simple interaction).</summary>
         SimpleTextDialogue,
 
-        /// <summary>Template 569: Tested single-use item gift with persistence flag and fanfares.</summary>
         ItemGift,
 
-        /// <summary>Template 630: Pokémon gift sequence with party/box space checks, nickname prompt, and diary logging.</summary>
         PokemonGift,
 
-        /// <summary>Template 014 (Script 5228): Static wild boss encounter with cry, battle trigger, ChrDel sprite despawn, and defeat flag.</summary>
         StaticEncounter,
 
-        /// <summary>Template 014 (Script 5227): In-game Pokémon trade sequence with party scan, trade execution, and trade flag.</summary>
         InGameTrade,
 
-        /// <summary>Template 020 (Script 5471): Multi-choice fossil restoration menu with dual ItemSub and party check.</summary>
         FossilRevival
     }
 
-    /// <summary>
-    /// Metadata and configuration specification for a verified AMX script template.
-    /// </summary>
     public class AmxTemplateMetadata
     {
         public AmxTemplateType Type { get; set; }
@@ -42,18 +30,12 @@ namespace pk3DS.Core.Modding.Research
         public string[] KeyOpcodes { get; set; }
     }
 
-    /// <summary>
-    /// Configuration for generating or injecting a Simple Text Dialogue NPC.
-    /// </summary>
     public class SimpleTextConfig
     {
         public int TextFileIndex { get; set; } = 582;
         public int TextLineIndex { get; set; } = 0;
     }
 
-    /// <summary>
-    /// Configuration for generating or injecting an Item Gift NPC.
-    /// </summary>
     public class ItemGiftConfig
     {
         public uint Flag { get; set; } = 2500;
@@ -64,9 +46,6 @@ namespace pk3DS.Core.Modding.Research
         public int TextPostGift { get; set; } = 1;
     }
 
-    /// <summary>
-    /// Configuration for generating or injecting a Pokémon Gift NPC.
-    /// </summary>
     public class PokemonGiftConfig
     {
         public uint Flag { get; set; } = 2501;
@@ -79,9 +58,6 @@ namespace pk3DS.Core.Modding.Research
         public int TextPartyFull { get; set; } = 2;
     }
 
-    /// <summary>
-    /// Configuration for generating or injecting a Static Boss Encounter.
-    /// </summary>
     public class StaticBossConfig
     {
         public uint Flag { get; set; } = 2502;
@@ -93,9 +69,6 @@ namespace pk3DS.Core.Modding.Research
         public int TextPreBattle { get; set; } = 0;
     }
 
-    /// <summary>
-    /// Configuration for generating or injecting an In-Game Trade NPC.
-    /// </summary>
     public class TradeNpcConfig
     {
         public uint Flag { get; set; } = 2503;
@@ -107,9 +80,6 @@ namespace pk3DS.Core.Modding.Research
         public int TextPostTrade { get; set; } = 1;
     }
 
-    /// <summary>
-    /// Provides reverse-engineered AMX event templates, architectural constraints, and bytecode generators.
-    /// </summary>
     public static class AmxEventTemplates
     {
         private static readonly Dictionary<AmxTemplateType, AmxTemplateMetadata> Templates = new()

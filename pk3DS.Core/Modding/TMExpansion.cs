@@ -6,24 +6,12 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Grows the USUM TM table from the stock 100 to up to <see cref="MaxCount"/> entries, all or nothing.
-/// <para>
-/// The five routines and both new tables go into a block of code.bin's .text that the caller reserved (the room), and
-/// the stock code that reads the table is hooked with branches to them. Pure: returns a new buffer, never writes a
-/// file, and never searches for space itself (CodeSpaceAllocator drags in the Research code, which this file avoids).
-/// Ported from the WinForms-bound ResearchEngine patch it replaced, which has since been removed.
-/// </para>
-/// </summary>
 public static class TMExpansion
 {
-    /// <summary>Largest TM count this patch allows; with <see cref="CodeBytes"/> it sets the space budget.</summary>
     public const int MaxCount = 128;
 
-    /// <summary>The largest TM count allowed right now: <see cref="MaxCount"/>, or <see cref="PassiveGuard.TmCap"/> while passive abilities own personal bytes 0x35-0x37.</summary>
     public static int EffectiveMax => PassiveGuard.Enabled ? PassiveGuard.TmCap : MaxCount;
 
-    /// <summary>Bytes of routine code: 68 + 68 + 32 + 32 + 88.</summary>
     public const int CodeBytes = 288;
 
     private const int LoadAddress = 0x100000;
@@ -38,12 +26,6 @@ public static class TMExpansion
     internal static readonly byte[] VanillaOrderSig = [0x10, 0x40, 0x2D, 0xE9, 0x00, 0x00, 0x50, 0xE3, 0x00, 0x40, 0xA0, 0xE1, 0x04, 0x00, 0x00, 0x3A, 0x00, 0x30, 0xA0, 0xE3];
     internal static readonly byte[] VanillaOrderMask = [0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
-    /// <summary>
-    /// The code with TMs 1..<paramref name="newCount"/> installed, or null with the reason in <paramref name="error"/>.
-    /// <paramref name="items"/> and <paramref name="moves"/> need one entry per TM, and their first stock entries must
-    /// match the current table. <paramref name="room"/> is the free (file offset, length) block the caller reserved; it must be
-    /// 4-aligned and hold <see cref="CodeBytes"/> + 4 * newCount bytes. The input is never modified.
-    /// </summary>
     public static byte[]? Expand(byte[] code, int newCount, ushort[] items, ushort[] moves, (int Offset, int Length) room, out string error)
     {
         error = "";
@@ -118,14 +100,12 @@ public static class TMExpansion
         return c;
     }
 
-    /// <summary>The lowest <paramref name="need"/> item ids in 1..1023 that <paramref name="isUsable"/> accepts, or none if there are not enough.</summary>
     public static int[] PickItemIds(int need, Func<int, bool> isUsable)
     {
         var ids = Enumerable.Range(1, 1023).Where(isUsable).Take(need).ToArray();
         return ids.Length == need ? ids : [];
     }
 
-    /// <summary>First 4-aligned offset at or after <paramref name="from"/> where the masked pattern matches, or -1.</summary>
     private static int FindMasked(byte[] c, byte[] sig, byte[] mask, int from)
     {
         for (int i = from; i + sig.Length <= c.Length; i += 4)
@@ -137,7 +117,6 @@ public static class TMExpansion
         return -1;
     }
 
-    /// <summary>Load address of the word after the cmp r1,#100 (0x64 0x00 0x51 0xE3) inside itemToMove, or -1.</summary>
     private static int ZCrystalFallback(byte[] c, int site)
     {
         for (int z = site + 4; z < site + 0x100 && z + 4 <= c.Length; z += 4)
@@ -145,7 +124,6 @@ public static class TMExpansion
         return -1;
     }
 
-    /// <summary>Overwrites the word at file offset <paramref name="at"/> with a branch to load address <paramref name="target"/>.</summary>
     private static void Branch(byte[] c, int at, int target)
     {
         uint word = 0xEA000000 | (uint)(((target - (at + LoadAddress + 8)) >> 2) & 0xFFFFFF);

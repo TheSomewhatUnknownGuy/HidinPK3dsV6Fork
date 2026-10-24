@@ -58,7 +58,6 @@ public class UniversalRandomizerForm : Form
     private CheckBox CHK_StarterNoDualTypes;
     private ComboBox CB_StarterSingleType;
 
-    /// <summary>Type names in index order, for any tab that needs a type picker.</summary>
     private static readonly string[] TypeNames =
     [
         "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost", "Steel",
@@ -135,7 +134,6 @@ public class UniversalRandomizerForm : Form
     private CheckBox CHK_LevelCaps, CHK_CheapCandies;
     private ComboBox CB_LevelCapStyle;
 
-    /// <summary>Difficulty entry that reads the curve off the ROM's trainers, past the offset list.</summary>
     private const string MatchTrainersLabel = "Match trainer levels";
     private NumericUpDown NUD_LevelCapFinal;
     private Label L_LevelCapSpace;
@@ -178,7 +176,6 @@ public class UniversalRandomizerForm : Form
     private CheckedListBox CLB_Patches;
     private Label L_PatchHint;
 
-    /// <summary>Recipe behind each row of <see cref="CLB_Patches"/>; null for a category heading.</summary>
     private readonly List<Recipe> _patchRows = [];
 
     // Limit Pokemon Settings State
@@ -693,7 +690,6 @@ public class UniversalRandomizerForm : Form
         TC_Main.TabPages.Add(tab);
     }
 
-    /// <summary>The competitive engine's tuning file (v2 spec §4).</summary>
     private void BuildTabCompetitive()
     {
         var tab = new TabPage("Competitive");
@@ -888,9 +884,6 @@ public class UniversalRandomizerForm : Form
         TC_Main.TabPages.Add(tab);
     }
 
-    /// <summary>
-    /// Every checkpoint, editable, with the presets as a way to fill them quickly.
-    /// </summary>
     private void BuildTabLevelCaps()
     {
         var tab = new TabPage("Level Caps");
@@ -1008,14 +1001,9 @@ public class UniversalRandomizerForm : Form
         SetEnabled();
     }
 
-    /// <summary>Whether the loaded game is Ultra Moon, for version-specific place names.</summary>
-    /// <summary>
-    /// Whether the loaded game is Ultra Moon, for the Sunne/Moone place names on the cap grid.
-    /// </summary>
     private static bool IsUltraMoonLoaded =>
         string.Equals(ResearchVersion.Resolve(Main.Config), "UM", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Shows a table in the grid, one row per checkpoint.</summary>
     private void LoadCapGrid(LevelCapTable table)
     {
         DGV_LevelCaps.Rows.Clear();
@@ -1023,9 +1011,6 @@ public class UniversalRandomizerForm : Form
             DGV_LevelCaps.Rows.Add(e.Label, $"{e.FlagOffset:X2}/{e.FlagBit:X2}", (int)e.Cap);
     }
 
-    /// <summary>
-    /// Puts previously saved caps back into the grid.
-    /// </summary>
     private void ApplySavedCaps(List<int> caps)
     {
         if (caps is not { Count: > 0 } || caps.Count != DGV_LevelCaps.Rows.Count) return;
@@ -1034,7 +1019,6 @@ public class UniversalRandomizerForm : Form
             DGV_LevelCaps.Rows[i].Cells[2].Value = caps[i];
     }
 
-    /// <summary>The caps currently in the grid, in order.</summary>
     private List<int> ReadCapGrid()
     {
         var caps = new List<int>();
@@ -1046,9 +1030,6 @@ public class UniversalRandomizerForm : Form
         return caps;
     }
 
-    /// <summary>
-    /// What the loaded ROM has room for, so the one-or-the-other limit is visible before it bites.
-    /// </summary>
     private static string DescribeLevelCapSpace()
     {
         try
@@ -1179,9 +1160,6 @@ public class UniversalRandomizerForm : Form
         TC_Main.TabPages.Add(tab);
     }
 
-    /// <summary>
-    /// Fills the patch list from whatever the Research Center can see on this build.
-    /// </summary>
     private void LoadPatchList()
     {
         CLB_Patches.Items.Clear();
@@ -1271,15 +1249,6 @@ public class UniversalRandomizerForm : Form
         L_PatchHint.Text = $"{r.Summary}\r\nWrites {files}.{DescribeIds(r)}";
     }
 
-    /// <summary>
-    /// Which ids this recipe would claim on the loaded ROM, or why it cannot claim any.
-    /// </summary>
-    /// <param name="reserved">
-    /// Ids already spoken for by other recipes in the same preview pass (see
-    /// <see cref="PreviewPatchIds"/>) - shared across a whole ticked batch so two rows never show the
-    /// same "free" id just because neither has actually been installed yet. Null for a single row
-    /// viewed on its own, where there is no batch to collide with.
-    /// </param>
     private static string DescribeIds(Recipe r, ISet<int> reserved = null)
     {
         if (r.SlotCount == 0 && r.Package?.Parameters is not { Count: > 0 }) return "";
@@ -1317,7 +1286,6 @@ public class UniversalRandomizerForm : Form
         return "";
     }
 
-    /// <summary>Reports the ids every ticked patch would take, in one place.</summary>
     private void PreviewPatchIds()
     {
         var picked = ReadPatchList();
@@ -1335,7 +1303,6 @@ public class UniversalRandomizerForm : Form
                            string.Join("\n", lines));
     }
 
-    /// <summary>Names of the ticked patches, in list order.</summary>
     private List<string> ReadPatchList()
     {
         var picked = new List<string>();
@@ -2285,9 +2252,6 @@ public class UniversalRandomizerForm : Form
         Application.DoEvents();
     }
 
-    /// <summary>
-    /// The categories, plus a searchable list of every ability the loaded ROM actually has.
-    /// </summary>
     private void OpenBanAbilitiesDialog()
     {
         using var dlg = new Form
@@ -2397,7 +2361,6 @@ public class UniversalRandomizerForm : Form
         _bannedAbilityNames = [.. banned];
     }
 
-    /// <summary>Abilities banned one by one, on top of the category toggles.</summary>
     private List<string> _bannedAbilityNames = [];
 
     private void OpenLimitPokemonDialog()

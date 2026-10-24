@@ -51,9 +51,6 @@ public partial class ItemEditor7 : Form
         CB_Item.SelectedIndex = 1;
     }
 
-    /// <summary>
-    /// Adds item slots past the end of the table, the way Add New Move Slot adds moves.
-    /// </summary>
     private void B_AddItem_Click(object sender, EventArgs e)
     {
         string input = WinFormsUtil.PromptInput("Add Item Slots",

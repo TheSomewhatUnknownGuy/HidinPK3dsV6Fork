@@ -6,20 +6,6 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Encode support for `menuicon` (a/0/6/2) - unlike `partyicon`, this GARC's members ARE real,
-/// standard <see cref="BFLIM"/> files (confirmed live: a genuine "FLIM" footer, Format=RGB5A1,
-/// 64x32, tile-swizzled with <see cref="XLIMOrientation.Rotate90"/>), so decoding an EXISTING member
-/// needs nothing new - `new BFLIM(decompressedBytes).GetBitmap(crop: false)` already works, same as
-/// every other real BFLIM this codebase already reads. This class only adds ENCODING a fresh
-/// replacement, since nothing in this codebase previously needed to write a NEW menuicon-shaped
-/// BFLIM. Freshly-encoded members here deliberately use <see cref="XLIMOrientation.None"/> (matching
-/// `PartyIconImage`'s own choice) rather than replicating the real files' Rotate90 - a file's own
-/// footer records whatever orientation its own pixel bytes were swizzled with, so any decoder
-/// (including this codebase's) reads it back correctly regardless of which orientation the ORIGINAL
-/// file happened to use; there's no need to match it on write, only to be internally consistent
-/// between this class's own Encode and however the result gets decoded later.
-/// </summary>
 public static class MenuIconImage
 {
     public const int Width = PartyIconImage.Width;
@@ -27,7 +13,6 @@ public static class MenuIconImage
     public const int FooterLength = 40; // FLIMHeader.SIZE
     public const int PixelDataLength = Width * Height * 2; // RGB5A1 = 2 bytes/pixel = 4096
 
-    /// <summary>Encodes a 64x32 (already a full sheet) or 32x32 (single pose, auto-centered) Bitmap into a fresh, uncompressed menuicon member.</summary>
     public static byte[] Encode(Bitmap img)
     {
         Bitmap sheet = img.Width == Width && img.Height == Height ? img : MakeSheet(img);
@@ -71,7 +56,6 @@ public static class MenuIconImage
         }
     }
 
-    /// <summary>Same auto-fit rule as <see cref="PartyIconImage"/>'s own MakeSheet - see its doc comment (centers a single pose instead of duplicating it into both halves).</summary>
     private static Bitmap MakeSheet(Bitmap frame)
     {
         var sheet = new Bitmap(Width, Height);

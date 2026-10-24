@@ -161,7 +161,6 @@ public static class Util
     }
 
     // Find Code off of Reference
-    /// <summary>First index at or after <paramref name="startIndex"/> where the pattern occurs, or -1.</summary>
     public static int IndexOfBytes(byte[] array, byte[] pattern, int startIndex, int count)
     {
         if (array == null || pattern == null || pattern.Length == 0) return -1;

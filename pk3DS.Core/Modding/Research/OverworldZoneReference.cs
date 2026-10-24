@@ -2,28 +2,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Known overworld zone base indices and their real location names, transcribed from the user's
-/// own community reference spreadsheet (the "model/file" sheet - a mechanical, per-member listing
-/// of every file in `a/0/8/2`, with a location-name comment on each zone's first ("ED") member).
-/// Confirmed live this session that each zone occupies an 11-file block within `a/0/8/2`
-/// (`ED`,`BG`,`TR`,`AC`,`AS`,an unnamed plain file,`AE`,`ZS`,`ZI`,`EA`, and a second `BG`), and that
-/// the zone's own "AC" (model placement) file always sits at <c>ZoneBaseIndex + 3</c> - verified
-/// directly against 9 different real zones by decompression, and consistent with every other
-/// zone base in this list (every one is a multiple of 11, and the sheet's own per-row file-type
-/// suffix column confirms the same ED/BG/TR/AC/... stride repeats throughout the whole archive,
-/// not just the originally-checked 9).
-/// <para>
-/// Still NOT exhaustive - only the zones the community happened to already label are here (a few
-/// hundred, spanning the whole main story and Ultra Space), not every zone base index that exists
-/// (some multiples of 11 in the underlying sheet have no comment at all and are simply omitted).
-/// A handful of names repeat at different indices on purpose (distinct sub-areas/story variants
-/// that share a display name in the source sheet, e.g. multiple "Skull Mansion" or "Route 8"
-/// entries) - kept as separate entries rather than merged, since each is a genuinely different
-/// zone base index in the real archive. A few names carry a "(?)" the source sheet itself was
-/// unsure about - preserved as-is rather than asserted with false confidence.
-/// </para>
-/// </summary>
 public static class OverworldZoneReference
 {
     public const int AcOffsetWithinZone = 3;
@@ -304,7 +282,6 @@ public static class OverworldZoneReference
 
     public static int AcFileIndex(int zoneBaseIndex) => zoneBaseIndex + AcOffsetWithinZone;
 
-    /// <summary>Reverse lookup for display purposes only - given an "AC" area file index, finds the known zone name it belongs to (null if it's not one of the zones in <see cref="KnownZones"/>).</summary>
     public static string TryResolveZoneName(int acFileIndex)
     {
         int zoneBase = acFileIndex - AcOffsetWithinZone;

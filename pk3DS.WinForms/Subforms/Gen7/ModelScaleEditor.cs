@@ -8,26 +8,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Workstream 5 - edits a species/form's 3D model height (the one confirmed-real float in the
-/// per-group "settings" file, the 9th/last file in each model group within `models`, a094 - see
-/// <see cref="ModelSettingsFile"/> for how that offset was actually found, correcting an earlier,
-/// unverified assumption about where it lived).
-/// <para>
-/// Uses the lazy GARC accessor (like <see cref="SpeciesInsertionWizard"/>) so opening this editor
-/// only ever reads file[0] (the species/group table, a few KB) plus the one settings file for
-/// whichever species/form is currently selected - never the whole multi-gigabyte `models` archive.
-/// </para>
-/// <para>
-/// Known gap, confirmed live rather than assumed: Table 1's own per-species form count does NOT
-/// cover Mega Evolutions - Venusaur's real record here says `count=1` despite Mega Venusaur having
-/// its own real, separate in-game model, so this editor's form list (built directly from that same
-/// count) has no way to reach Mega forms at all. Mega Evolution model routing goes through a
-/// separate mechanism (`code_map.csv`'s own "MEGA FORMS" section, not yet mapped) - out of scope
-/// for this pass; every base form and every real Table-1-tracked alt form (regional forms, costumes,
-/// gender differences, ...) works correctly.
-/// </para>
-/// </summary>
 public partial class ModelScaleEditor : Form
 {
     private readonly GameConfig config;
@@ -37,7 +17,6 @@ public partial class ModelScaleEditor : Form
     private readonly int maxSpeciesId;
     private readonly HashSet<int> touchedFiles = [];
     private int currentSettingsFileIndex = -1;
-    /// <summary>The raw stored height for whatever's currently selected, at the moment it was loaded - the NumericUpDown shows a PERCENTAGE relative to this, not the bare float, since a number like "0.9" means nothing to most people on its own; "100%" (unchanged) / "150%" (half again as big) does.</summary>
     private float baselineHeight = 1f;
 
     private sealed class Option

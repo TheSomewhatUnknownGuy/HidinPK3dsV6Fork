@@ -6,9 +6,6 @@ using System.Windows.Forms;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Windows-forms friendly wrapper for GARC functions
-/// </summary>
 public static class GarcUtil
 {
     private static ProgressBar Progress;

@@ -399,14 +399,6 @@ public partial class MartEditor7 : Form
             WinFormsUtil.Alert("Marts randomized — locations were also expanded to fit their full category lists.");
         }
 
-        /// <summary>
-        /// Reads back the format <see cref="B_ExportTxt_Click"/> writes.
-        /// <para>
-        /// Sections are "=== Location ===" for a normal mart and "=== BP: Location ===" for a BP
-        /// shop; each following line is "index: Item Name", with " | price" on the BP side. Slots
-        /// are matched by their index within the section, so a file may fill in only some of them.
-        /// </para>
-        /// </summary>
         private void B_ImportTxt_Click(object sender, EventArgs e)
         {
             using var ofd = new OpenFileDialog { FileName = "Marts.txt", Filter = "Text File|*.txt" };

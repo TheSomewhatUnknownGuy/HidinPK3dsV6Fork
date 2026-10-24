@@ -358,20 +358,6 @@ namespace pk3DS.WinForms;
         this.MaximizeBox = false;
     }
 
-    /// <summary>
-    /// Composites the whole window off-screen before it reaches the display.
-    /// <para>
-    /// The form paints a gradient under everything with <see cref="ControlStyles.UserPaint"/>, but
-    /// a TabControl draws its pages itself and its children draw over that in turn. Switching tabs
-    /// therefore repainted in layers - background, page, then every button - and each layer was
-    /// briefly visible, which is the flicker. Double-buffering the TabControl alone could not fix
-    /// it, because that buffers one control while the tearing happens between controls.
-    /// </para>
-    /// <para>
-    /// WS_EX_COMPOSITED moves the whole hierarchy to a single bottom-up composite, so the window
-    /// updates in one step no matter how many nested containers are involved.
-    /// </para>
-    /// </summary>
     protected override CreateParams CreateParams
     {
         get
@@ -389,16 +375,6 @@ namespace pk3DS.WinForms;
     private Size _gradientCacheSize;
     private string _gradientCacheTheme;
 
-    /// <summary>
-    /// Paints the cached background.
-    /// <para>
-    /// This used to build the gradient from scratch on every paint: a dictionary load, a fresh
-    /// LinearGradientBrush, a seven-stop ColorBlend and a full-client fill, all per repaint.
-    /// Switching tabs fires several repaints in a row, so that cost landed several times in a
-    /// single interaction and was the flicker - not a buffering problem, which is why buffering
-    /// the tab control did not help. Blitting a prepared bitmap is a memory copy instead.
-    /// </para>
-    /// </summary>
     private void Main_Paint(object sender, PaintEventArgs e)
     {
         string themeName = GetThemeForGame();
@@ -433,13 +409,6 @@ namespace pk3DS.WinForms;
         e.Graphics.DrawImageUnscaled(_gradientCache, 0, 0);
     }
 
-    /// <summary>
-    /// Asks before an executable binary is overwritten, and says what is about to change.
-    /// <para>
-    /// Marshalled to the UI thread because most of these patches run on a worker - a MessageBox
-    /// raised from there would appear behind the window or not at all.
-    /// </para>
-    /// </summary>
     private bool ConfirmBinaryWrite(pk3DS.Core.Modding.BinaryWriteRequest request)
     {
         if (InvokeRequired)
@@ -466,7 +435,6 @@ namespace pk3DS.WinForms;
         return answer == DialogResult.Yes;
     }
 
-    /// <summary>Drops the cached background so the next paint rebuilds it.</summary>
     private void InvalidateGradientCache()
     {
         _gradientCache?.Dispose();
@@ -1069,9 +1037,6 @@ namespace pk3DS.WinForms;
         }
     }
 
-    /// <summary>
-    /// Which Ultra game is loaded: "US", "UM", or null when it is not an Ultra title.
-    /// </summary>
     private static string DetectUltraVersion()
     {
         string raw = RomFSPath ?? "";
@@ -1196,13 +1161,6 @@ namespace pk3DS.WinForms;
         return "Necrozma";
     }
 
-    /// <summary>
-    /// A sprite from the CustomSprites folder beside the executable, or null when absent.
-    /// <para>
-    /// Read through memory so the file is not left locked - CustomSprites is a folder the user
-    /// drops images into while the editor is running.
-    /// </para>
-    /// </summary>
     private static Bitmap LoadCustomSprite(string resName)
     {
         try
@@ -1220,16 +1178,6 @@ namespace pk3DS.WinForms;
         return null;
     }
 
-    /// <summary>
-    /// Any sprite at all for a species, preferring its base form.
-    /// <para>
-    /// Every Gen 8 and Gen 9 mascot ships only as form variants - CustomSprites has _888_1 for
-    /// Crowned Zacian but no plain _888 - so an exact lookup missed and the mascot fell all the way
-    /// through to the Necrozma default. Showing the species in a form the user did not select is a
-    /// far smaller error than showing a different species entirely, so a form sprite is taken as a
-    /// last resort before that default.
-    /// </para>
-    /// </summary>
     private static Bitmap LoadAnySpeciesSprite(int species)
     {
         var exact = LoadCustomSprite($"_{species}");
@@ -1256,14 +1204,6 @@ namespace pk3DS.WinForms;
         catch { return null; }
     }
 
-    /// <summary>
-    /// Which rider the player picked for the Reins of Unity, or null if they have not been asked.
-    /// <para>
-    /// Stored as a marker inside MascotItems rather than as its own setting, because the shop
-    /// already persists that string and adding a generated settings key for one nullable int is
-    /// more machinery than the choice is worth.
-    /// </para>
-    /// </summary>
     private int? CalyrexRiderChoice
     {
         get
@@ -1278,10 +1218,6 @@ namespace pk3DS.WinForms;
         }
     }
 
-    /// <summary>
-    /// Asks which rider the Reins of Unity should summon and records the answer. Called once, when
-    /// the item is first applied - re-picking means clearing the mascot's items.
-    /// </summary>
     private void PromptForRiderChoice()
     {
         if (CalyrexRiderChoice.HasValue) return;
@@ -1519,9 +1455,6 @@ namespace pk3DS.WinForms;
         Properties.Settings.Default.Save();
     }
 
-    /// <summary>
-    /// True when the selected language names everything the ROM's data files contain.
-    /// </summary>
     private bool LanguageCoversData(out string shortfall)
     {
         shortfall = "";
@@ -1675,10 +1608,6 @@ namespace pk3DS.WinForms;
         }
     }
 
-    /// <summary>
-    /// Uhuru ships its new facility text in Korean only. When this ROM is Uhuru and has no English for it,
-    /// offer the bundled translation; it is asked again on every open until English is installed.
-    /// </summary>
     private void OfferUhuruEnglish()
     {
         string pkg = Path.Combine(AppContext.BaseDirectory, TextPackageInstaller.UhuruEnglishPath);
@@ -1699,10 +1628,6 @@ namespace pk3DS.WinForms;
         else WinFormsUtil.Error("English was not installed.", report);
     }
 
-    /// <summary>
-    /// Passives live in GARCs pk3DS edits outside any recipe, and ModExport only copies recorded files, so a passives save records its GARC.
-    /// Only while the setting is on: a plain save of the same GARC stays unrecorded, as before.
-    /// </summary>
     private static void RecordForExport(string garcName)
     {
         if (!pk3DS.Core.Modding.PassiveGuard.Enabled || Config?.GetGARCPath(garcName) is not { } full) return;
@@ -1912,26 +1837,8 @@ namespace pk3DS.WinForms;
         });
     }
 
-    /// <summary>Editor buttons per row.</summary>
     private const int EditorButtonColumns = 4;
 
-    /// <summary>
-    /// Sizes the editor buttons so a fixed number fit per row and the grid fills its panel.
-    /// <para>
-    /// A FlowLayoutPanel wraps purely on available width, so with fixed-size buttons the column
-    /// count was whatever happened to fit - three here - and the remaining width was left empty.
-    /// Deriving the width from the panel instead makes the count deliberate and removes the gap;
-    /// re-running on resize keeps it true when the window changes.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// Shows a long report in a scrollable, selectable window.
-    /// <para>
-    /// A MessageBox truncates and cannot be scrolled or copied out of, which makes it useless for
-    /// the code map - the whole value of that listing is being able to look through it and paste an
-    /// offset elsewhere.
-    /// </para>
-    /// </summary>
     private static void ShowScrollableReport(string text, string title)
     {
         using var form = new Form
@@ -1955,16 +1862,6 @@ namespace pk3DS.WinForms;
         form.ShowDialog();
     }
 
-    /// <summary>
-    /// How much of a panel is actually on screen, which is not the same as how wide it is.
-    /// <para>
-    /// The panel is docked inside a tab page that extends past the window's client area and behind
-    /// the mascot sidebar, so its own ClientSize is larger than the region the user can see. Sizing
-    /// against that put the fourth column in a part of the panel that exists but is clipped - and
-    /// made it invisible to a check comparing button.Right against ClientSize.Width, because by the
-    /// panel's own reckoning everything fit.
-    /// </para>
-    /// </summary>
     private int VisibleWidthOf(Control panel)
     {
         int width = panel.ClientSize.Width;
@@ -2346,46 +2243,12 @@ namespace pk3DS.WinForms;
         form.ShowDialog();
     }
 
-    /// <summary>
-    /// Runs an editor on a worker thread, turning a failure into a message instead of a crash.
-    /// <para>
-    /// Every one of these handlers reaches straight into <see cref="Config"/> and its GARCs. When a
-    /// ROM has not finished loading, or a language's archive is missing, those are null and the
-    /// dereference throws on a thread with no handler - which Windows Forms can only turn into a
-    /// process kill. The editors themselves are unchanged; this only decides what happens when the
-    /// data they need is not there.
-    /// </para>
-    /// </summary>
     // Counted like any worker: an editor's file save runs after its dialog closes, and uncounted, a
     // second editor could open and read (then save back) a file that save was still rewriting.
     private void RunEditor(string what, Action work) => StartGuarded(what, work, count: true, editor: true);
 
-    /// <summary>
-    /// Runs non-editor background work (packing, compression, extraction) under the same guard.
-    /// <para>
-    /// These sites all bracketed themselves with <c>Interlocked.Increment</c>/<c>Decrement</c> on
-    /// <see cref="threads"/> but without a <c>finally</c>, so a throw did two things: it killed the
-    /// process, and - had it not - it would have left the counter stuck above zero, after which
-    /// <see cref="ThreadActive"/> refuses every later operation for the rest of the session. Both
-    /// are handled here so no caller has to remember either half.
-    /// </para>
-    /// </summary>
     private void RunWorker(string what, Action work) => StartGuarded(what, work, count: true, editor: false);
 
-    /// <summary>
-    /// The one place a worker thread is created, so the guard cannot be forgotten at a call site.
-    /// <para>
-    /// The thread is deliberately left in the foreground. Marking it background would let the
-    /// runtime tear it down at exit, which for a GARC repack or a RomFS build means a half-written
-    /// file on disk - a worse outcome than the wait.
-    /// </para>
-    /// <para>
-    /// The busy count is raised on the calling thread rather than inside the lambda: incrementing
-    /// inside meant a window between <c>Start()</c> and the thread being scheduled during which
-    /// <see cref="ThreadActive"/> still read zero and a second operation could start on the same
-    /// data.
-    /// </para>
-    /// </summary>
     private void StartGuarded(string what, Action work, bool count, bool editor)
     {
         if (count)
@@ -2414,9 +2277,6 @@ namespace pk3DS.WinForms;
         }).Start();
     }
 
-    /// <summary>
-    /// Surfaces a background failure on the UI thread, tolerating a form that is already closing.
-    /// </summary>
     private void ReportWorkerFailure(string what, Exception ex, bool editor)
     {
         string title = editor ? $"The {what} editor could not open." : $"{what} could not be completed.";
@@ -2434,7 +2294,6 @@ namespace pk3DS.WinForms;
         catch (InvalidOperationException) { }
     }
 
-    /// <summary>Fetches a GARC, or explains which one is missing rather than throwing later.</summary>
     private bool TryGetGarc(string name, out GARCFile garc)
     {
         garc = Config?.GetGARCData(name);
@@ -2491,7 +2350,6 @@ namespace pk3DS.WinForms;
         });
     }
 
-    /// <summary>Encodes every text file; null means the user chose to discard all changes.</summary>
     private static byte[][] TryWriteText(string[][] files, GARCFile g)
     {
         byte[][] data = new byte[files.Length][];
@@ -2784,9 +2642,6 @@ namespace pk3DS.WinForms;
         });
     }
 
-    /// <summary>
-    /// Enables or disables the main window from a worker thread, tolerating a closed form.
-    /// </summary>
     private void SetMainEnabled(bool enabled)
     {
         try
@@ -2864,11 +2719,6 @@ namespace pk3DS.WinForms;
         });
     }
 
-    /// <summary>
-    /// Shows non-modal editors and keeps the main window disabled until those editors close.
-    /// The window used to be disabled before the "no ROM" guard and only re-enabled on success, so
-    /// any error left it dead until restart; and it waited for every open form, not just these.
-    /// </summary>
     private void ShowAndWait(params Func<Form>[] create)
     {
         var forms = new List<Form>();
@@ -3439,7 +3289,6 @@ namespace pk3DS.WinForms;
     }
 
 
-    /// <summary>Whether two files hold exactly the same bytes.</summary>
     private static bool SameFile(string a, string b)
     {
         try

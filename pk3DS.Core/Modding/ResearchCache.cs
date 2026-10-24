@@ -7,9 +7,6 @@ using System.Text.Json.Serialization;
 
 namespace pk3DS.Core.Modding
 {
-    /// <summary>
-    /// Cached patch data extracted from an XLSX research sheet.
-    /// </summary>
     public class CachedPatchSet
     {
         public string Name { get; set; }
@@ -47,11 +44,6 @@ namespace pk3DS.Core.Modding
         public string Category { get; set; }
     }
 
-    /// <summary>
-    /// Persistent cache of all ARM Research XLSX data.
-    /// Parses every XLSX in the research folder tree and makes the data queryable.
-    /// Persists to a JSON sidecar file for fast reload.
-    /// </summary>
     public class ResearchCache
     {
         public List<CachedPatchSet> MoveEdits { get; set; } = new();
@@ -75,9 +67,6 @@ namespace pk3DS.Core.Modding
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        /// <summary>
-        /// Load all XLSX files from an ARM Research folder tree.
-        /// </summary>
         public void LoadAll(string armResearchFolder, string version = "UM", Action<string> log = null)
         {
             log ??= _ => { };
@@ -271,41 +260,33 @@ namespace pk3DS.Core.Modding
 
         #region Queries
 
-        /// <summary>Get all cached patch sets across all categories.</summary>
         public IEnumerable<CachedPatchSet> AllPatchSets =>
             MoveEdits.Concat(AbilityEdits).Concat(ItemEdits)
                 .Concat(GenericFunctions).Concat(AIEdits)
                 .Concat(OtherMechanics).Concat(FieldEffects)
                 .Concat(Research).Concat(RootSheets);
 
-        /// <summary>Find a cached patch set by name (case-insensitive substring match).</summary>
         public CachedPatchSet FindByName(string name) =>
             AllPatchSets.FirstOrDefault(p =>
                 p.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
 
-        /// <summary>Get all patch sets for a specific move name.</summary>
         public List<CachedPatchSet> GetMoveEdits(string moveName) =>
             MoveEdits.Where(p => p.Name.IndexOf(moveName, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
 
-        /// <summary>Get all patch sets for a specific ability name.</summary>
         public List<CachedPatchSet> GetAbilityEdits(string abilityName) =>
             AbilityEdits.Where(p => p.Name.IndexOf(abilityName, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
 
-        /// <summary>Get all patch sets for a specific item name.</summary>
         public List<CachedPatchSet> GetItemEdits(string itemName) =>
             ItemEdits.Where(p => p.Name.IndexOf(itemName, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
 
-        /// <summary>Get a generic/stock function by name.</summary>
         public CachedPatchSet GetGenericFunction(string name) =>
             GenericFunctions.FirstOrDefault(p =>
                 p.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
 
-        /// <summary>Get all patch sets targeting a specific file.</summary>
         public List<CachedPatchSet> GetPatchesForFile(string targetFile) =>
             AllPatchSets.Where(p =>
                 p.TargetFile.Equals(targetFile, StringComparison.OrdinalIgnoreCase)).ToList();
 
-        /// <summary>Search all patch sets by keyword.</summary>
         public List<CachedPatchSet> Search(string keyword) =>
             AllPatchSets.Where(p =>
                 (p.Name?.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0) ||
@@ -317,7 +298,6 @@ namespace pk3DS.Core.Modding
 
         #region Persistence
 
-        /// <summary>Save the cache to a JSON file.</summary>
         public void SaveCache(string jsonPath)
         {
             try
@@ -328,7 +308,6 @@ namespace pk3DS.Core.Modding
             catch { }
         }
 
-        /// <summary>Load a previously saved cache.</summary>
         public static ResearchCache LoadCache(string jsonPath)
         {
             if (!File.Exists(jsonPath)) return null;
@@ -340,7 +319,6 @@ namespace pk3DS.Core.Modding
             catch { return null; }
         }
 
-        /// <summary>Check if cache is stale (research folder modified after last parse).</summary>
         public bool IsStale(string armResearchFolder)
         {
             if (!Directory.Exists(armResearchFolder)) return true;

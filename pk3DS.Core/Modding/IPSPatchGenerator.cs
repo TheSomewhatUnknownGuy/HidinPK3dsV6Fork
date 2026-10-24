@@ -112,9 +112,6 @@ namespace pk3DS.Core.Modding
             return result;
         }
 
-        /// <summary>
-        /// Applies an IPS patch binary payload onto a target byte array (e.g. Battle.cro or code.bin).
-        /// </summary>
         public static byte[] ApplyIPS(byte[] original, byte[] ipsData)
         {
             if (original == null || ipsData == null || ipsData.Length < 8)

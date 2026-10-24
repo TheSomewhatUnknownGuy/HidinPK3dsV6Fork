@@ -16,10 +16,6 @@ public static class CompetitiveValidator
     private const int SPA = CompetitiveDatabase.SPA;
     private const int SPD = CompetitiveDatabase.SPD;
 
-    /// <summary>
-    /// Performs strict validation and sanitization on a single trainer Pokemon.
-    /// Ensures 100% compliance with competitive manifesto rules.
-    /// </summary>
     public static void ValidateAndSanitize(
         TrainerPoke7 pk,
         PersonalInfo pi,
@@ -1308,10 +1304,6 @@ public static class CompetitiveValidator
         }
     }
 
-    /// <summary>
-    /// Validates the minimum number of STAB attacking moves on a Pokemon's moveset.
-    /// Attempts to swap in valid moves from the legal pool if under-count.
-    /// </summary>
     private static void ValidateMinSTABAttacks(
         TrainerPoke7 pk, PersonalInfo pi, string[] moveNames, Move[] moveData,
         LegalLearnsetAggregator learnsets, int minCount)
@@ -1355,9 +1347,6 @@ public static class CompetitiveValidator
         pk.Moves = currentMoves;
     }
 
-    /// <summary>
-    /// Validates minimum moves from a specific named category.
-    /// </summary>
     private static void ValidateMinMovesFromCategory(
         TrainerPoke7 pk, PersonalInfo pi, string[] moveNames, Move[] moveData,
         LegalLearnsetAggregator learnsets, HashSet<string> category, int minCount)
@@ -1397,9 +1386,6 @@ public static class CompetitiveValidator
         pk.Moves = currentMoves;
     }
 
-    /// <summary>
-    /// Ensures a specific named move is present in the moveset.
-    /// </summary>
     private static void EnsureMovePresent(
         TrainerPoke7 pk, string moveName, string[] moveNames, LegalLearnsetAggregator learnsets)
     {
@@ -1453,10 +1439,6 @@ public static class CompetitiveValidator
         pk.Moves = moves;
     }
 
-    /// <summary>
-    /// Validates team-level constraints: max 1 Mega Stone, max 1 Z-Crystal,
-    /// terrain seed-surge pairing, archetype requirements, and item clause.
-    /// </summary>
     public static void ValidateTeam(
         TrainerPoke7[] team,
         PersonalInfo[] teamPI,
@@ -1841,9 +1823,6 @@ public static class CompetitiveValidator
             }
         }
 
-    /// <summary>
-    /// Checks if a move is considered a viable competitive attack (>= 60 base power or verified competitive/situational move).
-    /// </summary>
     public static bool IsViableAttack(int m, Move[] moveData, string[] moveNames)
     {
         if (m <= 0 || moveData == null || m >= moveData.Length) return false;
@@ -1872,20 +1851,6 @@ public static class CompetitiveValidator
         return md.Power >= 60;
     }
 
-    /// <summary>
-    /// Checks if an item name is a Mega Stone.
-    /// </summary>
-    /// <summary>
-    /// Reports every ability, move or item this database names that the loaded ROM does not have.
-    /// <para>
-    /// A rule keyed on a name the ROM never produces cannot fire, and nothing else in the pipeline
-    /// notices — the rule just silently does nothing. That is how six shop items spelled "Feather"
-    /// instead of "Wing", a "Tomato Berry" that should read "Tamato", and three names written with
-    /// an ASCII apostrophe where the games use U+2019 all sat here inert. Running this against a
-    /// real ROM turns that whole class of defect into a list instead of a mystery.
-    /// </para>
-    /// </summary>
-    /// <returns>Human-readable lines, empty when every name resolves.</returns>
     public static List<string> FindUnresolvedNames(GameConfig config)
     {
         var problems = new List<string>();
@@ -1949,9 +1914,6 @@ public static class CompetitiveValidator
         return lower.EndsWith("ite") || lower.EndsWith("nite") || lower.EndsWith("tite");
     }
 
-    /// <summary>
-    /// Checks if an item name is a Z-Crystal.
-    /// </summary>
     public static bool IsZCrystal(string itemName)
     {
         if (string.IsNullOrEmpty(itemName)) return false;

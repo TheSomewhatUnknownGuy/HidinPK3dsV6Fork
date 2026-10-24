@@ -4,21 +4,15 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>What a master-table handler turned out to be.</summary>
 public enum HandlerShape
 {
-    /// <summary>Could not be interpreted.</summary>
     Unknown = 0,
-    /// <summary>A call setup stub that publishes a count and a timing table.</summary>
     CallSetup,
-    /// <summary>A real routine invoked directly, with no timing table of its own.</summary>
     DirectRoutine,
 }
 
-/// <summary>One row of a timing table: when it fires and what it runs.</summary>
 public readonly record struct TimingSlot(int Index, byte Timing, uint EntryOffset, uint FunctionOffset);
 
-/// <summary>A fully-walked mechanic chain.</summary>
 public sealed class ResolvedChain
 {
     public uint HandlerOffset { get; init; }
@@ -31,18 +25,6 @@ public sealed class ResolvedChain
     public bool HasTimingTable => Shape == HandlerShape.CallSetup && TimingTableOffset != 0;
 }
 
-/// <summary>
-/// Walks master-table handler -> call setup -> timing table -> effect functions.
-/// <para>
-/// Deliberately structural rather than shape-matching. The stubs are NOT uniform: most publish
-/// their entry count as a <c>MOV R1,#n</c> immediate, but some (Poison Touch and Stall among them
-/// — the exception called out in ABZB's notes) load both the count and the table pointer from
-/// literals at different offsets, and a further group are ordinary routines invoked directly with
-/// no timing table at all. Matching one fixed byte pattern classified a third of abilities as
-/// broken; keying off "which literal does a relocation write to" handles every observed form,
-/// because the relocation is what actually makes a pointer a pointer.
-/// </para>
-/// </summary>
 public static class MechanicChainResolver
 {
     // ARM encodings used to recognise the stub prologue.
@@ -52,16 +34,8 @@ public static class MechanicChainResolver
     private const uint MovR1ImmMask = 0x0FFFF000;
     private const uint MovR1Imm = 0x03A01000;    // MOV R1, #imm
 
-    /// <summary>Words examined when looking for the stub prologue and its literals.</summary>
     private const int StubWindowWords = 8;
 
-    /// <summary>
-    /// Resolves one handler.
-    /// </summary>
-    /// <param name="resolveSlot">
-    /// Maps a pointer-slot address to the address the relocation writes there; return 0 when the
-    /// slot is not relocated.
-    /// </param>
     public static ResolvedChain Resolve(byte[] rom, uint handler, Func<uint, uint> resolveSlot)
     {
         if (rom == null || resolveSlot == null || handler == 0 || handler + 8 > rom.Length)
@@ -149,7 +123,6 @@ public static class MechanicChainResolver
         return chain;
     }
 
-    /// <summary>Resolves every entry of a located table.</summary>
     public static Dictionary<uint, ResolvedChain> ResolveTable(
         byte[] rom, LocatedMechanicTable table, Func<uint, uint> resolveSlot)
     {

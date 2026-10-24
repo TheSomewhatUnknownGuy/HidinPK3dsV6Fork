@@ -6,14 +6,8 @@ using pk3DS.Core.Structures;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Reads the level distribution out of the ROM's own trainer data.
-/// </summary>
 public static class TrainerLevelSampler
 {
-    /// <summary>
-    /// The highest level on each trainer's team, ascending. Empty when trainer data is unreadable.
-    /// </summary>
     public static List<int> Collect(GameConfig config)
     {
         var levels = new List<int>();
@@ -48,7 +42,6 @@ public static class TrainerLevelSampler
         return levels;
     }
 
-    /// <summary>The value at a fraction through a sorted list, by nearest rank.</summary>
     public static int Percentile(IReadOnlyList<int> sorted, double fraction)
     {
         if (sorted == null || sorted.Count == 0) return 0;

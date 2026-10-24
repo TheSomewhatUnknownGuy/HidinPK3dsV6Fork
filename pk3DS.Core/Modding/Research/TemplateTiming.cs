@@ -5,45 +5,28 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// The stock element a template reproduces the shape of.
-/// </summary>
 public sealed class TemplateModel
 {
-    /// <summary>Kind of the model element. Null means "same kind as the template".</summary>
     public CustomMechanicKind? Kind { get; init; }
 
-    /// <summary>Documented name, as the corpus spells it.</summary>
     public string Name { get; init; } = "";
 
-    /// <summary>
-    /// Which of the model's timing slots this shape belongs at, when it has several.
-    /// </summary>
     public byte? Slot { get; init; }
 }
 
-/// <summary>What timing a template should use, and how confidently.</summary>
 public sealed class TimingSuggestion
 {
-    /// <summary>The timing to use, when only one is possible.</summary>
     public byte? Timing { get; init; }
 
-    /// <summary>Every timing the model element hooks, in table order.</summary>
     public List<byte> Options { get; init; } = [];
 
-    /// <summary>Plain-language account of where this came from, for the UI to show.</summary>
     public string Source { get; init; } = "";
 
-    /// <summary>True when the timing needs no further decision.</summary>
     public bool Certain => Timing.HasValue;
 }
 
-/// <summary>Resolves a template's timing against a loaded ROM.</summary>
 public static class TemplateTiming
 {
-    /// <summary>
-    /// Reads the timing a template's model element uses in this ROM.
-    /// </summary>
     public static TimingSuggestion Suggest(FunctionTemplate template, BattleMechanicMap? map)
     {
         // A timing the engine settles rather than a stock element wins outright, and is the one
@@ -111,9 +94,6 @@ public static class TemplateTiming
         };
     }
 
-    /// <summary>
-    /// The slot recorded on the template itself, used when the ROM cannot be consulted.
-    /// </summary>
     private static TimingSuggestion Recorded(TemplateModel? model, string why)
     {
         if (model?.Slot is not { } slot)
@@ -127,10 +107,6 @@ public static class TemplateTiming
         };
     }
 
-    /// <summary>
-    /// Fallback: the timings most used by elements of this kind, which is a short ranked list
-    /// rather than the 180-odd bytes in use across the whole engine.
-    /// </summary>
     private static TimingSuggestion FromUsage(FunctionTemplate template, BattleMechanicMap map, string why)
     {
         var ranked = map.OfKind(template.Kind)

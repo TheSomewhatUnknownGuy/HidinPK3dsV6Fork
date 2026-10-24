@@ -6,15 +6,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Finds free item / move / ability slots for a recipe that needs them.
-/// </summary>
 public static class RecipeIdAllocator
 {
-    /// <summary>Placeholder names the games use for a slot that is not really occupied.</summary>
     private static readonly string[] Placeholders = ["???", "-----", "—", "———"];
 
-    /// <summary>Whether an id is unnamed or holds a placeholder.</summary>
     public static bool IsFree(string[]? names, int id)
     {
         if (names == null || id < 1 || id >= names.Length) return false;
@@ -24,7 +19,6 @@ public static class RecipeIdAllocator
             || n.All(c => c is '?' or '？' or '(' or ')');
     }
 
-    /// <summary>Lowest free id not in <paramref name="taken"/>, or -1.</summary>
     public static int NextFree(string[]? names, ISet<int>? taken = null)
     {
         if (names == null) return -1;
@@ -33,9 +27,6 @@ public static class RecipeIdAllocator
         return -1;
     }
 
-    /// <summary>
-    /// Start of the lowest run of <paramref name="count"/> consecutive free ids, or -1.
-    /// </summary>
     public static int NextFreeRun(string[]? names, int count, ISet<int>? taken = null)
     {
         if (names == null || count <= 0) return -1;
@@ -52,7 +43,6 @@ public static class RecipeIdAllocator
         return -1;
     }
 
-    /// <summary>The name table a mechanic kind's ids live in.</summary>
     public static string[]? TableFor(GameConfig config, CustomMechanicKind kind) => kind switch
     {
         CustomMechanicKind.Move => config?.GetText(TextName.MoveNames),
@@ -60,7 +50,6 @@ public static class RecipeIdAllocator
         _ => config?.GetText(TextName.ItemNames),
     };
 
-    /// <summary>The name table a package parameter's ids live in.</summary>
     public static string[]? TableForParameter(GameConfig config, string? type) => (type ?? "").ToLowerInvariant() switch
     {
         "move" => config?.GetText(TextName.MoveNames),
@@ -68,15 +57,6 @@ public static class RecipeIdAllocator
         _ => config?.GetText(TextName.ItemNames),
     };
 
-    /// <summary>
-    /// Assigns every id a recipe needs, and reports what could not be placed.
-    /// </summary>
-    /// <param name="reserved">
-    /// Ids already spoken for elsewhere - typically by other recipes in the same batch, whose own
-    /// writes have not reached the id-name table on disk yet (a dry run never does; a commit does,
-    /// but only after this call returns). Every id this call claims is added to it, so passing the
-    /// same set into consecutive calls keeps a whole batch from handing out the same "free" id twice.
-    /// </param>
     public static Dictionary<string, string>? AssignIds(
         Recipe recipe, GameConfig config, List<string> problems, ISet<int>? reserved = null)
     {

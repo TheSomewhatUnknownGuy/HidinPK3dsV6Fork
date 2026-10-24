@@ -4,14 +4,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// The difficulty offsets the Level Caps tab offers, in levels.
-/// </summary>
 public static class LevelCapShifts
 {
     public static readonly int[] All = [-10, -5, -3, 0, 3, 5, 10];
 
-    /// <summary>Index of the unshifted curve, used as the default selection.</summary>
     public static readonly int StandardIndex = Array.IndexOf(All, 0);
 
     public static string Describe(int shift) => shift switch
@@ -22,15 +18,8 @@ public static class LevelCapShifts
     };
 }
 
-/// <summary>
-/// Builds a full 27-checkpoint <see cref="LevelCapTable"/> from two plain choices.
-/// </summary>
 public static class LevelCapPresets
 {
-    /// <summary>
-    /// The stock curve rescaled so the last checkpoint lands on <paramref name="finalCap"/>, then
-    /// shifted by <paramref name="shift"/> levels.
-    /// </summary>
     public static LevelCapTable Build(int shift, byte finalCap, bool ultraMoon = false)
     {
         if (finalCap < 5) finalCap = 5;
@@ -64,9 +53,6 @@ public static class LevelCapPresets
         return new LevelCapTable { Entries = trimmed };
     }
 
-    /// <summary>
-    /// A curve whose shape comes from the ROM's own trainer levels rather than the research values.
-    /// </summary>
     public static LevelCapTable BuildFromTrainerLevels(IReadOnlyList<int> sortedLevels, byte finalCap,
                                                        bool ultraMoon = false)
     {
@@ -105,7 +91,6 @@ public static class LevelCapPresets
         return new LevelCapTable { Entries = trimmed };
     }
 
-    /// <summary>A one-line summary of a built table, for the tab to show live.</summary>
     public static string Summarise(LevelCapTable table)
     {
         if (table?.Entries is not { Count: > 0 }) return "no checkpoints";
@@ -116,7 +101,6 @@ public static class LevelCapPresets
                $"rising to Lv{last.Cap} at \"{last.Label}\"";
     }
 
-    /// <summary>The caps in order, for a compact preview.</summary>
     public static string CapSequence(LevelCapTable table) =>
         table?.Entries is not { Count: > 0 } ? "" : string.Join(", ", table.Entries.Select(e => e.Cap));
 }

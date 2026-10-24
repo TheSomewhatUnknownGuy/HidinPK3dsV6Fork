@@ -182,12 +182,6 @@ public static class Mini
             File.Delete(path); // File is unpacked.
     }
 
-    /// <summary>
-    /// Unpacks a BinLinkerAccessor generated file into individual arrays.
-    /// </summary>
-    /// <param name="fileData">Packed data</param>
-    /// <param name="identifier">Signature expected in the first two bytes (ASCII)</param>
-    /// <returns>Unpacked array containing all files that were packed.</returns>
     public static byte[][] UnpackMini(byte[] fileData, string identifier)
     {
         if (fileData == null || fileData.Length < 4)

@@ -6,41 +6,27 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// What a routine expects to be handed, worked out by reading its code.
-/// </summary>
 public sealed class RegisterUsage
 {
-    /// <summary>Argument registers read before being written.</summary>
     public SortedSet<int> Inputs { get; } = [];
 
-    /// <summary>Register number to the record type it was dereferenced as, where recognisable.</summary>
     public Dictionary<int, string> Roles { get; } = [];
 
-    /// <summary>Instructions decoded before the routine returned or the budget ran out.</summary>
     public int Words { get; set; }
 
-    /// <summary>True when a return was reached, so the whole routine was seen.</summary>
     public bool Complete { get; set; }
 
     public string Describe() =>
         Inputs.Count == 0 ? "no arguments" : string.Join(", ", Inputs.Select(r => $"r{r}"));
 }
 
-/// <summary>Reads ARM routines to recover their calling convention.</summary>
 public static class RegisterContract
 {
-    /// <summary>
-    /// The calling convention every stock timing handler in Battle.cro follows, recovered by
-    /// disassembling known handlers (Iron Fist, Muscle Band, Low Kick, Rough Skin, Gravity,
-    /// Mean Look) rather than from documentation.
-    /// </summary>
     public const string EngineAbi =
         "r0 = subject id, r1 = battler context, r2 = event token (gate on it via Returns Battle "
         + "State data, or the handler fires on every event). Modifiers are reported by tail-calling "
         + "0x083108 with r0 = 0x35 and the value in r1, not by returning in r0.";
 
-    /// <summary>Struct offsets that identify what a base register points at.</summary>
     private static readonly Dictionary<uint, string> RoleByOffset = BuildRoles();
 
     private static Dictionary<uint, string> BuildRoles()
@@ -62,10 +48,6 @@ public static class RegisterContract
         return roles;
     }
 
-    /// <summary>
-    /// Walks a routine from <paramref name="offset"/>, recording which argument registers it
-    /// consumes and what they point at.
-    /// </summary>
     public static RegisterUsage Analyse(byte[] image, uint offset, int maxWords = 64)
     {
         var usage = new RegisterUsage();
@@ -165,12 +147,8 @@ public static class RegisterContract
         return usage;
     }
 
-    /// <summary>An observation about how a routine's arguments compare to its timing's.</summary>
     public sealed record Finding(string Message);
 
-    /// <summary>
-    /// Compares a routine against the stock handlers that run at the same timing.
-    /// </summary>
     public static List<Finding> Compare(RegisterUsage mine, IReadOnlyList<RegisterUsage> stock)
     {
         var findings = new List<Finding>();

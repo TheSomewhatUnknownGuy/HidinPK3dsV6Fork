@@ -38,12 +38,6 @@ public sealed partial class ToolsUI : Form
         PopulateGarcNames();
     }
 
-    /// <summary>
-    /// Lists every GARC this ROM's version has a registered name for (workstream 6 - the plan's own
-    /// bar for "usable through ToolsUI" was never actually met just by registering a name in
-    /// `GARCReference.cs`; this closes that gap for real - picking a name here resolves its real
-    /// RomFS path and hands it straight to the same unpack path a drag-and-drop already used).
-    /// </summary>
     private void PopulateGarcNames()
     {
         CB_GarcName.Items.Clear();
@@ -171,17 +165,6 @@ public sealed partial class ToolsUI : Form
 
     internal static volatile int threads;
 
-    /// <summary>
-    /// Runs a tool operation on a worker thread, releasing the busy count and reporting failures.
-    /// <para>
-    /// Every site here previously bracketed its own work with <c>Interlocked.Increment</c> and
-    /// <c>Decrement</c> and then returned early between the two - the ALYT branch bailed out on an
-    /// invalid SARC, the GARC branch on a failed unpack. Each of those left <see cref="threads"/>
-    /// permanently above zero, at which point every later operation in the window refuses to start
-    /// with "Please wait for all operations to finish first" and never recovers. A throw did the
-    /// same and additionally killed the process, since a worker thread has no handler above it.
-    /// </para>
-    /// </summary>
     private static void RunTool(string what, Action work)
     {
         Interlocked.Increment(ref threads);

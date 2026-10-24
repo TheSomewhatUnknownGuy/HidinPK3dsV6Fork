@@ -560,9 +560,6 @@ public partial class MartEditor7UU : Form
 
     internal static readonly HashSet<int> XItems = [055, 056, 057, 058, 059, 060, 061, 062];
 
-    /// <summary>
-    /// Just TMs & HMs; don't want these to be changed; if changed, they are not available elsewhere ingame.
-    /// </summary>
     internal static readonly HashSet<int> BannedItems =
     [
         328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348,

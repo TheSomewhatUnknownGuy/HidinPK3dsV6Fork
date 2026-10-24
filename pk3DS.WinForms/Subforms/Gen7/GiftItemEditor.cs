@@ -8,35 +8,6 @@ using pk3DS.Core.Modding.Research;
 
 namespace pk3DS.WinForms;
 
-/// <summary>
-/// Edits the community-documented NPC item gifts inside `amxscript` (a/0/9/2) by item name and
-/// quantity, instead of requiring the raw AMX bytecode editor (<see cref="AMXScriptEditor"/>) for
-/// something as simple as "give a different item" or "give more of it" - and, per explicit request,
-/// lets a script give MORE THAN ONE item at the same NPC moment, not just change which single item an
-/// existing gift gives.
-/// <para>
-/// Each <see cref="GiftItemEntry"/> from <see cref="GiftItemReference"/> is a real, live gift the
-/// community found and tested. <see cref="GiftItemLocator"/> re-finds every place that gift's
-/// (quantity, item id) pair could sit in the live ROM's own script data every time this form loads,
-/// rather than trusting a hardcoded byte offset - and EVERY candidate is shown as its own directly
-/// editable row (not just the ones the locator can uniquely place). A quantity/item id pair that
-/// coincides with unrelated code elsewhere in the script (a Max Potion's quantity turning up as an
-/// unrelated loop bound, say) shows up as several low-confidence candidates rather than being hidden
-/// - each carries a <see cref="GiftLocationConfidence"/> (driven by whether every candidate's
-/// confirming call agrees on one real target subroutine, not just the raw count - see
-/// <see cref="GiftItemLocator"/>'s own notes) and a snippet of surrounding decoded instructions.
-/// </para>
-/// <para>
-/// "Add Another Gift" (one per row with a confirmed call to clone) uses <see cref="GiftItemInserter"/>
-/// to clone that gift's own instruction span with new item/quantity values and splice it in right
-/// after the original, via <see cref="AmxRelocation"/> - verified this session against all 759 real
-/// scripts in this ROM (every jump/call/switch-case target still lands exactly on a real instruction
-/// boundary afterward) and against 208 real, confirmed gifts in this exact reference list (0 failures/
-/// corruptions). The new gift always triggers alongside the one it was cloned from - it isn't a new,
-/// independently-triggered NPC interaction, since building that trigger logic from scratch is a much
-/// larger, per-script task this can't safely automate.
-/// </para>
-/// </summary>
 public partial class GiftItemEditor : Form
 {
     private readonly GARCFile amxGarc;
@@ -52,7 +23,6 @@ public partial class GiftItemEditor : Form
         public bool IsManualAddition;
     }
     private readonly List<Row> rows = [];
-    /// <summary>Mirrors <see cref="DGV_Gifts"/>'s actual rows 1:1 (after the low-confidence filter, if any) - grid event handlers index into THIS, never <see cref="rows"/> directly, since hiding rows means the grid's own row index no longer lines up with <see cref="rows"/>'s.</summary>
     private readonly List<Row> visibleRows = [];
     private readonly List<GiftItemEntry> manualEntries = [];
     private readonly Dictionary<int, (Script script, uint[] cmd, List<DecodedInstruction> decoded)> scriptCache = [];
@@ -230,7 +200,6 @@ public partial class GiftItemEditor : Form
         PopulateGrid();
     }
 
-    /// <summary>The New Item column is intentionally narrower than a full item name (to keep the grid compact) - this widens just the dropdown popup itself while it's open, so picking from the list is still easy without the column eating permanent horizontal space.</summary>
     private void DGV_Gifts_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
     {
         if (DGV_Gifts.CurrentCell?.OwningColumn?.Name == "ColNewItem" && e.Control is ComboBox combo)
@@ -296,7 +265,6 @@ public partial class GiftItemEditor : Form
         WinFormsUtil.Alert("Gift added (in memory).", $"{ItemName(newItemId)} x{newQty} will now be given alongside the gift you cloned it from - click Save Changes to write it to the ROM.");
     }
 
-    /// <summary>Applies every row's pending grid-cell edit into its own cached Cmd array, and clears the pending flag - called before any operation (like an insertion, or toggling which rows are visible) that rebuilds the grid from the cache, so nothing typed but not yet saved gets lost. Reads from <see cref="visibleRows"/>, not <see cref="rows"/> - only visible rows have an actual grid cell to read a pending edit from right now.</summary>
     private void CommitPendingValueEdits()
     {
         foreach (var (row, idx) in visibleRows.Select((r, i) => (r, i)))

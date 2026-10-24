@@ -7,17 +7,14 @@ using pk3DS.Core.CTR;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>An item carried across builds: its name and its full data record.</summary>
 public sealed class PortedItem
 {
     public int Id { get; set; }
     public string Name { get; set; } = "";
-    /// <summary>Complete item record, hex.</summary>
     public string Data { get; set; } = "";
     public byte[] Bytes => Convert.FromHexString(Data);
 }
 
-/// <summary>Fields of a move that were changed; everything unlisted is left as the target has it.</summary>
 public sealed class PortedMove
 {
     public int Id { get; set; }
@@ -30,18 +27,8 @@ public sealed class PortedMove
     public int? HitMax { get; set; }
 }
 
-/// <summary>
-/// Ports the non-CRO half: item records, move fields, and the code.bin edits.
-/// <para>
-/// Item and move data are plain GARC contents and move across builds literally, with one caveat
-/// each: an item record is only meaningful if the target's item table is at least as long, and the
-/// move archive is a "WD" mini archive inside the GARC — writing move records at a flat stride
-/// destroys it, because there is an offset table rather than a fixed stride.
-/// </para>
-/// </summary>
 public static class PortDataInstaller
 {
-    /// <summary>Writes item records and names. Returns the number applied.</summary>
     public static int ApplyItems(GameConfig cfg, IEnumerable<PortedItem> items, bool commit, Action<string> log = null)
     {
         log ??= _ => { };
@@ -109,7 +96,6 @@ public static class PortDataInstaller
         return applied;
     }
 
-    /// <summary>Applies the listed move-field changes, repacking the mini archive correctly.</summary>
     public static int ApplyMoves(GameConfig cfg, IEnumerable<PortedMove> moves, bool commit, Action<string> log = null)
     {
         log ??= _ => { };
@@ -143,14 +129,6 @@ public static class PortDataInstaller
         return applied;
     }
 
-    /// <summary>
-    /// Resolves exported symbols to their addresses in the target build, via static.crs.
-    /// <para>
-    /// This is what makes the code.bin work portable at all: the mint dispatcher and the Ability
-    /// Capsule patches call routines like <c>CoreParam::FlipTokuseiIndex</c>, whose address differs
-    /// per build but whose name does not.
-    /// </para>
-    /// </summary>
     public static Dictionary<string, uint> ResolveStaticSymbols(string romFsPath, IEnumerable<string> names)
     {
         var found = new Dictionary<string, uint>(StringComparer.Ordinal);

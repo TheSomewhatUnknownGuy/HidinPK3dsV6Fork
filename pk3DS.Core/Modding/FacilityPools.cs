@@ -7,39 +7,15 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>How a pool's cells are laid out.</summary>
 public enum PoolKind
 {
-    /// <summary>(trainer id, flag) pairs, two cells per entry.</summary>
     TrainerFlagPairs,
-    /// <summary>One trainer id per cell.</summary>
     TrainerIds,
-    /// <summary>One flag id per cell.</summary>
     FlagIds,
 }
 
-/// <summary>
-/// One fixed-size pool in Uhuru's facility scripts. <see cref="Address"/> is the data-segment byte offset (AMX dat = 0).
-/// <see cref="Count"/> is pairs for <see cref="PoolKind.TrainerFlagPairs"/>, cells otherwise.
-/// <see cref="Alias"/> names a pool whose words this one shares (a window onto it, no copy).
-/// <see cref="Mirror"/> names the pool this one copies (its first <see cref="Count"/> pairs); see <see cref="FacilityPools.Set"/>.
-/// </summary>
 public sealed record PoolDef(string Name, int Script, int Address, int Count, PoolKind Kind, string? Alias = null, string? Mirror = null);
 
-/// <summary>
-/// Reads and edits Uhuru's trainer pools in AMX scripts 26 and 217 without recompressing them.
-/// <para>
-/// Only cell values change: pool sizes and addresses are code operands. Every untouched word keeps its
-/// original varint bytes and an edited word gets its own re-encoded varint, so the script can grow or shrink
-/// by a byte. Only the offset-0 Length field follows. There is no add, remove or reorder API.
-/// </para>
-/// <para>
-/// Alias: <c>0x160C</c> is <c>0x14EC</c> pairs 36..123, the same words, so either view sees a write.
-/// Mirror: <c>0x2F60</c> and <c>0x2FC8</c> are copies of the first 13 pairs of <c>0x2D10</c> and <c>0x2DE0</c>.
-/// A write to a copy is refused and names its source. A write to a source also writes the copy's matching cell,
-/// so the two never diverge. Chosen over linked-write-both-ways because the source is the one place to edit.
-/// </para>
-/// </summary>
 public sealed class FacilityPools
 {
     public const int MaxTrainer = 652;
@@ -104,7 +80,6 @@ public sealed class FacilityPools
         return _dataWord + d.Address / 4 + cell;
     }
 
-    /// <summary>True for cells that hold a trainer id. Even cells of a pair pool are trainers, odd cells are flags.</summary>
     public static bool IsTrainerCell(PoolDef d, int cell) =>
         d.Kind == PoolKind.TrainerIds || (d.Kind == PoolKind.TrainerFlagPairs && cell % 2 == 0);
 
@@ -114,13 +89,8 @@ public sealed class FacilityPools
         return (int)(_edits.TryGetValue(w, out uint v) ? v : _words[w]);
     }
 
-    /// <summary>Every cell in order. Pairs flatten to trainer, flag, trainer, flag...</summary>
     public int[] Read(PoolDef d) => Enumerable.Range(0, Cells(d)).Select(c => Get(d, c)).ToArray();
 
-    /// <summary>
-    /// Sets one cell. Trainer cells take 1..652 and flag cells 1..4095. A copy refuses writes (see the class
-    /// comment); a source also writes the same cell of its copy.
-    /// </summary>
     public void Set(PoolDef d, int cell, int value)
     {
         int w = Word(d, cell);
@@ -133,7 +103,6 @@ public sealed class FacilityPools
             _edits[Word(copy, cell)] = (uint)value;
     }
 
-    /// <summary>The script with the edits spliced in. With no edits this is an identical copy.</summary>
     public byte[] ToBytes()
     {
         if (_edits.Count == 0) return (byte[])_raw.Clone();
@@ -149,7 +118,6 @@ public sealed class FacilityPools
         return result;
     }
 
-    /// <summary>File byte range of one cell's varint. Tests use it to predict the size change.</summary>
     internal (int Start, int End) VarintSpan(PoolDef d, int cell)
     {
         int w = Word(d, cell);

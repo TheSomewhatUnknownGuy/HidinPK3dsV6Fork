@@ -68,10 +68,6 @@ public class LegalLearnsetAggregator
         }
     }
 
-    /// <summary>
-    /// Injects TM move IDs into all species' legal move pools using the provided TM move list.
-    /// Call this after the TM randomizer has finalized TM assignments.
-    /// </summary>
     public void InjectTMMoves(ushort[] tmMoveIDs)
     {
         if (tmMoveIDs == null || Config?.Personal == null) return;
@@ -91,15 +87,10 @@ public class LegalLearnsetAggregator
         }
     }
 
-    /// <summary>The eight fixed Gen 7 special tutors, in TutorFlags bit order 0-7 (as PersonalEditor7).</summary>
     private static readonly ushort[] SpecialTutors7 = [520, 519, 518, 338, 307, 308, 434, 620];
 
-    /// <summary>First TutorFlags bit of the beach-tutor lists: word 0x29, the base the tutor ASM expects.</summary>
     private const int BeachTutorFirstBit = 32;
 
-    /// <summary>
-    /// Injects tutor move IDs into all species' legal move pools.
-    /// </summary>
     public void InjectTutorMoves(ushort[][] tutorMoveLists)
     {
         if (tutorMoveLists == null || Config?.Personal == null) return;
@@ -162,17 +153,11 @@ public class LegalLearnsetAggregator
         }
     }
 
-    /// <summary>
-    /// Returns the complete set of legal move IDs for a given species.
-    /// </summary>
     public HashSet<int> GetLegalMoves(int species)
     {
         return LegalMovePools.TryGetValue(species, out var set) ? set : new HashSet<int>();
     }
 
-    /// <summary>
-    /// Returns the complete set of legal move names for a given species.
-    /// </summary>
     public HashSet<string> GetLegalMoveNames(int species)
     {
         var ids = GetLegalMoves(species);
@@ -190,17 +175,11 @@ public class LegalLearnsetAggregator
         return names;
     }
 
-    /// <summary>
-    /// Checks if a species legally learns a specific move by ID.
-    /// </summary>
     public bool LearnsMove(int species, int moveId)
     {
         return LegalMovePools.TryGetValue(species, out var set) && set.Contains(moveId);
     }
 
-    /// <summary>
-    /// Checks if a species learns any move from the given name set.
-    /// </summary>
     public bool LearnsAnyOf(int species, HashSet<string> moveNames)
     {
         if (moveNames == null || moveNames.Count == 0) return false;
@@ -208,9 +187,6 @@ public class LegalLearnsetAggregator
         return legalNames.Overlaps(moveNames);
     }
 
-    /// <summary>
-    /// Counts how many moves from the given category set the species can learn.
-    /// </summary>
     public int CountMovesInCategory(int species, HashSet<string> categoryNames)
     {
         if (categoryNames == null || categoryNames.Count == 0) return 0;
@@ -218,9 +194,6 @@ public class LegalLearnsetAggregator
         return legalNames.Count(n => categoryNames.Contains(n));
     }
 
-    /// <summary>
-    /// Counts how many moves from the given category set are also STAB for the given types.
-    /// </summary>
     public int CountSTABMovesInCategory(int species, HashSet<string> categoryNames, int[] types)
     {
         if (categoryNames == null || types == null) return 0;
@@ -241,10 +214,6 @@ public class LegalLearnsetAggregator
         return count;
     }
 
-    /// <summary>
-    /// Resolves a move name to its ID using cached names.
-    /// Returns -1 if not found.
-    /// </summary>
     public int GetMoveId(string moveName)
     {
         if (CachedMoveNames == null || string.IsNullOrEmpty(moveName)) return -1;
@@ -256,9 +225,6 @@ public class LegalLearnsetAggregator
         return -1;
     }
 
-    /// <summary>
-    /// Checks if a species is the final stage of its evolutionary line.
-    /// </summary>
     public bool IsFinalStage(int species)
     {
         if (Config?.Evolutions == null || species <= 0 || species >= Config.Evolutions.Length)
@@ -268,9 +234,6 @@ public class LegalLearnsetAggregator
         return !evoSet.PossibleEvolutions.Any(e => e.Species > 0 && e.Method > 0);
     }
 
-    /// <summary>
-    /// Gets all pre-evolution species IDs for a given species (walks the evo chain backwards).
-    /// </summary>
     public List<int> GetPreEvolutions(int species)
     {
         var result = new List<int>();

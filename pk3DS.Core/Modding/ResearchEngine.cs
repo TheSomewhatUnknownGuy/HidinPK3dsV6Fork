@@ -7,15 +7,11 @@ using pk3DS.Core;
 
 namespace pk3DS.Core.Modding;
 
-/// <summary>
-/// Universal Engine for complex binary modifications (ASM patches).
-/// </summary>
 public static class ResearchEngine
 {
     private static byte[] data;
     private static string currentFile;
 
-    /// <summary>Writes a .bak copy (if one doesn't already exist) before overwriting a game file in place.</summary>
     private static void BackupThenWrite(string path, byte[] contents)
     {
         string bak = path + ".bak";
@@ -654,13 +650,6 @@ public static class ResearchEngine
         return true;
     }
 
-    /// <summary>
-    /// Raises a count limit in ARM code: every <c>CMP Rn, #oldLimit</c> becomes <c>#newLimit</c>, and
-    /// every <c>CMP Rn, #oldLimit-1</c> (the <c>&lt;=</c> form of the same check) becomes <c>#newLimit-1</c>.
-    /// It used to rewrite any CMP from oldLimit-20 up to 2000 and mis-encode limits above 255, so
-    /// raising the tutor count 67 -> 127 also moved unrelated item and price bounds in Shop.cro.
-    /// Returns how many instructions changed.
-    /// </summary>
     public static int PatchLimitCheck(byte[] data, uint oldLimit, uint newLimit)
     {
         // Find every site first, then write: a value that cannot be encoded must not leave the
@@ -695,9 +684,6 @@ public static class ResearchEngine
         return GenerateHookInstruction((uint)from, (uint)to, "b");
     }
 
-    /// <summary>
-    /// Generates either a B (branch) or BL (branch-with-link) ARM instruction.
-    /// </summary>
     public static byte[] GenerateHookInstruction(uint fromAddress, uint toAddress, string type)
     {
         int diff = (int)toAddress - (int)(fromAddress + 8);
@@ -706,12 +692,6 @@ public static class ResearchEngine
         return BitConverter.GetBytes(opcode | offset24);
     }
 
-    /// <summary>
-    /// Searches for a contiguous block of zero bytes suitable for code injection.
-    /// </summary>
-    /// <summary>
-    /// Finds room for read-only DATA. Never use this for code - see <see cref="FindFreeExecutableSpace"/>.
-    /// </summary>
     public static int FindFreeSpace(byte[] data, int requiredSize, bool isCro, int alignment = 4)
     {
         int searchStart = isCro ? 0 : 0x55D000;
@@ -727,14 +707,8 @@ public static class ResearchEngine
         return -1;
     }
 
-    /// <summary>
-    /// End of code.bin's executable mapping, as a file offset.
-    /// </summary>
     public const int CodeTextRegionEnd = 0x4BA000;
 
-    /// <summary>
-    /// The largest run of padding inside .text - the only place new CODE may go in code.bin.
-    /// </summary>
     public static (int Offset, int Length) FindFreeExecutableSpace(byte[] code, int alignment = 4)
     {
         int limit = Math.Min(CodeTextRegionEnd, code?.Length ?? 0);
@@ -759,9 +733,6 @@ public static class ResearchEngine
         return bestLen > 0 ? (best, bestLen) : (-1, 0);
     }
 
-    /// <summary>
-    /// Converts a hex string (space/newline separated) to a byte array.
-    /// </summary>
     public static byte[] HexToBytes(string hexString)
     {
         string cleaned = hexString.Replace(" ", "").Replace("\n", "").Replace("\r", "").Replace("\t", "");
@@ -772,10 +743,6 @@ public static class ResearchEngine
         return result;
     }
 
-    /// <summary>
-    /// Assembles ARM assembly text into machine code using Keystone.
-    /// Returns null on failure.
-    /// </summary>
     public static byte[] AssembleARM(string asmText, uint baseAddress = 0)
     {
         try
@@ -785,10 +752,6 @@ public static class ResearchEngine
         catch { return null; }
     }
 
-    /// <summary>
-    /// Auto-detects whether code.bin belongs to Ultra Sun (US) or Ultra Moon (UM).
-    /// Returns "US", "UM", or "Unknown".
-    /// </summary>
     public static string DetectGameVersion(byte[] codeData)
     {
         // US and UM differ at known function offsets. The Café Relearner function is at:
@@ -816,15 +779,6 @@ public static class ResearchEngine
 
     // ─── Universal Patch System ───────────────────────────────────────
 
-    /// <summary>
-    /// Applies a universal patch to the provided file data dictionary.
-    /// </summary>
-    /// <param name="patch">The parsed universal patch.</param>
-    /// <param name="version">Game version: "US" or "UM".</param>
-    /// <param name="fileData">Dictionary of target filename → byte[] data. Modified in place.</param>
-    /// <param name="patchesDir">Path to the patches/ folder (for asm_file resolution).</param>
-    /// <param name="log">Optional logging callback.</param>
-    /// <returns>True if all patch entries applied successfully.</returns>
     public static bool ApplyUniversalPatch(
         UniversalPatch patch, 
         string version,
@@ -1041,9 +995,6 @@ public static class ResearchEngine
         return allSuccess;
     }
 
-    /// <summary>
-    /// Legacy compatibility: applies old-format CustomPatch by converting to UniversalPatch.
-    /// </summary>
     public static bool ApplyCustomPatch(byte[] codeData, CustomPatch patch)
     {
         var universal = patch.ToUniversal();
@@ -1287,10 +1238,8 @@ public static class ResearchEngine
         }
     }
 
-    /// <summary>Entries in the stock USUM tutor move table (the loop's retail `cmp #0x43`).</summary>
     public const int StockTutorCount = 67;
 
-    /// <summary>Tutor flags live in three 32-bit personal blocks (0x29-0x2B), so 96 is the most the checks can index.</summary>
     public const int MaxTutorMoves = 96;
 
     private const uint TutorTableMagic = 0x52545554; // "TUTR", written just before a relocated table
@@ -1579,9 +1528,6 @@ public static class ResearchEngine
         };
     }
 
-    /// <summary>
-    /// Checks dynamically whether a target file (code.bin, Battle.cro, etc.) is already expanded by the Pokemon+ Expansion Mod.
-    /// </summary>
     public static bool IsFileExpanded(string filename, byte[] fileData)
     {
         if (fileData == null || fileData.Length == 0) return false;

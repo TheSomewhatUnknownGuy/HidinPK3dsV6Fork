@@ -29,10 +29,6 @@ namespace pk3DS.Core.CTR
 
     public static class CodeBinDecompiler
     {
-        /// <summary>
-        /// Decompiles code.bin binary into a structured DecompiledCodeBin model.
-        /// Decompresses LZSS if compressed, and identifies virtual addresses.
-        /// </summary>
         public static DecompiledCodeBin Decompile(byte[] data, string filePath = null)
         {
             var codeBin = new DecompiledCodeBin

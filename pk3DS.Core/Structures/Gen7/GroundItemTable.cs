@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 namespace pk3DS.Core.Structures
 {
-    /// <summary>
-    /// Represents an overworld ground item entity (pickable Poké Ball) in Pokémon Generation 7 (USUM/SM).
-    /// Ground items require synchronous representation in both ED.EI (interaction/item) and ED.ES (visual model).
-    /// </summary>
     public class GroundItemEntry
     {
         public const int EI_RECORD_SIZE = 64;
@@ -125,10 +121,6 @@ namespace pk3DS.Core.Structures
         }
     }
 
-    /// <summary>
-    /// Dual-file manager for Gen 7 Overworld Ground Items, synchronizing ED.EI (interaction) and ED.ES (visuals).
-    /// Handles record insertion, coordinate synchronization, and collision/secondary block pointer recalculation.
-    /// </summary>
     public class GroundItemTable
     {
         public List<GroundItemEntry> Items { get; } = new List<GroundItemEntry>();
@@ -194,27 +186,17 @@ namespace pk3DS.Core.Structures
             }
         }
 
-        /// <summary>
-        /// Appends a new ground item Poké Ball and updates internal structures.
-        /// </summary>
         public void AddItem(GroundItemEntry item)
         {
             Items.Add(item);
         }
 
-        /// <summary>
-        /// Removes a ground item at the given index.
-        /// </summary>
         public void RemoveItem(int index)
         {
             if (index >= 0 && index < Items.Count)
                 Items.RemoveAt(index);
         }
 
-        /// <summary>
-        /// Assembles and serializes the complete, valid binary byte array for ED.EI (interaction).
-        /// Recalculates all collision block offsets.
-        /// </summary>
         public byte[] WriteEI()
         {
             uint count = (uint)Items.Count;
@@ -237,10 +219,6 @@ namespace pk3DS.Core.Structures
             return outData;
         }
 
-        /// <summary>
-        /// Synchronizes and serializes the complete, valid binary byte array for ED.ES (visuals).
-        /// Preserves non-item visual models, appends secondary blocks, and shifts all pointer offsets.
-        /// </summary>
         public byte[] WriteES()
         {
             if (RawEsData.Length < 4)

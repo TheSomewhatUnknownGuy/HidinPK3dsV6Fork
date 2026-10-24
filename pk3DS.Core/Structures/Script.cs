@@ -37,13 +37,6 @@ public class Script
     public uint OverlaysStart => BitConverter.ToUInt32(Raw, 0x34);
     public uint SymbolNamesStart => BitConverter.ToUInt32(Raw, 0x38);
 
-    /// <summary>
-    /// One 32-bit name-hash per native-function slot this script references, in table order - slot
-    /// index N is exactly the "N" a decoded SYSREQ.N/DoCommand? call's first argument names. Resolve
-    /// a slot's real name with <see cref="AmxNatives.Resolve"/>. Empty if the header region doesn't
-    /// look like a valid table (defensive: this region is read directly from file offsets that were
-    /// never exercised by this codebase before, on ROM builds this session did not all check).
-    /// </summary>
     public uint[] NativeFunctionHashes
     {
         get
@@ -93,24 +86,6 @@ public class Script
             throw new ArgumentException("Multi-environment script!?");
     }
 
-    /// <summary>
-    /// Recompresses (possibly edited) instructions back into <see cref="Raw"/> and returns it.
-    /// <para>
-    /// Pass the full, in-order instruction stream - <see cref="ScriptCommands"/> followed by
-    /// <see cref="MoveCommands"/>, exactly like <see cref="DecompressedInstructions"/> already
-    /// returns them - with whichever individual values were edited (e.g. via
-    /// <see cref="ScriptEditing.SetArgValue"/>). Omit it to just re-derive <see cref="Raw"/> from
-    /// the current, unedited data (a no-op check that the round trip still holds).
-    /// </para>
-    /// <para>
-    /// Only the compressed instruction bytes and the file's own total <c>Length</c> header field
-    /// change - everything before <see cref="ScriptInstructionStart"/> (magic, pointer table, the
-    /// <see cref="FinalOffset"/>/<see cref="AllocatedMemory"/> fields) is copied through unchanged,
-    /// since editing an existing argument's value never changes the instruction COUNT (only
-    /// possibly how many bytes the variable-length compression needs to represent it) -
-    /// <see cref="FinalOffset"/> derives from decompressed length, which is fixed either way.
-    /// </para>
-    /// </summary>
     public byte[] Write(uint[] editedInstructions = null)
     {
         uint[] instructions = editedInstructions ?? DecompressedInstructions;
@@ -125,18 +100,6 @@ public class Script
         return Raw;
     }
 
-    /// <summary>
-    /// Writes back a SCRIPT COMMANDS array whose word count differs from the current one (e.g. after
-    /// inserting new instructions with <see cref="Modding.Research.GiftItemInserter"/>) - unlike
-    /// <see cref="Write"/>, which only ever re-derives <see cref="Raw"/> from a same-length edit, an
-    /// insertion also moves where movement commands start and how much decompressed space the whole
-    /// script actually uses, so <see cref="ScriptMovementStart"/>/<see cref="FinalOffset"/> need
-    /// updating too - confirmed empirically that every real script in this ROM reserves exactly 4096
-    /// bytes of headroom past its own <see cref="FinalOffset"/> (<see cref="AllocatedMemory"/> is
-    /// always <c>FinalOffset + 0x1000</c>), so a modest insertion has real room without needing to
-    /// grow the reservation itself - but this refuses rather than silently overrunning it if a
-    /// particular edit ever doesn't fit.
-    /// </summary>
     public bool TryWriteResizedScriptCommands(uint[] newScriptCommands, out string error)
     {
         error = "";

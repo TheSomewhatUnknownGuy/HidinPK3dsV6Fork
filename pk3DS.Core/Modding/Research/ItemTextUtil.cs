@@ -7,14 +7,8 @@ using System.Text;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Text formatting utilities for item names, plurals, and descriptions.
-/// </summary>
 public static class ItemTextUtil
 {
-    /// <summary>
-    /// Computes the English plural form of an item name.
-    /// </summary>
     public static string Pluralize(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return name ?? "";
@@ -56,10 +50,6 @@ public static class ItemTextUtil
         return trimmed + "s";
     }
 
-    /// <summary>
-    /// Computes the branched plural format for Gen 7 / USUM 042 - Item Names Plural Alt.
-    /// Format: (Item Name)[VAR NUMBRNCH(00FE,0100)]s
-    /// </summary>
     public static string PluralAlt(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return name ?? "";
@@ -68,10 +58,6 @@ public static class ItemTextUtil
         return $"{trimmed}[VAR NUMBRNCH(00FE,0100)]s";
     }
 
-    /// <summary>
-    /// Normalizes item description line-breaks to the canonical format expected by pk3DS ("\n" escape)
-    /// and word-wraps unformatted single-line descriptions to fit the 3DS bag screen (~38-42 chars/line, 2-3 lines).
-    /// </summary>
     public static string FormatDescription(string? text, int maxLineLength = 40)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";

@@ -4,9 +4,6 @@ using System.Linq;
 
 namespace pk3DS.Core.Randomizers;
 
-/// <summary>
-/// The 18x18 attack/defence multiplier grid, as it is stored inside code.bin.
-/// </summary>
 public sealed class TypeEffectivenessTable
 {
     public const int TypeCount = 18;
@@ -16,12 +13,8 @@ public sealed class TypeEffectivenessTable
     public const byte Neutral = 4;
     public const byte SuperEffective = 8;
 
-    /// <summary>Every value the game recognises, in ascending multiplier order.</summary>
     public static readonly byte[] AllValues = [Immune, NotVeryEffective, Neutral, SuperEffective];
 
-    /// <summary>
-    /// Bytes immediately preceding the chart in code.bin.
-    /// </summary>
     public static readonly byte[] Signature =
     [
         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
@@ -42,7 +35,6 @@ public sealed class TypeEffectivenessTable
 
     public TypeEffectivenessTable Clone() => new((byte[])Chart.Clone());
 
-    /// <summary>A grid that is neutral everywhere, the starting point for a full re-roll.</summary>
     public static TypeEffectivenessTable Neutral18()
     {
         var chart = new byte[TypeCount * TypeCount];
@@ -50,7 +42,6 @@ public sealed class TypeEffectivenessTable
         return new TypeEffectivenessTable(chart);
     }
 
-    /// <summary>Where the chart begins, or -1 when the signature is not present.</summary>
     public static int Locate(byte[] code)
     {
         if (code == null || code.Length < 0x400000 + Signature.Length) return -1;
@@ -69,7 +60,6 @@ public sealed class TypeEffectivenessTable
 
     public void WriteTo(byte[] code, int offset) => Chart.CopyTo(code, offset);
 
-    /// <summary>Defender types this attacker hits for <paramref name="value"/>.</summary>
     public int CountWhenAttacking(int attacker, byte value)
     {
         int n = 0;
@@ -78,7 +68,6 @@ public sealed class TypeEffectivenessTable
         return n;
     }
 
-    /// <summary>Attacker types that hit this defender for <paramref name="value"/>.</summary>
     public int CountWhenDefending(int defender, byte value)
     {
         int n = 0;
@@ -87,10 +76,8 @@ public sealed class TypeEffectivenessTable
         return n;
     }
 
-    /// <summary>Total cells holding <paramref name="value"/>.</summary>
     public int Count(byte value) => Chart.Count(b => b == value);
 
-    /// <summary>Anything the game would not recognise, for a sanity check after a rewrite.</summary>
     public IReadOnlyList<string> Validate()
     {
         var problems = new List<string>();
@@ -103,28 +90,18 @@ public sealed class TypeEffectivenessTable
     }
 }
 
-/// <summary>
-/// Rewrites the type chart, ported from the Universal Pokemon Randomizer FVX.
-/// </summary>
 public static class TypeEffectivenessRandomizer
 {
-    /// <summary>Modes offered on the Type Effectiveness group, in UI order.</summary>
     public const int Unchanged = 0;
     public const int Random = 1;
     public const int RandomBalanced = 2;
     public const int KeepTypeIdentities = 3;
     public const int Inverse = 4;
 
-    /// <summary>Placement attempts before Random gives up, matching FVX's budget.</summary>
     private const int MaxPlacementTries = 10000;
 
-    /// <summary>Successful column swaps Keep Type Identities performs, matching FVX's budget.</summary>
     private const int KeepIdentitySwaps = 10000;
 
-    /// <summary>
-    /// Values re-placed by <see cref="Random"/>. Neutral is what every unplaced cell already is, so
-    /// placing it too would be a no-op that only slows the search down.
-    /// </summary>
     private static readonly byte[] Placed =
     [
         TypeEffectivenessTable.Immune,
@@ -132,14 +109,6 @@ public static class TypeEffectivenessRandomizer
         TypeEffectivenessTable.SuperEffective,
     ];
 
-    /// <summary>
-    /// Applies <paramref name="mode"/> to <paramref name="original"/> and returns the new chart.
-    /// </summary>
-    /// <param name="addRandomImmunities">
-    /// Inverse only: turn as many of the newly-resisted matchups into outright immunities as the
-    /// original chart had, so inverting does not simply delete every immunity from the game.
-    /// </param>
-    /// <param name="log">Receives one line describing what happened, including any shortfall.</param>
     public static TypeEffectivenessTable Apply(TypeEffectivenessTable original, int mode,
                                                bool addRandomImmunities, List<string> log)
     {
@@ -153,9 +122,6 @@ public static class TypeEffectivenessRandomizer
         };
     }
 
-    /// <summary>
-    /// Scatters the original chart's non-neutral cells over a blank grid.
-    /// </summary>
     private static TypeEffectivenessTable Reroll(TypeEffectivenessTable original, bool balanced, List<string> log)
     {
         var table = TypeEffectivenessTable.Neutral18();
@@ -208,9 +174,6 @@ public static class TypeEffectivenessRandomizer
         return table;
     }
 
-    /// <summary>
-    /// Shuffles the chart without changing any single type's defensive profile.
-    /// </summary>
     private static TypeEffectivenessTable KeepIdentities(TypeEffectivenessTable original, List<string> log)
     {
         var table = original.Clone();
@@ -256,9 +219,6 @@ public static class TypeEffectivenessRandomizer
         return true;
     }
 
-    /// <summary>
-    /// Turns resists into weaknesses and weaknesses into resists.
-    /// </summary>
     private static TypeEffectivenessTable Invert(TypeEffectivenessTable original, bool addRandomImmunities, List<string> log)
     {
         var table = original.Clone();

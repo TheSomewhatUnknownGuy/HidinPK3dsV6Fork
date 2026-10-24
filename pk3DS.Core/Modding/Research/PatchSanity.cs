@@ -6,15 +6,10 @@ using System.Linq;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>One thing wrong with a set of writes, found before any of them are made.</summary>
 public sealed record SanityFinding(bool Fatal, string Message);
 
-/// <summary>
-/// Reads a pending set of writes as ARM code and asks whether it hangs together.
-/// </summary>
 public static class PatchSanity
 {
-    /// <summary>An unconditional or linked branch, and where it goes.</summary>
     private static bool IsBranch(uint word, uint at, out long target)
     {
         target = 0;
@@ -25,12 +20,6 @@ public static class PatchSanity
         return true;
     }
 
-    /// <summary>
-    /// Checks a set of writes against the binary they are about to be applied to.
-    /// </summary>
-    /// <param name="binary">The file as it stands now.</param>
-    /// <param name="writes">Offset/bytes pairs the patch will apply.</param>
-    /// <param name="label">Name used in the messages.</param>
     public static List<SanityFinding> Check(byte[] binary, IReadOnlyList<(uint Offset, byte[] Bytes)> writes, string label)
     {
         var findings = new List<SanityFinding>();

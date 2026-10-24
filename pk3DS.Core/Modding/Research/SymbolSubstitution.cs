@@ -7,17 +7,10 @@ using System.Text.RegularExpressions;
 
 namespace pk3DS.Core.Modding.Research;
 
-/// <summary>
-/// Resolves named references in assembly to concrete addresses, just before it is assembled.
-/// </summary>
 public static class SymbolSubstitution
 {
     private static readonly Regex Token = new(@"\{(sym|off):([^}]+)\}", RegexOptions.Compiled);
 
-    /// <summary>
-    /// Offsets that come from the record layouts this program already models, so they need no
-    /// research lookup and cannot drift without the structures changing too.
-    /// </summary>
     public static readonly Dictionary<string, uint> KnownOffsets = new(StringComparer.OrdinalIgnoreCase)
     {
         // Move record (Move7, 0x28 bytes/entry) - see pk3DS.Core/Structures/Moves/Move7.cs
@@ -41,7 +34,6 @@ public static class SymbolSubstitution
         ["item.heldargument"] = 0x01,
     };
 
-    /// <summary>Outcome of a substitution pass.</summary>
     public sealed class Result
     {
         public string Text { get; init; } = "";
@@ -50,21 +42,9 @@ public static class SymbolSubstitution
         public bool Success => Errors.Count == 0;
     }
 
-    /// <summary>
-    /// Replaces every <c>{sym:...}</c> and <c>{off:...}</c> token in <paramref name="assembly"/>.
-    /// </summary>
-    /// <param name="assembly">Assembly text, possibly containing tokens.</param>
-    /// <param name="symbols">Symbol table for the target binary, or null when unavailable.</param>
     public static Result Apply(string assembly, ArmSymbolTable? symbols) =>
         Apply(assembly, symbols, null, null);
 
-    /// <summary>
-    /// As above, but also checks each resolved address actually lands on code in
-    /// <paramref name="binary"/>.
-    /// </summary>
-    /// <summary>
-    /// Reference binary the corpus was written against, when one is available.
-    /// </summary>
     public static byte[]? ReferenceBinary { get; set; }
 
     public static Result Apply(string assembly, ArmSymbolTable? symbols, byte[]? binary, string? version)
@@ -144,6 +124,5 @@ public static class SymbolSubstitution
         return r;
     }
 
-    /// <summary>True when the text still holds unresolved tokens.</summary>
     public static bool HasTokens(string assembly) => Token.IsMatch(assembly ?? "");
 }
