@@ -54,8 +54,8 @@ public class PersonalInfoSM : PersonalInfoXY
             int hi3 = Data[0x1F];
             int[] abilities = [
                 Data[0x18] | ((hi & 1) << 8),
-                Data[0x19] | ((hi2 >> 1 & 1) << 8),
-                Data[0x1A] | ((hi3 >> 2 & 1) << 8)
+                Data[0x19] | ((hi2 & 1) << 8),
+                Data[0x1A] | ((hi3 & 1) << 8)
             ];
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
