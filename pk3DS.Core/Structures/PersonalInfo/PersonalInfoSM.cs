@@ -50,18 +50,19 @@ public class PersonalInfoSM : PersonalInfoXY
         get
         {
             int hi = Data[0x53];
+            int hi2 = Data[0x1E];
+            int hi3 = Data[0x1F];
             int[] abilities = [
                 Data[0x18] | ((hi & 1) << 8),
-                Data[0x19] | ((hi >> 1 & 1) << 8),
-                Data[0x1A] | ((hi >> 2 & 1) << 8)
+                Data[0x19] | ((hi2 >> 1 & 1) << 8),
+                Data[0x1A] | ((hi3 >> 2 & 1) << 8)
             ];
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
-                int hi2 = Data[0x52];
-                abilities[0] |= (hi2 >> 4 & 1) << 9;
+                abilities[0] |= (hi >> 4 & 1) << 9;
                 abilities[1] |= (hi2 >> 5 & 1) << 9;
-                abilities[2] |= (hi2 >> 6 & 1) << 9;
+                abilities[2] |= (hi3 >> 6 & 1) << 9;
             }
             return abilities;
         }
