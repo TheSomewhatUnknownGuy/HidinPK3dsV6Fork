@@ -90,7 +90,7 @@ public class PersonalInfoSM : PersonalInfoXY
             Data[0x1A] = (byte)(value[2] & 0xFF);
     
             //clear the 3 bits from old version
-            Data[0x52] = Data[0x52] & 0x1 
+            Data[0x52] = Data[0x52] & 0x1; 
 
             // Vacate the pre-fix location so entries written by the 0x52-packing builds stop
             // reporting ids 0x100 too low. Bit 0 is LocalVariant and must survive.
@@ -99,9 +99,9 @@ public class PersonalInfoSM : PersonalInfoXY
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
             //sets high bytes?
-                Data[0x53] = (byte)(value[0] >> 8)
-                Data[0x1E] = (byte)(value[1] >> 8)
-                Data[0x1F] = (byte)(value[2] >> 8)
+                Data[0x53] = (byte)(value[0] >> 8);
+                Data[0x1E] = (byte)(value[1] >> 8);
+                Data[0x1F] = (byte)(value[2] >> 8);
             }
         }
     }
