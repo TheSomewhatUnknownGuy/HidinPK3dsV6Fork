@@ -53,41 +53,57 @@ public class PersonalInfoSM : PersonalInfoXY
             int hi2 = Data[0x1E];
             int hi3 = Data[0x1F];
             int[] abilities = [
-                Data[0x18] | ((hi & 1) << 8),
-                Data[0x19] | ((hi2 & 1) << 8),
-                Data[0x1A] | ((hi3 & 1) << 8)
+                Data[0x18] | (hi << 8),
+                Data[0x19] | (hi2 << 8),
+                Data[0x1A] | (hi3 << 8)
             ];
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
+                if(Data[0x52] & 0xE == 0)
+                    {
+                        Data[0x18] | (hi << 8);
+                        Data[0x19] | (hi2 << 8);
+                        Data[0x1A] | (hi3 << 8);
+                    }
+    
+                    //use new version
+                else
+                    {
+                        Data[0x18] | ((Data[0x52] >> 1 & 1) << 8);
+                        Data[0x19] | ((Data[0x52] >> 2 & 1) << 8);
+                        Data[0x1A] | ((Data[0x52] >> 3 & 1) << 8);
+                    }
                 abilities[0] |= (hi >> 4 & 1) << 9;
-                abilities[1] |= (hi2 >> 5 & 1) << 9;
-                abilities[2] |= (hi3 >> 6 & 1) << 9;
+                abilities[1] |= (hi2 >> 4 & 1) << 9;
+                abilities[2] |= (hi3 >> 4 & 1) << 9;
             }
             return abilities;
         }
         set
         {
             if (value?.Length != 3) return;
+            
+            //set low bytes
             Data[0x18] = (byte)(value[0] & 0xFF);
             Data[0x19] = (byte)(value[1] & 0xFF);
             Data[0x1A] = (byte)(value[2] & 0xFF);
+    
+            //Set high bytes
 
-            Data[0x53] = (byte)((Data[0x53] & ~0x07)
-                | (((value[0] >> 8) & 1) << 0)
-                | (((value[1] >> 8) & 1) << 1)
-                | (((value[2] >> 8) & 1) << 2));
+    
+            //clear the 3 bits from old version
+            Data[0x52] = Data[0x52] & 0x1 
 
             // Vacate the pre-fix location so entries written by the 0x52-packing builds stop
             // reporting ids 0x100 too low. Bit 0 is LocalVariant and must survive.
-            Data[0x52] &= unchecked((byte)~0x0E);
+            //Data[0x52] &= unchecked((byte)~0x0E);
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
-                Data[0x52] = (byte)((Data[0x52] & ~0x70)
-                    | (((value[0] >> 9) & 1) << 4)
-                    | (((value[1] >> 9) & 1) << 5)
-                    | (((value[2] >> 9) & 1) << 6));
+                Data[0x53] = (byte)(value[0] >> 8)
+                Data[0x1E] = (byte)(value[1] >> 8)
+                Data[0x1F] = (byte)(value[2] >> 8)
             }
         }
     }
