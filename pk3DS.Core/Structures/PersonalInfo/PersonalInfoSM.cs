@@ -89,9 +89,6 @@ public class PersonalInfoSM : PersonalInfoXY
             Data[0x19] = (byte)(value[1] & 0xFF);
             Data[0x1A] = (byte)(value[2] & 0xFF);
     
-            //Set high bytes
-
-    
             //clear the 3 bits from old version
             Data[0x52] = Data[0x52] & 0x1 
 
@@ -101,6 +98,7 @@ public class PersonalInfoSM : PersonalInfoXY
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
+            //sets high bytes?
                 Data[0x53] = (byte)(value[0] >> 8)
                 Data[0x1E] = (byte)(value[1] >> 8)
                 Data[0x1F] = (byte)(value[2] >> 8)
