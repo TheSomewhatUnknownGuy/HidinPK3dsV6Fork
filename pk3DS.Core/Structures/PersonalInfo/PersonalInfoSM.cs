@@ -62,17 +62,17 @@ public class PersonalInfoSM : PersonalInfoXY
             {
                 if((byte)(Data[0x52] & 0xE) == (byte)(0))
                     {
-                        Data[0x18] | (hi << 8);
-                        Data[0x19] | (hi2 << 8);
-                        Data[0x1A] | (hi3 << 8);
+                        abilities[0] = Data[0x18] | (hi << 8);
+                        abilities[1] = Data[0x19] | (hi2 << 8);
+                        abilities[2] = Data[0x1A] | (hi3 << 8);
                     }
     
                     //use new version
                 else
                     {
-                        Data[0x18] | ((Data[0x52] >> 1 & 1) << 8);
-                        Data[0x19] | ((Data[0x52] >> 2 & 1) << 8);
-                        Data[0x1A] | ((Data[0x52] >> 3 & 1) << 8);
+                        abilities[0] = Data[0x18] | ((Data[0x52] >> 1 & 1) << 8);
+                        abilities[1] = Data[0x19] | ((Data[0x52] >> 2 & 1) << 8);
+                        abilities[2] = Data[0x1A] | ((Data[0x52] >> 3 & 1) << 8);
                     }
                 abilities[0] |= (hi >> 4 & 1) << 9;
                 abilities[1] |= (hi2 >> 4 & 1) << 9;
