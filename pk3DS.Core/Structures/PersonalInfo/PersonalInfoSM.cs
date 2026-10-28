@@ -47,36 +47,34 @@ public class PersonalInfoSM : PersonalInfoXY
     // 0x1E/0x1F cannot host ability high bytes: that is FormeSprite (PersonalInfoXY.cs:101).
     public override int[] Abilities
     {
-        get
+         get
         {
-            int hi = Data[0x53];
-            int hi2 = Data[0x1E];
-            int hi3 = Data[0x1F];
             int[] abilities = [
-                Data[0x18] | (hi << 8),
-                Data[0x19] | (hi2 << 8),
-                Data[0x1A] | (hi3 << 8)
+                Data[0x18] | (Data[0x53] << 8),
+                Data[0x19] | (Data[0x1E] << 8),
+                Data[0x1A] | (Data[0x1F] << 8)
             ];
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
                 if((byte)(Data[0x52] & 0xE) == (byte)(0))
                     {
-                        abilities[0] = Data[0x18] | (hi << 8);
-                        abilities[1] = Data[0x19] | (hi2 << 8);
-                        abilities[2] = Data[0x1A] | (hi3 << 8);
+                        abilities[0] = (Data[0x18] | (Data[0x53] << 8));
+                        abilities[1] = (Data[0x19] | (Data[0x1E] << 8));
+                        abilities[2] = (Data[0x1A] | (Data[0x1F] << 8));
                     }
     
                     //use new version
                 else
                     {
-                        abilities[0] = Data[0x18] | ((Data[0x52] >> 1 & 1) << 8);
-                        abilities[1] = Data[0x19] | ((Data[0x52] >> 2 & 1) << 8);
-                        abilities[2] = Data[0x1A] | ((Data[0x52] >> 3 & 1) << 8);
+                        abilities[0] = (Data[0x18] | ((Data[0x52] >> 1 & 1) << 8));
+                        abilities[1] = (Data[0x19] | ((Data[0x52] >> 2 & 1) << 8));
+                        abilities[2] = (Data[0x1A] | ((Data[0x52] >> 3 & 1) << 8));
+                        abilities[0] |= (Data[0x53]>> 4 & 1) << 8;
+                        abilities[1] |= (Data[0x1E] >> 4 & 1) << 8;
+                        abilities[2] |= (Data[0x1F] >> 4 & 1) << 8;
                     }
-                abilities[0] |= (hi >> 4 & 1) << 9;
-                abilities[1] |= (hi2 >> 4 & 1) << 9;
-                abilities[2] |= (hi3 >> 4 & 1) << 9;
+               
             }
             return abilities;
         }
@@ -94,7 +92,7 @@ public class PersonalInfoSM : PersonalInfoXY
 
             // Vacate the pre-fix location so entries written by the 0x52-packing builds stop
             // reporting ids 0x100 too low. Bit 0 is LocalVariant and must survive.
-            //Data[0x52] &= unchecked((byte)~0x0E);
+            Data[0x52] &= unchecked((byte)~0x0E);
 
             if (GameConfig.ExpandedAbilities && !pk3DS.Core.Modding.PassiveGuard.Enabled)  // passives own 0x52 bits 4-6 then
             {
